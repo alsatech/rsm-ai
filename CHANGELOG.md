@@ -6,7 +6,7 @@
 ## Unreleased
 
 ### En desarrollo
-- Setup inicial del proyecto (Django + React + Vite)
+- Módulo 2 — Hidráulica y pluviómetros
 
 ---
 
@@ -17,7 +17,15 @@ _Se registran aquí al completar cada módulo._
 ---
 
 ### v0.1.0 — Login y roles
-> Pendiente
+- Setup del proyecto Django (`config`) + app `apps/users`
+- Modelo `User` extendido con campo `rol` (campo/inventario/operaciones/administrador/superadmin)
+- Autenticación JWT (djangorestframework-simplejwt): `POST /api/v1/auth/login/`, `POST /api/v1/auth/refresh/`, `GET /api/v1/auth/me/`
+- Login regresa `access`, `refresh`, `nombre` y `rol`
+- Permisos custom por rol en `apps/users/permissions.py`
+- Tests de modelo y de endpoints de autenticación
+- Frontend React + Vite + Tailwind con dark theme RSM (paleta y fuentes definidas en AGENTS.md)
+- Pantalla de Login, hook `useAuth` con refresh automático y logout si falla
+- Dashboard con los 12 módulos como cards, visibles según rol (elementos sin acceso completamente ocultos)
 
 ### v0.2.0 — Hidráulica y pluviómetros
 > Pendiente

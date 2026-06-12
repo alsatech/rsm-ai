@@ -1,0 +1,89 @@
+// Catálogo de módulos del sistema RSM y los roles que pueden verlos.
+// Roles disponibles: campo | inventario | operaciones | administrador | superadmin
+
+export const MODULOS = [
+  {
+    id: 'hidraulica',
+    nombre: 'Hidráulica y Pluviómetros',
+    descripcion: 'Mediciones de pilas, fluxómetros, manómetros y bebederos',
+    icono: '💧',
+    roles: ['campo', 'administrador', 'superadmin'],
+  },
+  {
+    id: 'pendientes',
+    nombre: 'Pendientes',
+    descripcion: 'Seguimiento de pendientes y tareas marcadas en la junta diaria',
+    icono: '📋',
+    roles: ['administrador', 'superadmin'],
+  },
+  {
+    id: 'ganado',
+    nombre: 'Ganado — Recorridos',
+    descripcion: 'Recorridos y monitoreo del ganado en mapa',
+    icono: '🐄',
+    roles: ['campo', 'administrador', 'superadmin'],
+  },
+  {
+    id: 'flota',
+    nombre: 'Flota Vehicular',
+    descripcion: 'Checklist de salida/llegada y mantenimiento de vehículos',
+    icono: '🚚',
+    roles: ['campo', 'operaciones', 'administrador', 'superadmin'],
+  },
+  {
+    id: 'inventario',
+    nombre: 'Inventarios',
+    descripcion: 'Control de materiales, alimento, herramienta y auditoría',
+    icono: '📦',
+    roles: ['inventario', 'administrador', 'superadmin'],
+  },
+  {
+    id: 'arete',
+    nombre: 'Registro de Ganado (Arete)',
+    descripcion: 'Catálogo de animales por arete SINIIGA',
+    icono: '🏷️',
+    roles: ['administrador', 'superadmin'],
+  },
+  {
+    id: 'sanidad',
+    nombre: 'Sanidad Animal',
+    descripcion: 'Vacunación, desparasitación, tratamientos y pesajes',
+    icono: '🩺',
+    roles: ['administrador', 'superadmin'],
+  },
+  {
+    id: 'personal',
+    nombre: 'Personal',
+    descripcion: 'Nómina y préstamos de trabajadores',
+    icono: '👤',
+    roles: ['superadmin'],
+  },
+  {
+    id: 'minuta',
+    nombre: 'Minuta Automática',
+    descripcion: 'Generación de la minuta diaria con un clic',
+    icono: '📝',
+    roles: ['administrador', 'superadmin'],
+  },
+  {
+    id: 'facturacion',
+    nombre: 'Facturación',
+    descripcion: 'Facturas, comprobantes de gasto y concentrado mensual',
+    icono: '🧾',
+    roles: ['administrador', 'superadmin'],
+  },
+  {
+    id: 'proyectos',
+    nombre: 'Proyectos',
+    descripcion: 'Gestión de proyectos, materiales, avances y contratistas',
+    icono: '🏗️',
+    roles: ['operaciones', 'administrador', 'superadmin'],
+  },
+  {
+    id: 'compras',
+    nombre: 'Compras',
+    descripcion: 'Cotizaciones y compras a proveedores',
+    icono: '🛒',
+    roles: ['operaciones', 'administrador', 'superadmin'],
+  },
+]
