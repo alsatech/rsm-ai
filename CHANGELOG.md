@@ -37,6 +37,15 @@ _Se registran aquí al completar cada módulo._
 - Frontend: página `/hidraulica` con formulario mobile-first (dropdown de punto, toggle de estado, campos condicionales para pluviómetros, foto opcional) y tabla de registros del día con botón "Validar" para `administrador`/`superadmin`
 - Ruta protegida por rol (`ProtectedRoute` con prop `roles`) y enlace desde el Dashboard
 
+### v0.2.1 — Generadores: checklist diario y alertas de mantenimiento (ajuste Módulo 2)
+- Modelos `Generador` (Chapote, Rancho, Margaritas — horas de operación), `ChecklistGenerador` (revisión diaria: aceite, refrigerante, filtro de aire, fugas) y `AlertaMantenimientoGenerador` (intervalos de servicio en horas/meses)
+- Data migration precarga los 3 generadores con sus intervalos de mantenimiento reales (Wacker Neuson G25, Cummins 225, Detroit Diesel 3-71)
+- Endpoints: `GET /api/v1/hidraulica/generadores/`, `PATCH /api/v1/hidraulica/generadores/{id}/` (horas, solo `administrador`/`superadmin`), `GET/POST /api/v1/hidraulica/generadores/{id}/checklist/`
+- `campo` registra la revisión diaria y ve su propio historial; `administrador`/`superadmin` ven el historial completo y las alertas de mantenimiento pendientes
+- Tarea Celery `revisar_alertas_generadores` (diaria, 6:00 am vía `CELERY_BEAT_SCHEDULE`): compara horas de operación contra los intervalos y notifica (consola) el servicio requerido
+- Tests de modelo y endpoints (checklist completo/incompleto, alerta por horas, permisos de actualización de horas)
+- Frontend: sección "Generadores" en `/hidraulica` con tarjetas por generador (horas actuales, botón "Hacer revisión diaria", checklist con 4 verificaciones + observaciones, historial del día), campo de actualización de horas para `administrador`/`superadmin` y alertas de mantenimiento destacadas en amarillo
+
 ### v0.3.0 — Pendientes rastreables
 > Pendiente
 

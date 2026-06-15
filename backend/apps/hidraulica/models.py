@@ -68,3 +68,79 @@ class RegistroHidraulico(models.Model):
             from .tasks import alerta_falla_hidraulica
 
             alerta_falla_hidraulica.delay(self.id)
+
+
+class Generador(models.Model):
+    """Generador eléctrico de la reserva — control de horas de operación."""
+
+    class Nombre(models.TextChoices):
+        CHAPOTE = 'chapote', 'Chapote'
+        RANCHO = 'rancho', 'Rancho'
+        MARGARITAS = 'margaritas', 'Margaritas'
+
+    nombre = models.CharField(max_length=20, choices=Nombre.choices, unique=True)
+    marca_modelo = models.CharField(max_length=100)
+    horas_operacion = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    ultima_actualizacion = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='generadores_actualizados',
+    )
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Generador'
+        verbose_name_plural = 'Generadores'
+
+    def __str__(self):
+        return f'{self.get_nombre_display()} ({self.marca_modelo})'
+
+
+class ChecklistGenerador(models.Model):
+    """Revisión diaria de un generador (aceite, refrigerante, filtro de aire, fugas)."""
+
+    generador = models.ForeignKey(Generador, on_delete=models.CASCADE, related_name='checklists')
+    fecha_hora = models.DateTimeField(default=timezone.now)
+
+    nivel_aceite = models.BooleanField(default=False)
+    nivel_refrigerante = models.BooleanField(default=False)
+    filtro_aire = models.BooleanField(default=False)
+    sin_fugas = models.BooleanField(default=False)
+    observaciones = models.TextField(blank=True)
+
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='checklists_generador',
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_hora']
+        verbose_name = 'Checklist de generador'
+        verbose_name_plural = 'Checklists de generadores'
+
+    def __str__(self):
+        return f'Checklist {self.generador.get_nombre_display()} — {self.fecha_hora:%Y-%m-%d %H:%M}'
+
+
+class AlertaMantenimientoGenerador(models.Model):
+    """Intervalo de mantenimiento preventivo (horas y/o meses) para un generador."""
+
+    generador = models.ForeignKey(Generador, on_delete=models.CASCADE, related_name='alertas_mantenimiento')
+    tipo_servicio = models.CharField(max_length=255)
+    horas_intervalo = models.IntegerField(null=True, blank=True)
+    meses_intervalo = models.IntegerField(null=True, blank=True)
+    ultima_alerta = models.DateTimeField(null=True, blank=True)
+    activa = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['generador', 'horas_intervalo']
+        verbose_name = 'Alerta de mantenimiento de generador'
+        verbose_name_plural = 'Alertas de mantenimiento de generadores'
+
+    def __str__(self):
+        return f'{self.generador.get_nombre_display()} — {self.tipo_servicio}'

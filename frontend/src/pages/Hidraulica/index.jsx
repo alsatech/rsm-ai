@@ -1,9 +1,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { createRegistro, getRegistros, validarRegistro } from '../../api/hidraulica'
+import {
+  actualizarHorasGenerador,
+  createRegistro,
+  getGeneradores,
+  getRegistros,
+  validarRegistro,
+} from '../../api/hidraulica'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import GeneradoresSection from './components/GeneradoresSection'
 import RegistroForm from './components/RegistroForm'
 import RegistroTable from './components/RegistroTable'
 
@@ -16,7 +23,13 @@ export default function Hidraulica() {
   const [error, setError] = useState('')
   const [guardando, setGuardando] = useState(false)
 
+  const [generadores, setGeneradores] = useState([])
+  const [loadingGeneradores, setLoadingGeneradores] = useState(true)
+  const [errorGeneradores, setErrorGeneradores] = useState('')
+
   const puedeValidar = user?.rol === 'administrador' || user?.rol === 'superadmin'
+  const puedeActualizarHorasGenerador = user?.rol === 'administrador' || user?.rol === 'superadmin'
+  const puedeVerAlertasGenerador = user?.rol === 'administrador' || user?.rol === 'superadmin'
 
   const cargarRegistros = useCallback(async () => {
     setLoading(true)
@@ -32,9 +45,23 @@ export default function Hidraulica() {
     }
   }, [])
 
+  const cargarGeneradores = useCallback(async () => {
+    setLoadingGeneradores(true)
+    setErrorGeneradores('')
+    try {
+      const { data } = await getGeneradores()
+      setGeneradores(data)
+    } catch {
+      setErrorGeneradores('No se pudieron cargar los generadores.')
+    } finally {
+      setLoadingGeneradores(false)
+    }
+  }, [])
+
   useEffect(() => {
     cargarRegistros()
-  }, [cargarRegistros])
+    cargarGeneradores()
+  }, [cargarRegistros, cargarGeneradores])
 
   const handleGuardar = async (formData) => {
     setGuardando(true)
@@ -68,6 +95,11 @@ export default function Hidraulica() {
     }
   }
 
+  const handleActualizarHorasGenerador = async (id, horasOperacion) => {
+    const { data } = await actualizarHorasGenerador(id, horasOperacion)
+    setGeneradores((prev) => prev.map((generador) => (generador.id === id ? data : generador)))
+  }
+
   return (
     <div className="min-h-svh bg-bg px-4 py-6 sm:px-8">
       <header className="mb-6">
@@ -92,6 +124,17 @@ export default function Hidraulica() {
           <RegistroTable registros={registros} puedeValidar={puedeValidar} onValidar={handleValidar} />
         )}
       </section>
+
+      {loadingGeneradores && <p className="mt-8 text-text-secondary">Cargando generadores…</p>}
+      {!loadingGeneradores && errorGeneradores && <p className="mt-8 text-error">{errorGeneradores}</p>}
+      {!loadingGeneradores && !errorGeneradores && generadores.length > 0 && (
+        <GeneradoresSection
+          generadores={generadores}
+          puedeActualizarHoras={puedeActualizarHorasGenerador}
+          puedeVerAlertas={puedeVerAlertasGenerador}
+          onActualizarHoras={handleActualizarHorasGenerador}
+        />
+      )}
     </div>
   )
 }

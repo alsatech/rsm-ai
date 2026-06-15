@@ -8,6 +8,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from celery.schedules import crontab
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -151,3 +152,11 @@ CELERY_TIMEZONE = TIME_ZONE
 # En desarrollo/tests las tareas corren de forma síncrona (sin worker ni Redis)
 CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=DEBUG)
 CELERY_TASK_EAGER_PROPAGATES = True
+
+# Tareas periódicas (Celery Beat)
+CELERY_BEAT_SCHEDULE = {
+    'revisar-alertas-generadores': {
+        'task': 'apps.hidraulica.tasks.revisar_alertas_generadores',
+        'schedule': crontab(hour=6, minute=0),
+    },
+}

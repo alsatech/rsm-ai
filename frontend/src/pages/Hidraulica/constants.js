@@ -26,3 +26,11 @@ export const ESTADO_BADGE = {
   alerta: 'border-warning text-warning',
   falla: 'border-error text-error',
 }
+
+// Checklist diario de generadores (backend: ChecklistGenerador)
+export const CHECKLIST_GENERADOR_ITEMS = [
+  { key: 'nivel_aceite', label: 'Nivel de aceite del motor verificado' },
+  { key: 'nivel_refrigerante', label: 'Nivel de refrigerante en radiador verificado' },
+  { key: 'filtro_aire', label: 'Indicador de filtro de aire inspeccionado' },
+  { key: 'sin_fugas', label: 'Sin fugas detectadas (combustible, aceite, refrigerante)' },
+]

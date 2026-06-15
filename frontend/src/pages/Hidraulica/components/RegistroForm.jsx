@@ -14,7 +14,7 @@ const ESTADO_INICIAL = {
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-text outline-none focus:border-highlight'
-const labelClass = 'mb-1 block text-sm text-text-secondary'
+const labelClass = 'mb-1 block text-sm text-[#86ef69]'
 
 export default function RegistroForm({ onGuardar, guardando }) {
   const [form, setForm] = useState(ESTADO_INICIAL)

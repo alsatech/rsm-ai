@@ -42,3 +42,47 @@ class PuedeValidarRegistroHidraulico(BasePermission):
             and request.user.is_authenticated
             and request.user.rol in ROLES_VALIDADOR
         )
+
+
+class PuedeVerGenerador(BasePermission):
+    """Permite ver generadores a 'campo', 'administrador' y 'superadmin'."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_CON_ACCESO
+        )
+
+
+class PuedeActualizarHorasGenerador(BasePermission):
+    """Permite actualizar horas_operacion solo a 'administrador' y 'superadmin'."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_VALIDADOR
+        )
+
+
+class PuedeCrearChecklistGenerador(BasePermission):
+    """Permite crear checklists de generador a 'campo', 'administrador' y 'superadmin'."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_CON_ACCESO
+        )
+
+
+class PuedeVerHistorialChecklistGenerador(BasePermission):
+    """Permite ver el historial de checklists a 'campo' (los propios), 'administrador' y 'superadmin' (todos)."""
+
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_CON_ACCESO
+        )

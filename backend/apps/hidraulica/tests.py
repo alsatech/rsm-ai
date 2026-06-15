@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -5,7 +7,8 @@ from rest_framework.test import APITestCase
 
 from apps.users.models import User
 
-from .models import RegistroHidraulico
+from .models import AlertaMantenimientoGenerador, ChecklistGenerador, Generador, RegistroHidraulico
+from .tasks import revisar_alertas_generadores
 
 
 class RegistroHidraulicoModelTest(TestCase):
@@ -149,3 +152,113 @@ class RegistroHidraulicoEndpointTest(APITestCase):
         }, format='multipart')
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+
+
+class GeneradorModelTest(TestCase):
+    def test_generadores_precargados_con_alertas(self):
+        self.assertEqual(Generador.objects.count(), 3)
+
+        chapote = Generador.objects.get(nombre=Generador.Nombre.CHAPOTE)
+        self.assertEqual(chapote.marca_modelo, 'Wacker Neuson G25 20kW')
+        self.assertEqual(chapote.horas_operacion, Decimal('0.00'))
+        self.assertEqual(chapote.alertas_mantenimiento.count(), 3)
+
+
+class GeneradorEndpointTest(APITestCase):
+    def setUp(self):
+        self.campo = User.objects.create_user(username='chino', password='clave12345', rol=User.Rol.CAMPO)
+        self.otro_campo = User.objects.create_user(username='beto', password='clave12345', rol=User.Rol.CAMPO)
+        self.administrador = User.objects.create_user(
+            username='abigail', password='clave12345', rol=User.Rol.ADMINISTRADOR
+        )
+
+        self.generador = Generador.objects.get(nombre=Generador.Nombre.CHAPOTE)
+        self.list_url = reverse('generador-list')
+        self.detail_url = reverse('generador-detail', args=[self.generador.id])
+        self.checklist_url = reverse('generador-checklist', args=[self.generador.id])
+
+    def test_checklist_completo(self):
+        self.client.force_authenticate(user=self.campo)
+
+        response = self.client.post(self.checklist_url, {
+            'nivel_aceite': True,
+            'nivel_refrigerante': True,
+            'filtro_aire': True,
+            'sin_fugas': True,
+            'observaciones': 'Todo en orden',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        registro = ChecklistGenerador.objects.get()
+        self.assertEqual(registro.generador, self.generador)
+        self.assertEqual(registro.created_by, self.campo)
+        self.assertTrue(registro.nivel_aceite)
+        self.assertTrue(registro.nivel_refrigerante)
+        self.assertTrue(registro.filtro_aire)
+        self.assertTrue(registro.sin_fugas)
+
+    def test_checklist_incompleto_guarda_igual(self):
+        self.client.force_authenticate(user=self.campo)
+
+        response = self.client.post(self.checklist_url, {
+            'nivel_aceite': True,
+            'observaciones': 'Falta revisar refrigerante y filtro de aire',
+        }, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        registro = ChecklistGenerador.objects.get()
+        self.assertTrue(registro.nivel_aceite)
+        self.assertFalse(registro.nivel_refrigerante)
+        self.assertFalse(registro.filtro_aire)
+        self.assertFalse(registro.sin_fugas)
+
+    def test_alerta_por_horas(self):
+        self.generador.horas_operacion = Decimal('260.00')
+        self.generador.save()
+        alerta = AlertaMantenimientoGenerador.objects.get(generador=self.generador, horas_intervalo=250)
+        self.assertIsNone(alerta.ultima_alerta)
+
+        revisar_alertas_generadores()
+
+        alerta.refresh_from_db()
+        self.assertIsNotNone(alerta.ultima_alerta)
+
+    def test_campo_no_actualiza_horas(self):
+        self.client.force_authenticate(user=self.campo)
+
+        response = self.client.patch(self.detail_url, {'horas_operacion': '300.00'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+        self.generador.refresh_from_db()
+        self.assertEqual(self.generador.horas_operacion, Decimal('0.00'))
+
+    def test_administrador_actualiza_horas(self):
+        self.client.force_authenticate(user=self.administrador)
+
+        response = self.client.patch(self.detail_url, {'horas_operacion': '300.50'}, format='json')
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.generador.refresh_from_db()
+        self.assertEqual(self.generador.horas_operacion, Decimal('300.50'))
+        self.assertEqual(self.generador.updated_by, self.administrador)
+
+    def test_campo_solo_ve_su_propio_historial(self):
+        ChecklistGenerador.objects.create(generador=self.generador, created_by=self.campo, nivel_aceite=True)
+        ChecklistGenerador.objects.create(generador=self.generador, created_by=self.otro_campo, nivel_aceite=True)
+
+        self.client.force_authenticate(user=self.campo)
+        response = self.client.get(self.checklist_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 1)
+
+    def test_generadores_list_incluye_alertas_pendientes(self):
+        self.generador.horas_operacion = Decimal('1200.00')
+        self.generador.save()
+
+        self.client.force_authenticate(user=self.administrador)
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        chapote = next(g for g in response.data if g['nombre'] == 'chapote')
+        self.assertEqual(len(chapote['alertas_pendientes']), 3)
