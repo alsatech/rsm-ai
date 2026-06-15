@@ -7,7 +7,7 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 1 / 11  
+**Módulos completados:** 2 / 11  
 **Fase actual:** Mes 1
 
 ---
@@ -16,7 +16,7 @@
 
 ### Fase 1 — Mes 1 (Días 1–30)
 - [x] **Módulo 1** — Login y roles
-- [ ] **Módulo 2** — Hidráulica y pluviómetros
+- [x] **Módulo 2** — Hidráulica y pluviómetros
 - [ ] **Módulo 3** — Pendientes rastreables
 
 ### Fase 2 — Mes 2 (Días 31–60)
@@ -46,6 +46,16 @@
 **Commit:** `[LOGIN] feat: setup proyecto Django+React y autenticación JWT con 5 roles`  
 **Descripción:** Setup completo del proyecto. Backend Django + DRF + SimpleJWT con app `apps/users` (modelo User con campo `rol`, endpoints `/api/v1/auth/login|refresh|me`, permisos custom por rol). Frontend React + Vite + Tailwind con dark theme RSM, pantalla de Login, hook `useAuth` con refresh automático y logout en caso de fallo, y Dashboard con los 12 módulos como cards filtrados por rol.  
 **Notas:** Usuarios de prueba creados en local (uno por rol) con contraseña `rsm12345` para validar el flujo de login/dashboard.
+
+---
+
+### 🟢 Push #2
+**Módulo:** Módulo 2 — Hidráulica y pluviómetros  
+**Fecha:** 2026-06-15  
+**Branch:** main  
+**Commit:** `[HIDRÁULICA] feat: captura de parámetros hidráulicos y pluviómetros`  
+**Descripción:** App `apps/hidraulica` con modelo `RegistroHidraulico` (10 puntos de medición, estados normal/alerta/falla, lecturas de nivel/caudal/presión/lluvia, foto, validación). Endpoints `GET/POST /api/v1/hidraulica/` y `GET/PATCH /api/v1/hidraulica/{id}/` con permisos por rol: `campo` crea y solo ve sus propios registros, `administrador`/`superadmin` ven todos y validan. Filtros por fecha, punto, estado y usuario. Tarea Celery `alerta_falla_hidraulica` notifica (consola) a Alberto/Minerva/Alexia/Abigail cuando un registro entra en estado `falla`. Se agregó configuración base de Celery + Redis (`config/celery.py`, `CELERY_TASK_ALWAYS_EAGER` en dev) y soporte de `MEDIA_URL`/`MEDIA_ROOT` para fotos (Pillow). Frontend: página `/hidraulica` mobile-first con formulario (dropdown de punto, toggle de estado, campos condicionales según punto pluviométrico, foto opcional) y tabla de registros del día con botón "Validar" para `administrador`/`superadmin`. Ruta protegida por rol y enlazada desde el Dashboard.  
+**Notas:** 17/17 tests backend OK. Verificado con llamadas reales a la API (login, crear, listar filtrado por rol, validar, alerta de falla en consola) y `npm run build` sin errores. No fue posible tomar screenshots de navegador en este entorno (faltan librerías del sistema para Chromium headless y no hay sudo).
 
 ---
 

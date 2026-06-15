@@ -6,7 +6,7 @@
 ## Unreleased
 
 ### En desarrollo
-- Módulo 2 — Hidráulica y pluviómetros
+- Módulo 3 — Pendientes rastreables
 
 ---
 
@@ -28,7 +28,14 @@ _Se registran aquí al completar cada módulo._
 - Dashboard con los 12 módulos como cards, visibles según rol (elementos sin acceso completamente ocultos)
 
 ### v0.2.0 — Hidráulica y pluviómetros
-> Pendiente
+- App `apps/hidraulica`: modelo `RegistroHidraulico` con 10 puntos de medición (pilas, fluxómetros, manómetros, pluviómetros), estados `normal`/`alerta`/`falla`, lecturas (nivel, caudal, presión, lluvia), foto, observaciones y validación (`validado`, `validado_por`)
+- Endpoints `GET/POST /api/v1/hidraulica/` y `GET/PATCH /api/v1/hidraulica/{id}/` con permisos por rol y filtros (fecha, punto, estado, usuario)
+- `campo` crea y solo ve sus propios registros; `administrador`/`superadmin` ven todos y validan
+- Tarea Celery `alerta_falla_hidraulica`: notifica (consola) a superadmins/administradores cuando un registro entra en estado `falla`
+- Configuración base de Celery + Redis (`config/celery.py`, `CELERY_TASK_ALWAYS_EAGER` en dev) y soporte de `MEDIA_URL`/`MEDIA_ROOT` (Pillow) para fotos
+- Tests de modelo y endpoints (permisos, filtros, validación, alerta)
+- Frontend: página `/hidraulica` con formulario mobile-first (dropdown de punto, toggle de estado, campos condicionales para pluviómetros, foto opcional) y tabla de registros del día con botón "Validar" para `administrador`/`superadmin`
+- Ruta protegida por rol (`ProtectedRoute` con prop `roles`) y enlace desde el Dashboard
 
 ### v0.3.0 — Pendientes rastreables
 > Pendiente

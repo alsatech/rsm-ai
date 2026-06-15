@@ -39,6 +39,7 @@ INSTALLED_APPS = [
 
     # Apps RSM
     'apps.users',
+    'apps.hidraulica',
 ]
 
 MIDDLEWARE = [
@@ -102,6 +103,10 @@ USE_TZ = True
 # Archivos estáticos
 STATIC_URL = 'static/'
 
+# Archivos subidos por usuarios (fotos de registros, etc.)
+MEDIA_URL = 'media/'
+MEDIA_ROOT = BASE_DIR / 'media'
+
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
@@ -134,3 +139,15 @@ CORS_ALLOWED_ORIGINS = env.list(
 
 # Redis (usado por Celery en módulos posteriores)
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
+
+
+# Celery — alertas y notificaciones (ver apps/*/tasks.py)
+CELERY_BROKER_URL = REDIS_URL
+CELERY_RESULT_BACKEND = REDIS_URL
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_SERIALIZER = 'json'
+CELERY_TIMEZONE = TIME_ZONE
+# En desarrollo/tests las tareas corren de forma síncrona (sin worker ni Redis)
+CELERY_TASK_ALWAYS_EAGER = env.bool('CELERY_TASK_ALWAYS_EAGER', default=DEBUG)
+CELERY_TASK_EAGER_PROPAGATES = True

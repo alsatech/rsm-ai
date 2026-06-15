@@ -8,6 +8,7 @@ export const MODULOS = [
     descripcion: 'Mediciones de pilas, fluxómetros, manómetros y bebederos',
     icono: '💧',
     roles: ['campo', 'administrador', 'superadmin'],
+    ruta: '/hidraulica',
   },
   {
     id: 'pendientes',

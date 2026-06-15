@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import ModuleCard from '../../components/ModuleCard'
 import { MODULOS } from '../../config/modules'
@@ -45,14 +45,21 @@ export default function Dashboard() {
       </header>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {modulosVisibles.map((modulo) => (
-          <ModuleCard
-            key={modulo.id}
-            icono={modulo.icono}
-            nombre={modulo.nombre}
-            descripcion={modulo.descripcion}
-          />
-        ))}
+        {modulosVisibles.map((modulo) => {
+          const card = (
+            <ModuleCard icono={modulo.icono} nombre={modulo.nombre} descripcion={modulo.descripcion} />
+          )
+
+          if (!modulo.ruta) {
+            return <div key={modulo.id}>{card}</div>
+          }
+
+          return (
+            <Link key={modulo.id} to={modulo.ruta} className="block">
+              {card}
+            </Link>
+          )
+        })}
       </div>
 
       {modulosVisibles.length === 0 && (

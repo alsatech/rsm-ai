@@ -17,5 +17,11 @@ export default defineConfig([
       globals: globals.browser,
       parserOptions: { ecmaFeatures: { jsx: true } },
     },
+    rules: {
+      // El patrón estándar del proyecto es cargar datos con useEffect + useState
+      // (sin React Compiler ni librerías de data-fetching), así que esta regla
+      // marcaría como error el patrón de "cargar lista al montar" usado en todos los módulos.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])
