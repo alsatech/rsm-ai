@@ -7,6 +7,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/v1/auth/', include('apps.users.urls')),
     path('api/v1/hidraulica/', include('apps.hidraulica.urls')),
+    path('api/v1/pendientes/', include('apps.pendientes.urls')),
 ]
 
 if settings.DEBUG:

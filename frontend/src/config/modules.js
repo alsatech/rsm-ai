@@ -15,7 +15,8 @@ export const MODULOS = [
     nombre: 'Pendientes',
     descripcion: 'Seguimiento de pendientes y tareas marcadas en la junta diaria',
     icono: '📋',
-    roles: ['administrador', 'superadmin'],
+    roles: ['campo', 'administrador', 'superadmin'],
+    ruta: '/pendientes',
   },
   {
     id: 'ganado',

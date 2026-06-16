@@ -47,7 +47,14 @@ _Se registran aquí al completar cada módulo._
 - Frontend: sección "Generadores" en `/hidraulica` con tarjetas por generador (horas actuales, botón "Hacer revisión diaria", checklist con 4 verificaciones + observaciones, historial del día), campo de actualización de horas para `administrador`/`superadmin` y alertas de mantenimiento destacadas en amarillo
 
 ### v0.3.0 — Pendientes rastreables
-> Pendiente
+- App `apps/pendientes`: modelos `Pendiente` (estados, prioridades, motivos de bloqueo, asignación M2M, módulo relacionado, fecha límite/cierre, cerrado_por), `HistorialPendiente` y `FotoPendiente` (máx. 4 fotos con momentos apertura/seguimiento/cierre)
+- Señales Django: historial automático al cambiar estado, fecha_cierre auto en cierre, validación de bloqueo sin motivo → HTTP 400
+- Custom exception handler (`config/exceptions.py`) que convierte `django.core.exceptions.ValidationError` a respuestas DRF 400
+- Endpoints: `GET/POST /api/v1/pendientes/`, `GET/PATCH /api/v1/pendientes/{id}/`, historial, cambiar-estado, resumen, fotos (subir y eliminar)
+- `GET /api/v1/auth/usuarios/` agregado en `apps/users` para el multiselect de asignación
+- Permisos: `campo` ve solo sus pendientes asignados y solo puede cambiar a en_proceso/bloqueado; `administrador`/`superadmin` tienen acceso completo incluyendo cierre y eliminación de fotos
+- Frontend: página `/pendientes` con vista lista (admin) y vista tarjetas (campo), formulario paso a paso en 3 etapas, vista detalle con timeline de historial y galería de fotos con lightbox, widget `ResumenPendientes` para el dashboard
+- Ruta `/pendientes` registrada en `App.jsx` y `modules.js` actualizado con `ruta` y acceso a campo
 
 ### v0.4.0 — Ganado — recorridos GPS
 > Pendiente

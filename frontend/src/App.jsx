@@ -4,6 +4,7 @@ import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import Hidraulica from './pages/Hidraulica'
 import Login from './pages/Login'
+import Pendientes from './pages/Pendientes'
 
 function App() {
   return (
@@ -22,6 +23,14 @@ function App() {
         element={
           <ProtectedRoute roles={['campo', 'administrador', 'superadmin']}>
             <Hidraulica />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/pendientes"
+        element={
+          <ProtectedRoute roles={['campo', 'administrador', 'superadmin']}>
+            <Pendientes />
           </ProtectedRoute>
         }
       />

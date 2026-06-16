@@ -7,7 +7,7 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 2 / 11  
+**Módulos completados:** 3 / 11  
 **Fase actual:** Mes 1
 
 ---
@@ -17,7 +17,7 @@
 ### Fase 1 — Mes 1 (Días 1–30)
 - [x] **Módulo 1** — Login y roles
 - [x] **Módulo 2** — Hidráulica y pluviómetros
-- [ ] **Módulo 3** — Pendientes rastreables
+- [x] **Módulo 3** — Pendientes rastreables
 
 ### Fase 2 — Mes 2 (Días 31–60)
 - [ ] **Módulo 4** — Ganado — recorridos GPS
@@ -66,6 +66,16 @@
 **Commit:** `[HIDRÁULICA] feat: generadores con checklist diario y alertas de mantenimiento`  
 **Descripción:** Se agregan a `apps/hidraulica` los modelos `Generador` (Chapote/Rancho/Margaritas con horas de operación), `ChecklistGenerador` (revisión diaria: nivel de aceite, refrigerante, filtro de aire, fugas, observaciones) y `AlertaMantenimientoGenerador` (intervalos de servicio en horas/meses). Data migration precarga los 3 generadores reales (Wacker Neuson G25 20kW, Cummins 225 20kW, Detroit Diesel 3-71 20kW) con sus intervalos de mantenimiento documentados. Endpoints: `GET /api/v1/hidraulica/generadores/` (lista con horas y alertas pendientes), `PATCH /api/v1/hidraulica/generadores/{id}/` (actualizar horas, solo `administrador`/`superadmin`), `GET/POST /api/v1/hidraulica/generadores/{id}/checklist/` (checklist diario — `campo` crea y ve su propio historial, `administrador`/`superadmin` ven todo). Tarea Celery `revisar_alertas_generadores` corre diariamente (6:00 am vía `CELERY_BEAT_SCHEDULE`), compara `horas_operacion` contra cada `horas_intervalo` activo y, si se alcanzó, imprime en consola el servicio requerido (evita repetir el mismo día). Frontend: nueva sección "Generadores" dentro de `/hidraulica` con una tarjeta por generador (horas actuales, alertas de mantenimiento en amarillo para `administrador`/`superadmin`, campo de horas editable para esos roles, botón "Hacer revisión diaria" que despliega el checklist de 4 verificaciones + observaciones y el historial de revisiones del día).  
 **Notas:** 25/25 tests backend OK (8 nuevos: checklist completo/incompleto, alerta por horas, permisos de horas, historial filtrado por rol, fixture de generadores). Verificado con llamadas reales a la API (POST checklist como `chino`, PATCH horas bloqueado para `campo` y permitido para `abigail`, alerta de mantenimiento de Chapote a las 250h disparada y sin duplicarse en una segunda corrida) y `npm run build`/`npm run lint` sin errores. No fue posible tomar screenshots de navegador en este entorno (faltan librerías del sistema para Chromium headless y no hay sudo).
+
+---
+
+### 🟢 Push #4
+**Módulo:** Módulo 3 — Pendientes rastreables  
+**Fecha:** 2026-06-16  
+**Branch:** main  
+**Commit:** `[PENDIENTES] feat: sistema de pendientes rastreables con historial y bloqueos`  
+**Descripción:** App `apps/pendientes` con modelos `Pendiente` (estados abierto/en_proceso/bloqueado/cerrado, prioridades, motivos de bloqueo, asignación ManyToMany, módulo relacionado, fecha límite, fecha de cierre, cerrado_por), `HistorialPendiente` (trazabilidad de cada cambio de estado con nota y usuario), y `FotoPendiente` (máximo 4 fotos por pendiente en momentos apertura/seguimiento/cierre). Señales Django que registran historial automáticamente al cambiar estado, establecen fecha_cierre al cerrar, y validan que el bloqueo siempre tenga motivo. Endpoints: `GET/POST /api/v1/pendientes/`, `GET/PATCH /api/v1/pendientes/{id}/`, `GET /api/v1/pendientes/{id}/historial/`, `POST /api/v1/pendientes/{id}/cambiar-estado/`, `GET /api/v1/pendientes/resumen/`, `POST /api/v1/pendientes/{id}/fotos/`, `DELETE /api/v1/pendientes/{id}/fotos/{foto_id}/`. Permisos estrictos: `campo` solo ve sus pendientes asignados y solo puede cambiar a en_proceso/bloqueado; `administrador`/`superadmin` tienen acceso completo. Endpoint `GET /api/v1/auth/usuarios/` agregado para el multiselect de asignación. Custom exception handler para convertir `django.core.exceptions.ValidationError` a respuestas HTTP 400 en la API. Frontend: página `/pendientes` con vista lista para admin/superadmin (tabs por estado con conteo, cards clickeables con badges de estado/prioridad, bloqueados destacados en naranja, botón fijo "Nuevo pendiente"), vista tarjetas para campo (cards grandes mobile-first con estado legible, empty state amigable), formulario de 3 pasos (título/descripción/prioridad → asignado_a/origen → módulo/fecha_límite), vista detalle con timeline de historial, componente para cambiar estado con motivos de bloqueo, galería de fotos con lightbox y contador 3/4. Widget `ResumenPendientes` exportable para el dashboard.  
+**Notas:** 13 nuevos tests backend (todos OK) — 38/38 totales. `npm run build` y `npm run lint` sin errores. No fue posible tomar screenshots de navegador (faltan librerías Chromium en el entorno).
 
 ---
 
