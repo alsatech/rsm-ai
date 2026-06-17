@@ -10,5 +10,6 @@ export const getResumen = () => api.get('/api/v1/pendientes/resumen/')
 export const subirFoto = (id, formData) => api.post(`/api/v1/pendientes/${id}/fotos/`, formData, {
   headers: { 'Content-Type': 'multipart/form-data' },
 })
+export const eliminarPendiente = (id) => api.delete(`/api/v1/pendientes/${id}/`)
 export const eliminarFoto = (id, fotoId) => api.delete(`/api/v1/pendientes/${id}/fotos/${fotoId}/`)
 export const getUsuarios = () => api.get('/api/v1/auth/usuarios/')

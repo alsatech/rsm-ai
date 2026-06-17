@@ -15,6 +15,7 @@ from .permissions import (
     PuedeCrearPendiente,
     PuedeEditarPendiente,
     PuedeEliminarFoto,
+    PuedeEliminarPendiente,
     PuedeSubirFoto,
     PuedeVerHistorial,
     PuedeVerPendiente,
@@ -76,13 +77,15 @@ class PendienteListCreateView(generics.ListCreateAPIView):
         serializer.save(created_by=self.request.user)
 
 
-class PendienteDetailView(generics.RetrieveUpdateAPIView):
+class PendienteDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = PendienteSerializer
-    http_method_names = ['get', 'patch', 'head', 'options']
+    http_method_names = ['get', 'patch', 'delete', 'head', 'options']
 
     def get_permissions(self):
         if self.request.method == 'PATCH':
             return [IsAuthenticated(), PuedeEditarPendiente()]
+        if self.request.method == 'DELETE':
+            return [IsAuthenticated(), PuedeEliminarPendiente()]
         return [IsAuthenticated(), PuedeVerPendiente()]
 
     def get_queryset(self):

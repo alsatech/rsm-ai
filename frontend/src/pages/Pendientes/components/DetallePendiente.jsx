@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   cambiarEstado,
   eliminarFoto,
+  eliminarPendiente,
   getHistorial,
   getPendiente,
   subirFoto,
@@ -29,12 +30,14 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
   const { showToast } = useToast()
   const esCampo = user?.rol === 'campo'
   const esAdmin = user?.rol === 'administrador' || user?.rol === 'superadmin'
+  const esSuperadmin = user?.rol === 'superadmin'
 
   const [pendiente, setPendiente] = useState(null)
   const [historial, setHistorial] = useState([])
   const [loading, setLoading] = useState(true)
   const [guardandoEstado, setGuardandoEstado] = useState(false)
   const [guardandoFoto, setGuardandoFoto] = useState(false)
+  const [eliminando, setEliminando] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -96,6 +99,19 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
     }
   }
 
+  const handleEliminarPendiente = async () => {
+    if (!window.confirm('¿Eliminar este pendiente permanentemente? Esta acción no se puede deshacer.')) return
+    setEliminando(true)
+    try {
+      await eliminarPendiente(pendienteId)
+      showToast('Pendiente eliminado.', 'alerta')
+      onVolver()
+    } catch {
+      showToast('No se pudo eliminar el pendiente.', 'error')
+      setEliminando(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="py-12 text-center text-text-secondary">Cargando pendiente…</div>
@@ -109,12 +125,24 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
 
   return (
     <div className="flex flex-col gap-6 pb-8">
-      <button
-        onClick={onVolver}
-        className="self-start text-sm text-text-secondary hover:text-highlight"
-      >
-        ← Volver a la lista
-      </button>
+      <div className="flex items-center justify-between">
+        <button
+          onClick={onVolver}
+          className="text-sm text-text-secondary hover:text-highlight"
+        >
+          ← Volver a la lista
+        </button>
+        {esSuperadmin && (
+          <button
+            onClick={handleEliminarPendiente}
+            disabled={eliminando}
+            className="flex items-center gap-1.5 rounded-lg border border-error/40 px-3 py-2 text-sm text-error transition hover:bg-error/10 disabled:opacity-50"
+          >
+            <span>🗑</span>
+            <span>{eliminando ? 'Eliminando…' : 'Eliminar'}</span>
+          </button>
+        )}
+      </div>
 
       <div className={`rounded-2xl border p-5 ${esBloqueado ? 'border-orange-500/40 bg-orange-500/5' : 'border-border bg-card'}`}>
         <div className="mb-3 flex flex-wrap items-start gap-2">

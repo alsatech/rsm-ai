@@ -67,3 +67,12 @@ class PuedeEliminarFoto(BasePermission):
             and request.user.is_authenticated
             and request.user.rol in ROLES_ADMIN
         )
+
+
+class PuedeEliminarPendiente(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol == User.Rol.SUPERADMIN
+        )
