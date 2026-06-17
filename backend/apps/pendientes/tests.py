@@ -1,4 +1,7 @@
+import io
+
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 from rest_framework import status
@@ -6,7 +9,7 @@ from rest_framework.test import APITestCase
 
 from apps.users.models import User
 
-from .models import HistorialPendiente, Pendiente
+from .models import FotoPendiente, HistorialPendiente, Pendiente
 
 
 def crear_usuario(username, rol):
@@ -135,17 +138,24 @@ class PendienteEndpointTest(APITestCase):
 
     def test_cierre_registra_fecha_y_usuario_endpoint(self):
         p = crear_pendiente(created_by=self.admin)
+        # Subir foto de cierre antes de cerrar
+        imagen = SimpleUploadedFile('evidencia.jpg', b'\xff\xd8\xff\xe0' + b'\x00' * 100, content_type='image/jpeg')
+        FotoPendiente.objects.create(pendiente=p, foto=imagen, momento='cierre', uploaded_by=self.admin)
+
         url = reverse('pendiente-cambiar-estado', args=[p.id])
         self.client.force_authenticate(user=self.admin)
         response = self.client.post(url, {
             'estado': Pendiente.Estado.CERRADO,
             'nota': 'Trabajo completado',
+            'solucion_cierre': 'Se reparó la fuga en la tubería.',
+            'se_compro_material': False,
         }, format='json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         p.refresh_from_db()
         self.assertIsNotNone(p.fecha_cierre)
         self.assertEqual(p.cerrado_por, self.admin)
         self.assertEqual(p.estado, Pendiente.Estado.CERRADO)
+        self.assertEqual(p.solucion_cierre, 'Se reparó la fuga en la tubería.')
 
     def test_historial_accesible_para_admin(self):
         p = crear_pendiente(created_by=self.admin)

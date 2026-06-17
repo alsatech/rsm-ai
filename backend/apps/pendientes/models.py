@@ -55,6 +55,9 @@ class Pendiente(models.Model):
     asignado_a = models.ManyToManyField(User, blank=True, related_name='pendientes_asignados')
     fecha_limite = models.DateField(null=True, blank=True)
     fecha_cierre = models.DateTimeField(null=True, blank=True)
+    solucion_cierre = models.TextField(blank=True, default='')
+    se_compro_material = models.BooleanField(null=True, blank=True)
+    quien_compro = models.CharField(max_length=200, blank=True)
     cerrado_por = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

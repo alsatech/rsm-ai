@@ -101,6 +101,9 @@ class PendienteSerializer(serializers.ModelSerializer):
             'asignado_a_detalle',
             'fecha_limite',
             'fecha_cierre',
+            'solucion_cierre',
+            'se_compro_material',
+            'quien_compro',
             'cerrado_por',
             'cerrado_por_nombre',
             'created_by',
@@ -114,6 +117,9 @@ class PendienteSerializer(serializers.ModelSerializer):
             'id',
             'estado',
             'fecha_cierre',
+            'solucion_cierre',
+            'se_compro_material',
+            'quien_compro',
             'cerrado_por',
             'created_by',
             'created_at',
@@ -146,3 +152,6 @@ class CambiarEstadoSerializer(serializers.Serializer):
         allow_blank=True,
     )
     nota = serializers.CharField(required=False, allow_blank=True)
+    solucion_cierre = serializers.CharField(required=False, allow_blank=True)
+    se_compro_material = serializers.BooleanField(required=False, allow_null=True)
+    quien_compro = serializers.CharField(required=False, allow_blank=True)

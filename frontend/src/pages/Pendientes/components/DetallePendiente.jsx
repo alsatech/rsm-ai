@@ -216,6 +216,7 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
             estadoActual={pendiente.estado}
             esCampo={esCampo}
             guardando={guardandoEstado}
+            pendienteId={pendiente.id}
             onCambiar={handleCambiarEstado}
           />
         </div>

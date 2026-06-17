@@ -106,7 +106,7 @@ class CambiarEstadoPendienteView(APIView):
     permission_classes = [IsAuthenticated, PuedeCambiarEstado]
 
     def _get_pendiente(self, pk, user):
-        qs = Pendiente.objects.prefetch_related('asignado_a')
+        qs = Pendiente.objects.prefetch_related('asignado_a', 'fotos')
         if user.rol == User.Rol.CAMPO:
             qs = qs.filter(asignado_a=user)
         try:
@@ -123,6 +123,9 @@ class CambiarEstadoPendienteView(APIView):
         nuevo_estado = serializer.validated_data['estado']
         motivo_bloqueo = serializer.validated_data.get('motivo_bloqueo') or ''
         nota = serializer.validated_data.get('nota', '')
+        solucion_cierre = serializer.validated_data.get('solucion_cierre', '').strip()
+        se_compro_material = serializer.validated_data.get('se_compro_material')
+        quien_compro = serializer.validated_data.get('quien_compro', '').strip()
         user = request.user
 
         if user.rol == User.Rol.CAMPO and nuevo_estado not in (
@@ -140,6 +143,18 @@ class CambiarEstadoPendienteView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        if nuevo_estado == Pendiente.Estado.CERRADO:
+            errores = {}
+            if not solucion_cierre:
+                errores['solucion_cierre'] = 'Describe la solución antes de cerrar el pendiente.'
+            if se_compro_material and not quien_compro:
+                errores['quien_compro'] = 'Indica quién realizó la compra del material.'
+            tiene_foto_cierre = pendiente.fotos.filter(momento='cierre').exists()
+            if not tiene_foto_cierre:
+                errores['foto_cierre'] = 'Sube al menos una foto de evidencia del cierre antes de cerrar.'
+            if errores:
+                return Response(errores, status=status.HTTP_400_BAD_REQUEST)
+
         if nuevo_estado == pendiente.estado:
             return Response(
                 {'detail': 'El pendiente ya tiene ese estado.'},
@@ -153,6 +168,9 @@ class CambiarEstadoPendienteView(APIView):
 
         if nuevo_estado == Pendiente.Estado.CERRADO:
             pendiente.cerrado_por = user
+            pendiente.solucion_cierre = solucion_cierre
+            pendiente.se_compro_material = se_compro_material
+            pendiente.quien_compro = quien_compro if se_compro_material else ''
             if not pendiente.fecha_cierre:
                 pendiente.fecha_cierre = timezone.now()
 
