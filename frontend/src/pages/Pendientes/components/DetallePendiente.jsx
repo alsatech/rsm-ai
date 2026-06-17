@@ -118,7 +118,7 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
 
       <div className={`rounded-2xl border p-5 ${esBloqueado ? 'border-orange-500/40 bg-orange-500/5' : 'border-border bg-card'}`}>
         <div className="mb-3 flex flex-wrap items-start gap-2">
-          <h2 className="flex-1 text-xl font-bold text-text">{pendiente.titulo}</h2>
+          <h2 className="flex-1 text-xl font-bold text-highlight">{pendiente.titulo}</h2>
           <span className={`rounded-full px-3 py-1 text-sm font-bold ${BADGE_ESTADO[pendiente.estado]}`}>
             {pendiente.estado_display}
           </span>

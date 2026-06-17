@@ -1,11 +1,11 @@
 import { useState } from 'react'
 
 const TABS = [
-  { label: 'Todos', value: null },
-  { label: 'Abiertos', value: 'abierto' },
-  { label: 'En proceso', value: 'en_proceso' },
-  { label: 'Bloqueados', value: 'bloqueado' },
-  { label: 'Cerrados', value: 'cerrado' },
+  { label: 'Todos', value: null, activeClass: 'border-highlight bg-accent text-highlight' },
+  { label: 'Abiertos', value: 'abierto', activeClass: 'border-error bg-error/10 text-error' },
+  { label: 'En proceso', value: 'en_proceso', activeClass: 'border-warning bg-warning/10 text-warning' },
+  { label: 'Bloqueados', value: 'bloqueado', activeClass: 'border-orange-400 bg-orange-500/10 text-orange-400' },
+  { label: 'Cerrados', value: 'cerrado', activeClass: 'border-highlight bg-highlight/10 text-highlight' },
 ]
 
 const BADGE_ESTADO = {
@@ -41,14 +41,14 @@ export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, on
           <button
             key={tab.value ?? 'todos'}
             onClick={() => setTabActivo(tab.value)}
-            className={`flex-shrink-0 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+            className={`flex-shrink-0 rounded-lg border px-3 py-2 text-sm font-bold transition ${
               tabActivo === tab.value
-                ? 'border-highlight bg-accent text-highlight'
-                : 'border-border text-text-secondary hover:border-highlight'
+                ? tab.activeClass
+                : 'border-border text-text-secondary hover:border-highlight hover:text-text'
             }`}
           >
             {tab.label}
-            <span className="ml-1.5 rounded-full bg-bg px-1.5 py-0.5 text-xs font-mono">
+            <span className="ml-1.5 rounded-full bg-bg/60 px-1.5 py-0.5 text-xs font-mono">
               {conteo(tab.value)}
             </span>
           </button>
@@ -74,7 +74,7 @@ export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, on
             >
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-semibold text-text">{p.titulo}</p>
+                  <p className="truncate text-base font-bold text-highlight">{p.titulo}</p>
                   <p className="mt-0.5 text-sm text-text-secondary">
                     {p.modulo_display !== 'Ninguno' && (
                       <span className="mr-2 rounded bg-border/50 px-1.5 py-0.5 text-xs">

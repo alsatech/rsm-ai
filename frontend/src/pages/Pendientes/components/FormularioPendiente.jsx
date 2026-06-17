@@ -2,6 +2,14 @@ import { useEffect, useState } from 'react'
 
 import { getUsuarios } from '../../../api/pendientes'
 
+const ROL_LABEL = {
+  campo: 'Campo',
+  inventario: 'Inventario',
+  operaciones: 'Operaciones',
+  administrador: 'Administrador',
+  superadmin: 'Superadmin',
+}
+
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
 const labelClass = 'mb-1 block text-sm text-[#86ef69]'
@@ -43,10 +51,17 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
   const [form, setForm] = useState(ESTADO_INICIAL)
   const [asignadoA, setAsignadoA] = useState([])
   const [usuarios, setUsuarios] = useState([])
+  const [cargandoUsuarios, setCargandoUsuarios] = useState(true)
+  const [errorUsuarios, setErrorUsuarios] = useState(false)
   const [paso, setPaso] = useState(1)
 
   useEffect(() => {
-    getUsuarios().then(({ data }) => setUsuarios(data)).catch(() => {})
+    setCargandoUsuarios(true)
+    setErrorUsuarios(false)
+    getUsuarios()
+      .then(({ data }) => setUsuarios(data))
+      .catch(() => setErrorUsuarios(true))
+      .finally(() => setCargandoUsuarios(false))
   }, [])
 
   const handleChange = (campo) => (e) => setForm((prev) => ({ ...prev, [campo]: e.target.value }))
@@ -142,27 +157,52 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
         {paso === 2 && (
           <>
             <div>
-              <p className={labelClass}>Asignar a</p>
-              {usuarios.length === 0 ? (
+              <div className="mb-2 flex items-center justify-between">
+                <p className={labelClass}>Asignar a</p>
+                {asignadoA.length > 0 && (
+                  <span className="rounded-full bg-accent px-2 py-0.5 text-xs font-bold text-highlight">
+                    {asignadoA.length} seleccionado{asignadoA.length !== 1 ? 's' : ''}
+                  </span>
+                )}
+              </div>
+              {cargandoUsuarios && (
                 <p className="text-sm text-text-secondary">Cargando usuarios…</p>
-              ) : (
+              )}
+              {errorUsuarios && (
+                <p className="text-sm text-error">No se pudieron cargar los usuarios.</p>
+              )}
+              {!cargandoUsuarios && !errorUsuarios && (
                 <div className="flex flex-col gap-2">
-                  {usuarios.map((u) => (
-                    <button
-                      key={u.id}
-                      type="button"
-                      onClick={() => toggleUsuario(u.id)}
-                      style={{ minHeight: '52px' }}
-                      className={`flex items-center justify-between rounded-lg border px-4 py-3 text-left transition ${
-                        asignadoA.includes(u.id)
-                          ? 'border-highlight bg-accent/20 text-text'
-                          : 'border-border text-text-secondary hover:border-highlight'
-                      }`}
-                    >
-                      <span className="text-base">{u.nombre}</span>
-                      <span className="text-xs text-text-secondary">{u.rol}</span>
-                    </button>
-                  ))}
+                  {usuarios.map((u) => {
+                    const seleccionado = asignadoA.includes(u.id)
+                    return (
+                      <button
+                        key={u.id}
+                        type="button"
+                        onClick={() => toggleUsuario(u.id)}
+                        style={{ minHeight: '56px' }}
+                        className={`flex items-center gap-3 rounded-xl border px-4 py-3 text-left transition ${
+                          seleccionado
+                            ? 'border-highlight bg-accent/30 text-text'
+                            : 'border-border bg-bg text-text-secondary hover:border-highlight hover:text-text'
+                        }`}
+                      >
+                        <span
+                          className={`flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full border text-xs font-bold transition ${
+                            seleccionado
+                              ? 'border-highlight bg-highlight text-bg'
+                              : 'border-border'
+                          }`}
+                        >
+                          {seleccionado ? '✓' : ''}
+                        </span>
+                        <span className="flex-1 text-base font-medium">{u.nombre}</span>
+                        <span className="text-xs text-text-secondary">
+                          {ROL_LABEL[u.rol] ?? u.rol}
+                        </span>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

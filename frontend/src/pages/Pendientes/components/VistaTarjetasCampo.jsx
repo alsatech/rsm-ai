@@ -31,7 +31,7 @@ export default function VistaTarjetasCampo({ pendientes, onSeleccionar }) {
         >
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-lg font-bold text-text">{p.titulo}</p>
+              <p className="text-lg font-bold text-highlight">{p.titulo}</p>
               {p.descripcion && (
                 <p className="mt-1 line-clamp-2 text-base text-text-secondary">{p.descripcion}</p>
               )}

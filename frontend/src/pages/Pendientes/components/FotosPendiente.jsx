@@ -85,11 +85,14 @@ export default function FotosPendiente({
       )}
 
       {fotosRestantes > 0 && (
-        <form onSubmit={handleSubir} className="flex flex-col gap-3 rounded-xl border border-border bg-bg p-4">
-          <p className="text-sm text-text-secondary">Agregar foto ({fotosRestantes} disponible{fotosRestantes !== 1 ? 's' : ''})</p>
+        <form onSubmit={handleSubir} className="flex flex-col gap-4 rounded-xl border border-border bg-bg p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-medium text-text">Agregar foto</p>
+            <span className="text-xs text-text-secondary">{fotosRestantes} disponible{fotosRestantes !== 1 ? 's' : ''}</span>
+          </div>
 
           <div>
-            <p className="mb-1 text-sm text-[#86ef69]">Momento</p>
+            <p className="mb-2 text-sm text-[#86ef69]">Momento</p>
             <div className="grid grid-cols-3 gap-2">
               {['apertura', 'seguimiento', 'cierre'].map((m) => (
                 <button
@@ -110,8 +113,21 @@ export default function FotosPendiente({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm text-[#86ef69]" htmlFor={`foto-input-${pendienteId}`}>
-              Foto
+            <label
+              htmlFor={`foto-input-${pendienteId}`}
+              className={`flex cursor-pointer flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-6 transition ${
+                archivoFoto
+                  ? 'border-highlight bg-accent/10'
+                  : 'border-border hover:border-highlight/50'
+              }`}
+            >
+              <span className="text-4xl">{archivoFoto ? '✅' : '📷'}</span>
+              <span className="text-center text-base font-medium text-text">
+                {archivoFoto ? archivoFoto.name : 'Tomar foto o seleccionar archivo'}
+              </span>
+              <span className="text-xs text-text-secondary">
+                {archivoFoto ? 'Toca para cambiar' : 'JPG, PNG — toca para abrir cámara'}
+              </span>
             </label>
             <input
               ref={fileInputRef}
@@ -120,7 +136,7 @@ export default function FotosPendiente({
               accept="image/*"
               capture="environment"
               onChange={(e) => setArchivoFoto(e.target.files?.[0] ?? null)}
-              className="w-full text-sm text-text-secondary"
+              className="sr-only"
             />
           </div>
 
@@ -129,16 +145,17 @@ export default function FotosPendiente({
             value={descripcion}
             onChange={(e) => setDescripcion(e.target.value)}
             placeholder="Descripción breve (opcional)"
-            className="rounded-lg border border-border bg-card px-3 py-3 text-base text-text outline-none focus:border-highlight"
+            className="rounded-lg border border-border bg-card px-4 py-3 text-base text-text outline-none focus:border-highlight"
           />
 
           <button
             type="submit"
             disabled={!archivoFoto || guardando}
             style={{ minHeight: '56px' }}
-            className="rounded-xl bg-accent px-4 py-3 font-bold text-text transition hover:bg-highlight hover:text-bg disabled:opacity-60"
+            className="flex items-center justify-center gap-2 rounded-xl bg-accent px-4 py-3 text-base font-bold text-text transition hover:bg-highlight hover:text-bg disabled:opacity-60"
           >
-            {guardando ? 'Subiendo…' : 'Subir foto'}
+            <span className="text-xl">{guardando ? '⏳' : '📷'}</span>
+            <span>{guardando ? 'Subiendo foto…' : 'Subir foto'}</span>
           </button>
         </form>
       )}
