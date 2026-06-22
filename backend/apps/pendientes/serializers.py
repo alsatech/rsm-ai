@@ -99,7 +99,7 @@ class PendienteSerializer(serializers.ModelSerializer):
             'registro_relacionado_id',
             'asignado_a',
             'asignado_a_detalle',
-            'fecha_limite',
+            'fecha_asignacion',
             'fecha_cierre',
             'solucion_cierre',
             'se_compro_material',

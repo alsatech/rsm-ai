@@ -49,7 +49,7 @@ const ESTADO_INICIAL = {
   origen: 'junta',
   modulo_relacionado: 'ninguno',
   registro_relacionado_id: '',
-  fecha_limite: '',
+  fecha_asignacion: '',
 }
 
 function Seccion({ titulo, children }) {
@@ -110,7 +110,7 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
       ...form,
       asignado_a: asignadoA,
       registro_relacionado_id: form.registro_relacionado_id || null,
-      fecha_limite: form.fecha_limite || null,
+      fecha_asignacion: form.fecha_asignacion || null,
     }
     await onGuardar(payload)
     setForm(ESTADO_INICIAL)
@@ -329,16 +329,19 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
               )}
             </Seccion>
 
-            <Seccion titulo="Fecha límite">
+            <Seccion titulo="Fecha de origen">
               <div>
-                <Label htmlFor="fecha_limite">¿Cuándo debe resolverse? (opcional)</Label>
+                <Label htmlFor="fecha_asignacion">¿Cuándo surgió este pendiente? (opcional)</Label>
                 <input
-                  id="fecha_limite"
+                  id="fecha_asignacion"
                   type="date"
-                  value={form.fecha_limite}
-                  onChange={handleChange('fecha_limite')}
+                  value={form.fecha_asignacion}
+                  onChange={handleChange('fecha_asignacion')}
                   className={inputClass}
                 />
+                <p className="mt-1.5 text-sm text-text-secondary">
+                  Fecha de la junta, recorrido o evento donde se originó
+                </p>
               </div>
             </Seccion>
           </>

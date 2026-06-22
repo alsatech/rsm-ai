@@ -16,8 +16,8 @@ export default function VistaTarjetasCampo({ pendientes, onSeleccionar }) {
       {pendientes.map((p) => {
         const conf = ESTADO[p.estado] ?? ESTADO.abierto
         const moduloIcon = MODULO_ICON[p.modulo_relacionado]
-        const fechaLimite = p.fecha_limite
-          ? new Date(p.fecha_limite + 'T00:00:00').toLocaleDateString('es-MX', {
+        const fechaAsignacion = p.fecha_asignacion
+          ? new Date(p.fecha_asignacion + 'T00:00:00').toLocaleDateString('es-MX', {
               day: '2-digit', month: 'short',
             })
           : null
@@ -63,10 +63,10 @@ export default function VistaTarjetasCampo({ pendientes, onSeleccionar }) {
 
             {/* Footer: días + fecha límite */}
             <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap gap-3 text-sm text-zinc-600">
-                <span>📅 {p.dias_abierto}d abierto</span>
-                {fechaLimite && (
-                  <span className="text-orange-400">⏰ Límite {fechaLimite}</span>
+              <div className="flex flex-wrap gap-3 text-base text-zinc-500">
+                <span>📅 {p.dias_abierto} día{p.dias_abierto !== 1 ? 's' : ''} abierto</span>
+                {fechaAsignacion && (
+                  <span className="text-zinc-400">📌 Origen: {fechaAsignacion}</span>
                 )}
               </div>
               <span className="text-sm text-zinc-600">Ver detalle →</span>

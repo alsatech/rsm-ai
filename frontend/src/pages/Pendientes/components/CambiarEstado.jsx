@@ -23,7 +23,7 @@ function getOpciones(estadoActual, esCampo) {
     { value: 'abierto', label: 'Abierto' },
     { value: 'en_proceso', label: 'En proceso' },
     { value: 'bloqueado', label: 'Bloqueado' },
-    { value: 'cerrado', label: 'Cerrado' },
+    { value: 'cerrado', label: 'Terminado' },
   ]
   return todas
     .filter((o) => o.value !== estadoActual)

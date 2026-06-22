@@ -56,7 +56,9 @@ class PendienteListCreateView(generics.ListCreateAPIView):
         asignado_a = p.get('asignado_a')
         origen = p.get('origen')
         modulo = p.get('modulo_relacionado')
-        fecha_limite = p.get('fecha_limite')
+        fecha_asignacion = p.get('fecha_asignacion')
+        fecha_desde = p.get('fecha_desde')
+        fecha_hasta = p.get('fecha_hasta')
 
         if estado:
             qs = qs.filter(estado=estado)
@@ -68,8 +70,12 @@ class PendienteListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(origen=origen)
         if modulo:
             qs = qs.filter(modulo_relacionado=modulo)
-        if fecha_limite:
-            qs = qs.filter(fecha_limite=fecha_limite)
+        if fecha_asignacion:
+            qs = qs.filter(fecha_asignacion=fecha_asignacion)
+        if fecha_desde:
+            qs = qs.filter(created_at__date__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(created_at__date__lte=fecha_hasta)
 
         return qs
 

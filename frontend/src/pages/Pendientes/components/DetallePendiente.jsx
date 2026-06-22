@@ -184,11 +184,11 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
             <span className="text-zinc-600">📅 </span>
             <span className="text-zinc-300">{pendiente.dias_abierto} días abierto</span>
           </div>
-          {pendiente.fecha_limite && (
+          {pendiente.fecha_asignacion && (
             <div>
-              <span className="text-zinc-600">⏰ Límite </span>
-              <span className="text-orange-400">
-                {new Date(pendiente.fecha_limite + 'T00:00:00').toLocaleDateString('es-MX')}
+              <span className="text-zinc-600">📌 Fecha origen </span>
+              <span className="text-zinc-300">
+                {new Date(pendiente.fecha_asignacion + 'T00:00:00').toLocaleDateString('es-MX')}
               </span>
             </div>
           )}

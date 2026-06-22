@@ -31,7 +31,7 @@ export const ESTADO = {
   },
   cerrado: {
     icon: '✅',
-    label: 'Cerrado',
+    label: 'Terminado',
     badge: 'bg-emerald-700 text-white',
     borderL: 'border-l-emerald-500',
     borderColor: 'border-emerald-500/25',

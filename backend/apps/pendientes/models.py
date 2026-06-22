@@ -10,7 +10,7 @@ class Pendiente(models.Model):
         ABIERTO = 'abierto', 'Abierto'
         EN_PROCESO = 'en_proceso', 'En proceso'
         BLOQUEADO = 'bloqueado', 'Bloqueado'
-        CERRADO = 'cerrado', 'Cerrado'
+        CERRADO = 'cerrado', 'Terminado'
 
     class Prioridad(models.TextChoices):
         BAJA = 'baja', 'Baja'
@@ -53,7 +53,7 @@ class Pendiente(models.Model):
     )
     registro_relacionado_id = models.IntegerField(null=True, blank=True)
     asignado_a = models.ManyToManyField(User, blank=True, related_name='pendientes_asignados')
-    fecha_limite = models.DateField(null=True, blank=True)
+    fecha_asignacion = models.DateField(null=True, blank=True)
     fecha_cierre = models.DateTimeField(null=True, blank=True)
     solucion_cierre = models.TextField(blank=True, default='')
     se_compro_material = models.BooleanField(null=True, blank=True)

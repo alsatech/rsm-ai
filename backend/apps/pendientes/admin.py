@@ -18,7 +18,7 @@ class HistorialInline(admin.TabularInline):
 
 @admin.register(Pendiente)
 class PendienteAdmin(admin.ModelAdmin):
-    list_display = ('titulo', 'estado', 'prioridad', 'origen', 'created_by', 'fecha_limite', 'created_at')
+    list_display = ('titulo', 'estado', 'prioridad', 'origen', 'created_by', 'fecha_asignacion', 'created_at')
     list_filter = ('estado', 'prioridad', 'origen', 'modulo_relacionado')
     search_fields = ('titulo', 'descripcion')
     readonly_fields = ('created_by', 'created_at', 'updated_at', 'cerrado_por', 'fecha_cierre')
