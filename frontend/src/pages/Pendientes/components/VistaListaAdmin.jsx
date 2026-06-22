@@ -1,25 +1,70 @@
 import { useState } from 'react'
 
+import { ESTADO, MODULO_ICON, PRIORIDAD } from '../estadoConfig'
+
 const TABS = [
-  { label: 'Todos', value: null, activeClass: 'border-highlight bg-accent text-highlight' },
-  { label: 'Abiertos', value: 'abierto', activeClass: 'border-error bg-error/10 text-error' },
-  { label: 'En proceso', value: 'en_proceso', activeClass: 'border-warning bg-warning/10 text-warning' },
-  { label: 'Bloqueados', value: 'bloqueado', activeClass: 'border-orange-400 bg-orange-500/10 text-orange-400' },
-  { label: 'Cerrados', value: 'cerrado', activeClass: 'border-highlight bg-highlight/10 text-highlight' },
+  { label: 'Todos', value: null, icon: '📋', activeClass: 'border-zinc-400 bg-zinc-800 text-white' },
+  { label: 'Abiertos', value: 'abierto' },
+  { label: 'En proceso', value: 'en_proceso' },
+  { label: 'Bloqueados', value: 'bloqueado' },
+  { label: 'Cerrados', value: 'cerrado' },
 ]
 
-const BADGE_ESTADO = {
-  abierto: 'bg-error/20 text-error',
-  en_proceso: 'bg-warning/20 text-warning',
-  bloqueado: 'bg-orange-500/20 text-orange-400',
-  cerrado: 'bg-highlight/20 text-highlight',
-}
+function PendienteCard({ p, onSeleccionar }) {
+  const conf = ESTADO[p.estado] ?? ESTADO.abierto
+  const priConf = PRIORIDAD[p.prioridad] ?? PRIORIDAD.media
+  const moduloIcon = MODULO_ICON[p.modulo_relacionado]
 
-const BADGE_PRIORIDAD = {
-  baja: 'bg-border text-text-secondary',
-  media: 'bg-warning/20 text-warning',
-  alta: 'bg-error/20 text-error',
-  urgente: 'bg-error text-bg animate-pulse',
+  const fechaLimite = p.fecha_limite
+    ? new Date(p.fecha_limite + 'T00:00:00').toLocaleDateString('es-MX', {
+        day: '2-digit', month: 'short',
+      })
+    : null
+
+  return (
+    <button
+      onClick={() => onSeleccionar(p)}
+      style={{ boxShadow: `0 0 16px ${conf.glowRgba}` }}
+      className={`w-full rounded-xl border border-l-4 bg-[#080808] p-4 text-left transition-all active:scale-[0.99] ${conf.borderColor} ${conf.borderL}`}
+    >
+      {/* Fila superior: título + badges */}
+      <div className="flex items-start justify-between gap-2">
+        <p className="flex-1 truncate text-base font-bold text-white">{p.titulo}</p>
+        <div className="flex flex-shrink-0 flex-col items-end gap-1">
+          <span className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold ${conf.badge}`}>
+            <span className="text-[10px]">{conf.icon}</span>
+            <span>{p.estado_display}</span>
+          </span>
+          <span className={`rounded px-1.5 py-0.5 text-xs font-medium ${priConf.badge}`}>
+            {priConf.icon} {p.prioridad_display}
+          </span>
+        </div>
+      </div>
+
+      {/* Fila media: módulo + asignados */}
+      <p className="mt-1.5 flex flex-wrap items-center gap-1.5 text-sm text-zinc-500">
+        {moduloIcon && p.modulo_relacionado !== 'ninguno' && (
+          <span className="rounded bg-zinc-900 px-1.5 py-0.5 text-xs text-zinc-400">
+            {moduloIcon} {p.modulo_display}
+          </span>
+        )}
+        <span>
+          👤 {p.asignado_a_detalle?.map((u) => u.nombre).join(', ') || 'Sin asignar'}
+        </span>
+      </p>
+
+      {/* Fila inferior: tiempo + límite + bloqueo */}
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-zinc-600">
+        <span>📅 {p.dias_abierto}d abierto</span>
+        {fechaLimite && (
+          <span className="text-orange-400">⏰ Límite {fechaLimite}</span>
+        )}
+        {p.estado === 'bloqueado' && p.motivo_bloqueo_display && (
+          <span className="text-orange-400">⚠ {p.motivo_bloqueo_display}</span>
+        )}
+      </div>
+    </button>
+  )
 }
 
 export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, onNuevo }) {
@@ -36,88 +81,54 @@ export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, on
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Tabs de filtro */}
       <div className="flex gap-2 overflow-x-auto pb-1">
-        {TABS.map((tab) => (
-          <button
-            key={tab.value ?? 'todos'}
-            onClick={() => setTabActivo(tab.value)}
-            className={`flex-shrink-0 rounded-lg border px-3 py-2 text-sm font-bold transition ${
-              tabActivo === tab.value
-                ? tab.activeClass
-                : 'border-border text-text-secondary hover:border-highlight hover:text-text'
-            }`}
-          >
-            {tab.label}
-            <span className="ml-1.5 rounded-full bg-bg/60 px-1.5 py-0.5 text-xs font-mono">
-              {conteo(tab.value)}
-            </span>
-          </button>
-        ))}
+        {TABS.map((tab) => {
+          const conf = tab.value ? ESTADO[tab.value] : null
+          const isActive = tabActivo === tab.value
+          const activeStyle = conf ? conf.tabActive : 'border-zinc-400 bg-zinc-800 text-white'
+          const activeGlow = conf ? conf.glowRgba : null
+          return (
+            <button
+              key={tab.value ?? 'todos'}
+              onClick={() => setTabActivo(tab.value)}
+              style={isActive && activeGlow ? { boxShadow: `0 0 10px ${activeGlow}` } : undefined}
+              className={`flex-shrink-0 flex items-center gap-1.5 rounded-lg border px-3 py-2 text-sm font-bold transition ${
+                isActive
+                  ? activeStyle
+                  : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+              }`}
+            >
+              <span>{tab.icon ?? ESTADO[tab.value]?.icon}</span>
+              <span>{tab.label}</span>
+              <span className="rounded bg-black/50 px-1.5 py-0.5 text-xs font-mono">
+                {conteo(tab.value)}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
+      {/* Lista de pendientes */}
       {filtrados.length === 0 ? (
-        <div className="rounded-2xl border border-border bg-card p-10 text-center">
+        <div className="rounded-2xl border border-zinc-800 bg-black p-10 text-center">
           <p className="mb-2 text-3xl">✅</p>
-          <p className="text-text-secondary">No hay pendientes en esta categoría.</p>
+          <p className="text-zinc-500">No hay pendientes en esta categoría.</p>
         </div>
       ) : (
         <div className="flex flex-col gap-2">
           {filtrados.map((p) => (
-            <button
-              key={p.id}
-              onClick={() => onSeleccionar(p)}
-              className={`w-full rounded-xl border p-4 text-left transition hover:border-highlight ${
-                p.estado === 'bloqueado'
-                  ? 'border-orange-500/40 bg-orange-500/5 hover:border-orange-400'
-                  : 'border-border bg-card'
-              }`}
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-base font-bold text-highlight">{p.titulo}</p>
-                  <p className="mt-0.5 text-sm text-text-secondary">
-                    {p.modulo_display !== 'Ninguno' && (
-                      <span className="mr-2 rounded bg-border/50 px-1.5 py-0.5 text-xs">
-                        {p.modulo_display}
-                      </span>
-                    )}
-                    {p.asignado_a_detalle?.map((u) => u.nombre).join(', ') || 'Sin asignar'}
-                  </p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-xs font-bold ${BADGE_ESTADO[p.estado]}`}
-                  >
-                    {p.estado_display}
-                  </span>
-                  <span className={`rounded-full px-2 py-0.5 text-xs ${BADGE_PRIORIDAD[p.prioridad]}`}>
-                    {p.prioridad_display}
-                  </span>
-                </div>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-3 text-xs text-text-secondary">
-                <span>
-                  {p.dias_abierto} día{p.dias_abierto !== 1 ? 's' : ''} abierto
-                </span>
-                {p.fecha_limite && (
-                  <span>
-                    Límite: {new Date(p.fecha_limite).toLocaleDateString('es-MX')}
-                  </span>
-                )}
-                {p.estado === 'bloqueado' && p.motivo_bloqueo_display && (
-                  <span className="text-orange-400">⚠ {p.motivo_bloqueo_display}</span>
-                )}
-              </div>
-            </button>
+            <PendienteCard key={p.id} p={p} onSeleccionar={onSeleccionar} />
           ))}
         </div>
       )}
 
+      {/* Botón flotante */}
       <div className="fixed bottom-6 right-6 z-20">
         <button
           onClick={onNuevo}
-          style={{ minHeight: '56px' }}
-          className="rounded-xl bg-accent px-6 py-3 text-base font-bold text-text shadow-lg transition hover:bg-highlight hover:text-bg"
+          style={{ minHeight: '56px', boxShadow: '0 0 20px rgba(74, 222, 128, 0.35)' }}
+          className="rounded-xl bg-emerald-600 px-6 py-3 text-base font-bold text-white transition hover:bg-emerald-500"
         >
           + Nuevo pendiente
         </button>

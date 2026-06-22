@@ -104,6 +104,7 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (paso !== 3) return
     if (!puedeAvanzar1) return
     const payload = {
       ...form,
@@ -358,6 +359,7 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
 
           {paso < 3 ? (
             <button
+              key="siguiente"
               type="button"
               onClick={() => setPaso((p) => p + 1)}
               disabled={paso === 1 && !puedeAvanzar1}
@@ -368,6 +370,7 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
             </button>
           ) : (
             <button
+              key="guardar"
               type="submit"
               disabled={!puedeAvanzar1 || guardando}
               style={{ minHeight: '56px' }}
