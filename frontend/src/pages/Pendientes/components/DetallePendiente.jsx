@@ -8,6 +8,7 @@ import {
   getPendiente,
   subirFoto,
 } from '../../../api/pendientes'
+import { useConfirm } from '../../../hooks/useConfirm'
 import { useToast } from '../../../hooks/useToast'
 import { ESTADO, MODULO_ICON, ORIGEN_ICON, PRIORIDAD } from '../estadoConfig'
 import CambiarEstado from './CambiarEstado'
@@ -15,6 +16,7 @@ import FotosPendiente from './FotosPendiente'
 
 export default function DetallePendiente({ pendienteId, user, onVolver, onActualizado }) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const esCampo = user?.rol === 'campo'
   const esAdmin = user?.rol === 'administrador' || user?.rol === 'superadmin'
   const esSuperadmin = user?.rol === 'superadmin'
@@ -76,7 +78,14 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
   }
 
   const handleEliminarFoto = async (fotoId) => {
-    if (!window.confirm('¿Eliminar esta foto?')) return
+    const confirmado = await confirm({
+      titulo: '¿Eliminar esta foto?',
+      mensaje: 'Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      cancelText: 'No, cancelar',
+      variante: 'peligro',
+    })
+    if (!confirmado) return
     try {
       await eliminarFoto(pendienteId, fotoId)
       showToast('Foto eliminada.', 'exito')
@@ -87,7 +96,14 @@ export default function DetallePendiente({ pendienteId, user, onVolver, onActual
   }
 
   const handleEliminarPendiente = async () => {
-    if (!window.confirm('¿Eliminar este pendiente permanentemente? Esta acción no se puede deshacer.')) return
+    const confirmado = await confirm({
+      titulo: '¿Eliminar este pendiente?',
+      mensaje: 'Se eliminará permanentemente junto con su historial y fotos. Esta acción no se puede deshacer.',
+      confirmText: 'Sí, eliminar',
+      cancelText: 'No, cancelar',
+      variante: 'peligro',
+    })
+    if (!confirmado) return
     setEliminando(true)
     try {
       await eliminarPendiente(pendienteId)

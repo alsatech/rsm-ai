@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { getUsuarios } from '../../../api/pendientes'
+import { useConfirm } from '../../../hooks/useConfirm'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -74,6 +75,7 @@ function Label({ htmlFor, children }) {
 }
 
 export default function FormularioPendiente({ onGuardar, onCancelar, guardando }) {
+  const confirm = useConfirm()
   const [form, setForm] = useState(ESTADO_INICIAL)
   const [asignadoA, setAsignadoA] = useState([])
   const [usuarios, setUsuarios] = useState([])
@@ -106,6 +108,16 @@ export default function FormularioPendiente({ onGuardar, onCancelar, guardando }
     e.preventDefault()
     if (paso !== 3) return
     if (!puedeAvanzar1) return
+
+    const confirmado = await confirm({
+      titulo: '¿Crear este pendiente?',
+      mensaje: `Se creará "${form.titulo}" y quedará visible para los responsables asignados.`,
+      confirmText: 'Sí, crear',
+      cancelText: 'No, revisar',
+      variante: 'pregunta',
+    })
+    if (!confirmado) return
+
     const payload = {
       ...form,
       asignado_a: asignadoA,

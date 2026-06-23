@@ -15,6 +15,17 @@ const FILTROS_FECHA = [
   { label: 'Hoy', value: 'hoy' },
   { label: 'Esta semana', value: 'semana' },
   { label: 'Este mes', value: 'mes' },
+  { label: 'Rango personalizado', value: 'rango' },
+]
+
+const FILTROS_MODULO = [
+  { label: 'Todos los módulos', value: null, icon: '🗂️' },
+  { label: 'Hidráulica', value: 'hidraulica', icon: '💧' },
+  { label: 'Flota', value: 'flota', icon: '🚗' },
+  { label: 'Inventario', value: 'inventario', icon: '📦' },
+  { label: 'Proyectos', value: 'proyectos', icon: '🏗️' },
+  { label: 'Personal', value: 'personal', icon: '👥' },
+  { label: 'Sin módulo', value: 'ninguno', icon: '➖' },
 ]
 
 function fechaEfectiva(p) {
@@ -22,8 +33,21 @@ function fechaEfectiva(p) {
   return new Date(p.created_at)
 }
 
-function aplicarFiltroFecha(pendientes, filtro) {
+function aplicarFiltroFecha(pendientes, filtro, rango) {
   if (filtro === 'todo') return pendientes
+
+  if (filtro === 'rango') {
+    if (!rango?.desde && !rango?.hasta) return pendientes
+    const desde = rango.desde ? new Date(rango.desde + 'T00:00:00') : null
+    const hasta = rango.hasta ? new Date(rango.hasta + 'T23:59:59') : null
+    return pendientes.filter((p) => {
+      const f = fechaEfectiva(p)
+      if (desde && f < desde) return false
+      if (hasta && f > hasta) return false
+      return true
+    })
+  }
+
   const hoy = new Date()
   hoy.setHours(0, 0, 0, 0)
   return pendientes.filter((p) => {
@@ -89,16 +113,32 @@ function PendienteCard({ p, onSeleccionar }) {
 export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, onNuevo }) {
   const [tabEstado, setTabEstado] = useState(null)
   const [filtroFecha, setFiltroFecha] = useState('todo')
+  const [filtroModulo, setFiltroModulo] = useState(null)
+  const [rangoFechas, setRangoFechas] = useState({ desde: '', hasta: '' })
 
   const filtrados = useMemo(() => {
     let lista = tabEstado ? pendientes.filter((p) => p.estado === tabEstado) : pendientes
-    lista = aplicarFiltroFecha(lista, filtroFecha)
+    lista = aplicarFiltroFecha(lista, filtroFecha, rangoFechas)
+    if (filtroModulo) lista = lista.filter((p) => p.modulo_relacionado === filtroModulo)
     return lista
-  }, [pendientes, tabEstado, filtroFecha])
+  }, [pendientes, tabEstado, filtroFecha, filtroModulo, rangoFechas])
 
   const conteoEstado = (estado) => {
     const base = estado ? pendientes.filter((p) => p.estado === estado) : pendientes
-    return aplicarFiltroFecha(base, filtroFecha).length
+    let lista = aplicarFiltroFecha(base, filtroFecha, rangoFechas)
+    if (filtroModulo) lista = lista.filter((p) => p.modulo_relacionado === filtroModulo)
+    return lista.length
+  }
+
+  const hayFiltrosActivos = Boolean(
+    tabEstado || filtroModulo || filtroFecha !== 'todo'
+  )
+
+  const limpiarFiltros = () => {
+    setTabEstado(null)
+    setFiltroModulo(null)
+    setFiltroFecha('todo')
+    setRangoFechas({ desde: '', hasta: '' })
   }
 
   return (
@@ -132,8 +172,29 @@ export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, on
         })}
       </div>
 
-      {/* ── Filtro por fecha ── */}
+      {/* ── Filtro por módulo ── */}
       <div className="flex items-center gap-2">
+        <span className="flex-shrink-0 text-sm text-zinc-600">🗂️ Módulo:</span>
+        <div className="flex gap-2 overflow-x-auto pb-0.5">
+          {FILTROS_MODULO.map((m) => (
+            <button
+              key={m.value ?? 'todos'}
+              onClick={() => setFiltroModulo(m.value)}
+              className={`flex flex-shrink-0 items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-medium transition ${
+                filtroModulo === m.value
+                  ? 'border-zinc-400 bg-zinc-700 text-white'
+                  : 'border-zinc-800 bg-zinc-900 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
+              }`}
+            >
+              <span>{m.icon}</span>
+              <span>{m.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Filtro por fecha ── */}
+      <div className="flex flex-wrap items-center gap-2">
         <span className="flex-shrink-0 text-sm text-zinc-600">📅 Período:</span>
         <div className="flex gap-2 overflow-x-auto pb-0.5">
           {FILTROS_FECHA.map((f) => (
@@ -157,14 +218,46 @@ export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, on
         </span>
       </div>
 
+      {/* ── Rango de fechas personalizado ── */}
+      {filtroFecha === 'rango' && (
+        <div className="flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2.5">
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
+            Desde
+            <input
+              type="date"
+              value={rangoFechas.desde}
+              onChange={(e) => setRangoFechas((prev) => ({ ...prev, desde: e.target.value }))}
+              className="rounded-md border border-zinc-700 bg-black px-2 py-1.5 text-sm text-white outline-none focus:border-zinc-400"
+            />
+          </label>
+          <label className="flex items-center gap-2 text-sm text-zinc-500">
+            Hasta
+            <input
+              type="date"
+              value={rangoFechas.hasta}
+              onChange={(e) => setRangoFechas((prev) => ({ ...prev, hasta: e.target.value }))}
+              className="rounded-md border border-zinc-700 bg-black px-2 py-1.5 text-sm text-white outline-none focus:border-zinc-400"
+            />
+          </label>
+          {(rangoFechas.desde || rangoFechas.hasta) && (
+            <button
+              onClick={() => setRangoFechas({ desde: '', hasta: '' })}
+              className="text-sm text-zinc-500 underline hover:text-white"
+            >
+              Limpiar rango
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ── Lista ── */}
       {filtrados.length === 0 ? (
         <div className="rounded-2xl border border-zinc-800 bg-black p-10 text-center">
           <p className="mb-2 text-3xl">🔍</p>
           <p className="text-base text-zinc-500">Sin pendientes para este filtro.</p>
-          {(tabEstado || filtroFecha !== 'todo') && (
+          {hayFiltrosActivos && (
             <button
-              onClick={() => { setTabEstado(null); setFiltroFecha('todo') }}
+              onClick={limpiarFiltros}
               className="mt-3 text-sm text-zinc-400 hover:text-white underline"
             >
               Limpiar filtros
