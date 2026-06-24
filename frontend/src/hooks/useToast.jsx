@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useState } from 'react'
+import { v4 as uuidv4 } from 'uuid'
 
 const ToastContext = createContext(null)
 
@@ -24,7 +25,7 @@ export function ToastProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
   const showToast = useCallback((mensaje, tipo = 'exito') => {
-    const id = crypto.randomUUID()
+    const id = uuidv4()
     setToasts((prev) => [...prev, { id, mensaje, tipo }])
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id))
