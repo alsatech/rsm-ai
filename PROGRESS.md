@@ -7,7 +7,7 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 3 / 11  
+**Módulos completados:** 4 / 11  
 **Fase actual:** Mes 1
 
 ---
@@ -20,7 +20,7 @@
 - [x] **Módulo 3** — Pendientes rastreables
 
 ### Fase 2 — Mes 2 (Días 31–60)
-- [ ] **Módulo 4** — Ganado — recorridos GPS
+- [x] **Módulo 4** — Ganado — recorridos GPS
 - [ ] **Módulo 5** — Flota vehicular
 - [ ] **Módulo 6** — Inventarios
 - [ ] **Módulo 7** — Registro de ganado por arete
@@ -76,6 +76,16 @@
 **Commit:** `[PENDIENTES] feat: sistema de pendientes rastreables con historial y bloqueos`  
 **Descripción:** App `apps/pendientes` con modelos `Pendiente` (estados abierto/en_proceso/bloqueado/cerrado, prioridades, motivos de bloqueo, asignación ManyToMany, módulo relacionado, fecha límite, fecha de cierre, cerrado_por), `HistorialPendiente` (trazabilidad de cada cambio de estado con nota y usuario), y `FotoPendiente` (máximo 4 fotos por pendiente en momentos apertura/seguimiento/cierre). Señales Django que registran historial automáticamente al cambiar estado, establecen fecha_cierre al cerrar, y validan que el bloqueo siempre tenga motivo. Endpoints: `GET/POST /api/v1/pendientes/`, `GET/PATCH /api/v1/pendientes/{id}/`, `GET /api/v1/pendientes/{id}/historial/`, `POST /api/v1/pendientes/{id}/cambiar-estado/`, `GET /api/v1/pendientes/resumen/`, `POST /api/v1/pendientes/{id}/fotos/`, `DELETE /api/v1/pendientes/{id}/fotos/{foto_id}/`. Permisos estrictos: `campo` solo ve sus pendientes asignados y solo puede cambiar a en_proceso/bloqueado; `administrador`/`superadmin` tienen acceso completo. Endpoint `GET /api/v1/auth/usuarios/` agregado para el multiselect de asignación. Custom exception handler para convertir `django.core.exceptions.ValidationError` a respuestas HTTP 400 en la API. Frontend: página `/pendientes` con vista lista para admin/superadmin (tabs por estado con conteo, cards clickeables con badges de estado/prioridad, bloqueados destacados en naranja, botón fijo "Nuevo pendiente"), vista tarjetas para campo (cards grandes mobile-first con estado legible, empty state amigable), formulario de 3 pasos (título/descripción/prioridad → asignado_a/origen → módulo/fecha_límite), vista detalle con timeline de historial, componente para cambiar estado con motivos de bloqueo, galería de fotos con lightbox y contador 3/4. Widget `ResumenPendientes` exportable para el dashboard.  
 **Notas:** 13 nuevos tests backend (todos OK) — 38/38 totales. `npm run build` y `npm run lint` sin errores. No fue posible tomar screenshots de navegador (faltan librerías Chromium en el entorno).
+
+---
+
+### 🟢 Push #5
+**Módulo:** Módulo 4 — Ganado — recorridos GPS  
+**Fecha:** 2026-06-26  
+**Branch:** main  
+**Commit:** `[GANADO] feat: recorridos con catálogo de 27 corraletas reales, mapa Leaflet y narrativa`  
+**Descripción:** App `apps/ganado` con modelos `Corraleta` (catálogo fijo de 27 ubicaciones reales con coordenadas GPS), `RecorridoGanado` (fecha, responsable, asistentes M2M, número de cabezas, estado del hato, color para diferenciación visual, narrativa libre), `ParadaRecorrido` (tabla intermedia con campo `orden` para mantener secuencia) y `FotoRecorrido` (máx. 4 por recorrido). Data migration precarga las 27 corraletas reales del rancho. Permisos: `campo` crea y solo ve recorridos donde es responsable o asistente; `administrador`/`superadmin` ven todos y eliminan; catálogo solo editable por admin. Endpoints completos con filtros por fecha, responsable, estado_hato y corraleta, más endpoint `resumen/` con total del mes, último recorrido y alertas. Frontend: wizard mobile-first de 3 pasos (info del recorrido con selector de estado por 3 botones grandes + 6 colores; mapa Leaflet con 27 marcadores interactivos + polyline en color del recorrido + chips para seleccionar orden de paradas; carga de fotos desde cámara). Historial agrupado por fecha con tarjetas y alerta visual si hay estado crítico/alerta en el día. Vista detalle con mapa en modo lectura, ruta numerada y lightbox de fotos. Widget `ResumenGanado` para dashboard. `react-leaflet@5 + leaflet@1.9` instalados.  
+**Notas:** 46/46 tests backend OK (8 nuevos). `npm run build` sin errores. El único error de lint es pre-existente en `VistaListaAdmin.jsx` del Módulo 3 (no modificado).
 
 ---
 

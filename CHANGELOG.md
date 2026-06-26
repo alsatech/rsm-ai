@@ -3,13 +3,6 @@
 
 ---
 
-## Unreleased
-
-### En desarrollo
-- Módulo 3 — Pendientes rastreables
-
----
-
 ## Versiones
 
 _Se registran aquí al completar cada módulo._
@@ -57,7 +50,18 @@ _Se registran aquí al completar cada módulo._
 - Ruta `/pendientes` registrada en `App.jsx` y `modules.js` actualizado con `ruta` y acceso a campo
 
 ### v0.4.0 — Ganado — recorridos GPS
-> Pendiente
+- App `apps/ganado`: modelos `Corraleta` (catálogo fijo de 27 ubicaciones reales), `RecorridoGanado` (fecha, responsable, asistentes M2M, cabezas, estado_hato, color, narrativa, observaciones), `ParadaRecorrido` (tabla intermedia con orden) y `FotoRecorrido` (máx. 4 fotos)
+- Data migration `0002_precarga_corraletas` carga las 27 corraletas reales de la reserva con coordenadas exactas GPS
+- Endpoints: `GET /api/v1/ganado/corraletas/`, `GET/POST /api/v1/ganado/recorridos/`, `GET/PATCH/DELETE /api/v1/ganado/recorridos/{id}/`, `GET /api/v1/ganado/recorridos/resumen/`, fotos (subir y eliminar)
+- Permisos: `campo` crea recorridos y solo ve los que es responsable o asistente; `administrador`/`superadmin` ven todos y pueden eliminar; CRUD de corraletas solo para `administrador`/`superadmin`
+- Filtros: fecha, fecha_desde/hasta, responsable, estado_hato, corraleta
+- 8 tests backend (todos OK): corraletas precargadas, paradas ordenadas, campo ve solo los suyos, admin ve todos, asistente ve el recorrido, mínimo 2 paradas, máximo 4 fotos, creación exitosa
+- Frontend: página `/ganado` con wizard mobile-first de 3 pasos: (1) info del recorrido con selector de estado por 3 botones grandes, selector de color como círculos coloreados y multiselect de asistentes; (2) mapa Leaflet + OpenStreetMap con las 27 corraletas como marcadores interactivos, lista de chips para seleccionar paradas en orden y polyline con el color del recorrido; (3) fotos con captura desde cámara y miniaturas
+- Vista historial agrupada por fecha con tarjetas que muestran estado, ruta resumida y narrativa
+- Vista detalle en modo solo lectura con mapa, ruta numerada, fotos con lightbox
+- Alertas visuales en historial cuando hay recorridos con estado alerta/crítico del día
+- Widget `ResumenGanado` exportable para el dashboard (último recorrido, total mes, alertas)
+- react-leaflet + leaflet instalados como dependencia
 
 ### v0.5.0 — Flota vehicular
 > Pendiente

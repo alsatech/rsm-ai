@@ -24,6 +24,7 @@ export const MODULOS = [
     descripcion: 'Recorridos y monitoreo del ganado en mapa',
     icono: '🐄',
     roles: ['campo', 'administrador', 'superadmin'],
+    ruta: '/ganado',
   },
   {
     id: 'flota',

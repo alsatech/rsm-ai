@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'apps.users',
     'apps.hidraulica',
     'apps.pendientes',
+    'apps.ganado',
 ]
 
 MIDDLEWARE = [
