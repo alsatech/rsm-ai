@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 
+import { getMe } from '../../../api/auth'
 import { createRecorrido, getCorraletas, subirFotoRecorrido } from '../../../api/ganado'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
@@ -33,11 +34,19 @@ export default function WizardNuevoRecorrido({ onVolver, onGuardado }) {
   const [corraletas, setCorraletas] = useState([])
   const [guardando, setGuardando] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
+  const [userId, setUserId] = useState(null)
 
   useEffect(() => {
     getCorraletas()
       .then(({ data }) => setCorraletas(data))
       .catch(() => showToast('No se pudo cargar el catálogo de corraletas.', 'error'))
+    // Obtener el id real del usuario (no está en el perfil almacenado en localStorage)
+    getMe()
+      .then(({ data }) => {
+        setUserId(data.id)
+        setForm((f) => ({ ...f, responsable: data.id }))
+      })
+      .catch(() => {})
   }, [showToast])
 
   const handleChange = (campo, valor) => {
@@ -103,10 +112,19 @@ export default function WizardNuevoRecorrido({ onVolver, onGuardado }) {
       showToast('Recorrido guardado correctamente.', 'exito')
       onGuardado()
     } catch (err) {
-      const msg =
-        err?.response?.data?.paradas?.[0] ||
-        err?.response?.data?.detail ||
-        'Error al guardar el recorrido.'
+      const data = err?.response?.data
+      let msg = 'Error al guardar el recorrido.'
+      if (data) {
+        if (typeof data === 'string') {
+          msg = data
+        } else if (data.detail) {
+          msg = data.detail
+        } else {
+          const primerCampo = Object.keys(data)[0]
+          const primerError = data[primerCampo]
+          msg = Array.isArray(primerError) ? `${primerCampo}: ${primerError[0]}` : msg
+        }
+      }
       setErrorMsg(msg)
       showToast(msg, 'error')
     } finally {
@@ -156,7 +174,7 @@ export default function WizardNuevoRecorrido({ onVolver, onGuardado }) {
         )}
 
         {paso === 1 && (
-          <Paso1Info data={form} onChange={handleChange} currentUser={user} />
+          <Paso1Info data={form} onChange={handleChange} currentUserId={userId} />
         )}
         {paso === 2 && (
           <Paso2Corraletas

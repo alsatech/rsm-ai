@@ -91,7 +91,10 @@ class RecorridoGanadoListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
-        serializer.save(created_by=self.request.user)
+        extra = {'created_by': self.request.user}
+        if 'responsable' not in serializer.validated_data:
+            extra['responsable'] = self.request.user
+        serializer.save(**extra)
 
 
 class ResumenGanadoView(APIView):

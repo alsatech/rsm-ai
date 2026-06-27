@@ -6,7 +6,7 @@ import { COLOR_LABELS, COLOR_MAP, ESTADO_CONFIG } from './colorConfig'
 const COLORES = Object.keys(COLOR_MAP)
 const ESTADOS = ['bien', 'alerta', 'critico']
 
-export default function Paso1Info({ data, onChange, currentUser }) {
+export default function Paso1Info({ data, onChange, currentUserId }) {
   const [usuarios, setUsuarios] = useState([])
 
   useEffect(() => {
@@ -15,7 +15,7 @@ export default function Paso1Info({ data, onChange, currentUser }) {
       .catch(() => {})
   }, [])
 
-  const otrosUsuarios = usuarios.filter((u) => u.id !== currentUser?.id)
+  const otrosUsuarios = usuarios.filter((u) => u.id !== currentUserId)
 
   const toggleAsistente = (id) => {
     const actual = data.asistentes ?? []

@@ -126,6 +126,25 @@ class RecorridoAPITest(APITestCase):
         resp = self.client.post('/api/v1/ganado/recorridos/', data, format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
 
+    def test_crear_recorrido_sin_responsable_usa_usuario_actual(self):
+        """Caso real: frontend no envía responsable porque user.id no está en el perfil localStorage."""
+        self._auth(self.campo1)
+        data = {
+            'fecha': '2026-06-26',
+            # sin 'responsable' — simula el bug del frontend
+            'estado_hato': 'bien',
+            'color': 'azul_claro',
+            'narrativa': 'Test sin responsable explícito',
+            'paradas': [
+                {'corraleta': self.c1.id, 'orden': 1},
+                {'corraleta': self.c2.id, 'orden': 2},
+            ],
+        }
+        resp = self.client.post('/api/v1/ganado/recorridos/', data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        recorrido = RecorridoGanado.objects.get(pk=resp.data['id'])
+        self.assertEqual(recorrido.responsable, self.campo1)
+
     def test_maximo_4_fotos(self):
         from PIL import Image
 

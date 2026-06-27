@@ -94,10 +94,16 @@ class RecorridoGanadoSerializer(serializers.ModelSerializer):
 
 class RecorridoGanadoCreateSerializer(serializers.ModelSerializer):
     paradas = ParadaRecorridoSerializer(many=True)
+    # required=False porque si no viene, perform_create usa request.user
+    responsable = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+    )
 
     class Meta:
         model = RecorridoGanado
         fields = (
+            'id',
             'fecha',
             'responsable',
             'asistentes',
@@ -108,6 +114,7 @@ class RecorridoGanadoCreateSerializer(serializers.ModelSerializer):
             'observaciones',
             'paradas',
         )
+        read_only_fields = ('id',)
 
     def validate_paradas(self, value):
         if len(value) < 2:
