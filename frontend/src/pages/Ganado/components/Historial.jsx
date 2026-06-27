@@ -110,7 +110,7 @@ export default function Historial({ recargar, onVerDetalle, onNuevo }) {
                   <TarjetaRecorrido
                     key={r.id}
                     recorrido={r}
-                    onClick={() => onVerDetalle(r.id)}
+                    onClick={() => onVerDetalle(r)}
                   />
                 ))}
               </div>

@@ -63,6 +63,15 @@ _Se registran aquí al completar cada módulo._
 - Widget `ResumenGanado` exportable para el dashboard (último recorrido, total mes, alertas)
 - react-leaflet + leaflet instalados como dependencia
 
+### v0.4.1 — Ganado: flujo iniciar/agregar paradas con puntos libres (ajuste Módulo 4)
+- Migración `0003_ganado_estado_parada_libre`: `RecorridoGanado` recibe campos `estado` (en_curso/finalizado), `hora_inicio` (auto), `hora_fin` (nullable). `ParadaRecorrido` ahora acepta `corraleta` nullable o `nombre_libre` + `lat`/`lng` opcionales para puntos fuera del catálogo
+- 4 nuevos endpoints: `POST /api/v1/ganado/recorridos/iniciar/` (estado en_curso), `POST /recorridos/{id}/agregar-parada/` (auto-orden, corraleta o nombre_libre), `DELETE /recorridos/{id}/paradas/{parada_id}/` (undo), `PATCH /recorridos/{id}/finalizar/` (cierra con estado_hato, narrativa y hora_fin)
+- `RecorridoGanadoListCreateView.perform_create` fuerza `estado=finalizado` para el flujo antiguo
+- 5 tests nuevos (14 totales): iniciar_crea_en_curso, agregar_parada_con_corraleta, agregar_parada_con_nombre_libre, parada_sin_datos_falla, finalizar_cambia_estado_y_hora_fin
+- Frontend: reemplaza el wizard de 3 pasos por flujo `PantallaIniciar → PantallaEnCurso → PantallaFinalizar`; `PantallaEnCurso` tiene mapa en vivo, sheet con 2 tabs (catálogo de corraletas con chips / lugar libre con coords opcionales), botón deshacer (llama DELETE parada) y botón Finalizar
+- Recorridos en_curso en el historial se reanudan tocándolos (redirige a PantallaEnCurso con paradas ya cargadas)
+- `MapaRecorrido` actualizado: API unificada `paradas=[{orden,tipo,lat,lng,nombre,corraleta_id}]`, puntos libres con coords se renderizan como círculo con borde punteado
+
 ### v0.5.0 — Flota vehicular
 > Pendiente
 

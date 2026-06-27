@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.core.exceptions import ValidationError
 from django.db import models
 
 User = get_user_model()
@@ -33,6 +34,10 @@ class RecorridoGanado(models.Model):
         MORADO = 'morado', 'Morado'
         AMARILLO = 'amarillo', 'Amarillo'
 
+    class Estado(models.TextChoices):
+        EN_CURSO = 'en_curso', 'En curso'
+        FINALIZADO = 'finalizado', 'Finalizado'
+
     fecha = models.DateField()
     responsable = models.ForeignKey(
         User, on_delete=models.PROTECT, related_name='recorridos_responsable'
@@ -41,13 +46,22 @@ class RecorridoGanado(models.Model):
         User, related_name='recorridos_asistidos', blank=True
     )
     numero_cabezas = models.IntegerField(null=True, blank=True)
-    estado_hato = models.CharField(max_length=10, choices=EstadoHato.choices)
-    color = models.CharField(max_length=20, choices=Color.choices, default=Color.AZUL_CLARO)
+    estado = models.CharField(
+        max_length=15, choices=Estado.choices, default=Estado.EN_CURSO
+    )
+    estado_hato = models.CharField(
+        max_length=10, choices=EstadoHato.choices, blank=True
+    )
+    color = models.CharField(
+        max_length=20, choices=Color.choices, default=Color.AZUL_CLARO
+    )
     corraletas_visitadas = models.ManyToManyField(
         Corraleta, through='ParadaRecorrido', blank=True
     )
-    narrativa = models.TextField()
+    narrativa = models.TextField(blank=True)
     observaciones = models.TextField(blank=True)
+    hora_inicio = models.DateTimeField(auto_now_add=True)
+    hora_fin = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         User, on_delete=models.PROTECT, related_name='recorridos_creados'
     )
@@ -68,9 +82,18 @@ class ParadaRecorrido(models.Model):
     recorrido = models.ForeignKey(
         RecorridoGanado, on_delete=models.CASCADE, related_name='paradas'
     )
-    corraleta = models.ForeignKey(Corraleta, on_delete=models.PROTECT)
+    corraleta = models.ForeignKey(
+        Corraleta, on_delete=models.PROTECT, null=True, blank=True
+    )
+    nombre_libre = models.CharField(max_length=150, null=True, blank=True)
+    lat = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    lng = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     orden = models.IntegerField()
     hora_llegada = models.TimeField(null=True, blank=True)
+
+    def clean(self):
+        if not self.corraleta_id and not self.nombre_libre:
+            raise ValidationError('La parada debe tener corraleta o nombre de lugar.')
 
     class Meta:
         ordering = ['orden']
@@ -79,7 +102,8 @@ class ParadaRecorrido(models.Model):
         verbose_name_plural = 'Paradas de recorrido'
 
     def __str__(self):
-        return f'{self.recorrido} — Parada {self.orden}: {self.corraleta.nombre}'
+        nombre = self.corraleta.nombre if self.corraleta_id else (self.nombre_libre or 'Punto libre')
+        return f'{self.recorrido} — Parada {self.orden}: {nombre}'
 
 
 class FotoRecorrido(models.Model):

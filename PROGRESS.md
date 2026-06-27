@@ -89,4 +89,14 @@
 
 ---
 
+### 🟢 Push #6
+**Módulo:** Ajuste Módulo 4 — Ganado: flujo iniciar/agregar paradas con puntos libres  
+**Fecha:** 2026-06-27  
+**Branch:** main  
+**Commit:** `[GANADO] feat: flujo iniciar/agregar paradas con puntos libres fuera del catálogo`  
+**Descripción:** Ajuste al Módulo 4 basado en la realidad operativa: los vaqueros no siempre pasan solo por corraletas del catálogo. Se agregan campos `estado` (en_curso/finalizado), `hora_inicio` (auto), `hora_fin` a `RecorridoGanado`. `ParadaRecorrido` ahora acepta `corraleta` (FK nullable) o `nombre_libre` (texto libre) con `lat`/`lng` opcionales. 4 nuevos endpoints: `POST /iniciar/` (crea recorrido en_curso sin narrativa todavía), `POST /{id}/agregar-parada/` (agrega paradas una a una con auto-orden), `DELETE /{id}/paradas/{parada_id}/` (undo), `PATCH /{id}/finalizar/` (cierra el recorrido con estado_hato + narrativa + hora_fin). Frontend reemplaza el wizard de 3 pasos por flujo dinámico: `PantallaIniciar` (fecha, color, asistentes → llama /iniciar/), `PantallaEnCurso` (mapa en vivo, sheet con 2 tabs: catálogo de 27 corraletas o lugar libre con coords opcionales, botón deshacer, botón Finalizar), `PantallaFinalizar` (estado_hato, narrativa, fotos → llama /finalizar/ luego sube fotos). Recorridos en_curso del historial se pueden reanudar tocándolos. `MapaRecorrido` actualizado para diferencias puntos libres (círculo con borde punteado) vs corraletas del catálogo.  
+**Notas:** 14/14 tests backend OK (5 nuevos). `npm run build` sin errores. Sin errores de lint nuevos.
+
+---
+
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._

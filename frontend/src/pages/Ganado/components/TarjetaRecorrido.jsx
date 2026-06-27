@@ -5,8 +5,18 @@ function formatFecha(fecha) {
   return `${d}/${m}/${y}`
 }
 
+const EN_CURSO_BADGE = {
+  icon: '⏳',
+  label: 'En curso',
+  border: 'border-yellow-500',
+  text: 'text-yellow-400',
+}
+
 export default function TarjetaRecorrido({ recorrido, onClick }) {
-  const estado = ESTADO_CONFIG[recorrido.estado_hato] ?? ESTADO_CONFIG.bien
+  const badge =
+    recorrido.estado === 'en_curso'
+      ? EN_CURSO_BADGE
+      : (ESTADO_CONFIG[recorrido.estado_hato] ?? ESTADO_CONFIG.bien)
   const lineColor = COLOR_MAP[recorrido.color] ?? '#60a5fa'
   const paradas = recorrido.paradas ?? []
 
@@ -29,8 +39,8 @@ export default function TarjetaRecorrido({ recorrido, onClick }) {
             </p>
           )}
         </div>
-        <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${estado.border} ${estado.text}`}>
-          {estado.icon} {estado.label}
+        <div className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${badge.border} ${badge.text}`}>
+          {badge.icon} {badge.label}
         </div>
       </div>
 
@@ -43,12 +53,14 @@ export default function TarjetaRecorrido({ recorrido, onClick }) {
       {/* Ruta */}
       {paradas.length > 0 && (
         <p className="mb-2 line-clamp-1 text-xs text-text-secondary">
-          {paradas.map((p) => p.corraleta_detalle?.nombre).filter(Boolean).join(' → ')}
+          {paradas.map((p) => p.corraleta_detalle?.nombre ?? p.nombre_libre ?? 'Punto libre').join(' → ')}
         </p>
       )}
 
       {/* Narrativa */}
-      <p className="line-clamp-2 text-sm text-text-secondary">{recorrido.narrativa}</p>
+      <p className="line-clamp-2 text-sm text-text-secondary">
+        {recorrido.narrativa || (recorrido.estado === 'en_curso' ? 'Recorrido en progreso...' : '')}
+      </p>
 
       {/* Footer */}
       <div className="mt-3 flex items-center justify-between text-xs text-text-secondary">

@@ -175,3 +175,75 @@ class RecorridoAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         ids = [item['id'] for item in resp.data]
         self.assertIn(r.id, ids)
+
+
+class IniciarFinalizarAPITest(APITestCase):
+    def setUp(self):
+        self.campo = crear_usuario('campo_flow', 'campo')
+        self.c1 = crear_corraleta('Flow-C1')
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _crear_en_curso(self):
+        return RecorridoGanado.objects.create(
+            fecha='2026-06-27',
+            responsable=self.campo,
+            created_by=self.campo,
+            color='verde',
+        )
+
+    def test_iniciar_recorrido_crea_en_curso(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/ganado/recorridos/iniciar/',
+            {'fecha': '2026-06-27', 'color': 'verde'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['estado'], 'en_curso')
+
+    def test_agregar_parada_con_corraleta(self):
+        self._auth(self.campo)
+        rec = self._crear_en_curso()
+        resp = self.client.post(
+            f'/api/v1/ganado/recorridos/{rec.id}/agregar-parada/',
+            {'corraleta': self.c1.id},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['orden'], 1)
+
+    def test_agregar_parada_con_nombre_libre(self):
+        self._auth(self.campo)
+        rec = self._crear_en_curso()
+        resp = self.client.post(
+            f'/api/v1/ganado/recorridos/{rec.id}/agregar-parada/',
+            {'nombre_libre': 'La lomita del aguaje', 'lat': '29.520', 'lng': '-101.555'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['nombre_libre'], 'La lomita del aguaje')
+
+    def test_parada_sin_corraleta_ni_nombre_libre_falla(self):
+        self._auth(self.campo)
+        rec = self._crear_en_curso()
+        resp = self.client.post(
+            f'/api/v1/ganado/recorridos/{rec.id}/agregar-parada/',
+            {},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_finalizar_cambia_estado_y_hora_fin(self):
+        self._auth(self.campo)
+        rec = self._crear_en_curso()
+        resp = self.client.patch(
+            f'/api/v1/ganado/recorridos/{rec.id}/finalizar/',
+            {'estado_hato': 'bien', 'narrativa': 'Todo bien en el rancho.'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        rec.refresh_from_db()
+        self.assertEqual(rec.estado, RecorridoGanado.Estado.FINALIZADO)
+        self.assertIsNotNone(rec.hora_fin)

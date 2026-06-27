@@ -46,11 +46,13 @@ export default function DetalleRecorrido({ id, onVolver }) {
 
   const estado = ESTADO_CONFIG[recorrido.estado_hato] ?? ESTADO_CONFIG.bien
   const lineColor = COLOR_MAP[recorrido.color] ?? '#60a5fa'
-  const paradasSeleccionadas = (recorrido.paradas ?? []).map((p) => ({
-    id: p.corraleta,
-    lat: p.corraleta_detalle?.lat,
-    lng: p.corraleta_detalle?.lng,
-    nombre: p.corraleta_detalle?.nombre,
+  const paradasParaMapa = (recorrido.paradas ?? []).map((p) => ({
+    orden: p.orden,
+    tipo: p.corraleta ? 'corraleta' : 'libre',
+    corraleta_id: p.corraleta ?? null,
+    lat: p.corraleta_detalle?.lat ?? p.lat ?? null,
+    lng: p.corraleta_detalle?.lng ?? p.lng ?? null,
+    nombre: p.corraleta_detalle?.nombre ?? p.nombre_libre ?? 'Punto libre',
   }))
 
   return (
@@ -83,7 +85,7 @@ export default function DetalleRecorrido({ id, onVolver }) {
         {/* Mapa */}
         <MapaRecorrido
           corraletas={corraletas}
-          paradasSeleccionadas={paradasSeleccionadas}
+          paradas={paradasParaMapa}
           color={recorrido.color}
           readOnly
           height="300px"
@@ -102,7 +104,7 @@ export default function DetalleRecorrido({ id, onVolver }) {
                   >
                     {i + 1}
                   </span>
-                  {p.corraleta_detalle?.nombre}
+                  {p.corraleta_detalle?.nombre ?? p.nombre_libre ?? 'Punto libre'}
                   {p.hora_llegada && (
                     <span className="ml-auto font-mono text-xs text-text-secondary">
                       {p.hora_llegada}

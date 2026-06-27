@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -8,7 +8,7 @@ from rest_framework.views import APIView
 
 from apps.users.models import User
 
-from .models import FotoRecorrido, RecorridoGanado, Corraleta
+from .models import Corraleta, FotoRecorrido, ParadaRecorrido, RecorridoGanado
 from .permissions import (
     PuedeCrearRecorrido,
     PuedeEliminarRecorrido,
@@ -16,8 +16,12 @@ from .permissions import (
     PuedeVerRecorridos,
 )
 from .serializers import (
+    AgregarParadaSerializer,
     CorraletaSerializer,
+    FinalizarRecorridoSerializer,
     FotoRecorridoSerializer,
+    IniciarRecorridoSerializer,
+    ParadaRecorridoSerializer,
     RecorridoGanadoCreateSerializer,
     RecorridoGanadoSerializer,
 )
@@ -91,6 +95,20 @@ class RecorridoGanadoListCreateView(generics.ListCreateAPIView):
         return qs
 
     def perform_create(self, serializer):
+        extra = {
+            'created_by': self.request.user,
+            'estado': RecorridoGanado.Estado.FINALIZADO,
+        }
+        if 'responsable' not in serializer.validated_data:
+            extra['responsable'] = self.request.user
+        serializer.save(**extra)
+
+
+class IniciarRecorridoView(generics.CreateAPIView):
+    serializer_class = IniciarRecorridoSerializer
+    permission_classes = [IsAuthenticated, PuedeCrearRecorrido]
+
+    def perform_create(self, serializer):
         extra = {'created_by': self.request.user}
         if 'responsable' not in serializer.validated_data:
             extra['responsable'] = self.request.user
@@ -107,7 +125,7 @@ class ResumenGanadoView(APIView):
 
         total_mes = qs.filter(fecha__gte=inicio_mes).count()
 
-        ultimo = qs.first()
+        ultimo = qs.filter(estado=RecorridoGanado.Estado.FINALIZADO).first()
         ultimo_data = None
         if ultimo:
             ultimo_data = {
@@ -147,6 +165,66 @@ class RecorridoGanadoDetailView(generics.RetrieveUpdateDestroyAPIView):
 
     def get_queryset(self):
         return _qs_recorrido_base(self.request.user)
+
+
+class AgregarParadaView(APIView):
+    permission_classes = [IsAuthenticated, PuedeCrearRecorrido]
+
+    def post(self, request, pk):
+        qs = _qs_recorrido_base(request.user)
+        recorrido = get_object_or_404(qs, pk=pk)
+        if recorrido.estado != RecorridoGanado.Estado.EN_CURSO:
+            return Response(
+                {'detail': 'El recorrido ya fue finalizado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = AgregarParadaSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        max_orden = recorrido.paradas.aggregate(m=Max('orden'))['m'] or 0
+        parada = serializer.save(recorrido=recorrido, orden=max_orden + 1)
+        return Response(
+            ParadaRecorridoSerializer(parada).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class EliminarParadaView(APIView):
+    permission_classes = [IsAuthenticated, PuedeCrearRecorrido]
+
+    def delete(self, request, pk, parada_id):
+        qs = _qs_recorrido_base(request.user)
+        recorrido = get_object_or_404(qs, pk=pk)
+        if recorrido.estado != RecorridoGanado.Estado.EN_CURSO:
+            return Response(
+                {'detail': 'El recorrido ya fue finalizado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        parada = get_object_or_404(ParadaRecorrido, pk=parada_id, recorrido=recorrido)
+        parada.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class FinalizarRecorridoView(APIView):
+    permission_classes = [IsAuthenticated, PuedeCrearRecorrido]
+
+    def patch(self, request, pk):
+        qs = _qs_recorrido_base(request.user)
+        recorrido = get_object_or_404(qs, pk=pk)
+        if recorrido.estado == RecorridoGanado.Estado.FINALIZADO:
+            return Response(
+                {'detail': 'El recorrido ya fue finalizado.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = FinalizarRecorridoSerializer(recorrido, data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer.save(estado=RecorridoGanado.Estado.FINALIZADO, hora_fin=timezone.now())
+        return Response(serializer.data)
 
 
 class FotoRecorridoListView(APIView):

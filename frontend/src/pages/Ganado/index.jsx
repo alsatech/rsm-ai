@@ -10,18 +10,39 @@ export default function Ganado() {
   const { user } = useAuth()
   const [vista, setVista] = useState('historial')
   const [recorridoId, setRecorridoId] = useState(null)
+  const [recorridoActivo, setRecorridoActivo] = useState(null)
   const [recargar, setRecargar] = useState(0)
 
   const puedeCrear = ['campo', 'administrador', 'superadmin'].includes(user?.rol)
 
+  const handleVerDetalle = (recorrido) => {
+    if (recorrido.estado === 'en_curso' && puedeCrear) {
+      setRecorridoActivo(recorrido)
+      setVista('nuevo')
+    } else {
+      setRecorridoId(recorrido.id)
+      setVista('detalle')
+    }
+  }
+
+  const handleVolver = () => {
+    setRecorridoActivo(null)
+    setRecorridoId(null)
+    setVista('historial')
+  }
+
+  const handleGuardado = () => {
+    setRecorridoActivo(null)
+    setVista('historial')
+    setRecargar((r) => r + 1)
+  }
+
   if (vista === 'nuevo') {
     return (
       <WizardNuevoRecorrido
-        onVolver={() => setVista('historial')}
-        onGuardado={() => {
-          setVista('historial')
-          setRecargar((r) => r + 1)
-        }}
+        recorridoInicial={recorridoActivo}
+        onVolver={handleVolver}
+        onGuardado={handleGuardado}
       />
     )
   }
@@ -30,17 +51,13 @@ export default function Ganado() {
     return (
       <DetalleRecorrido
         id={recorridoId}
-        onVolver={() => {
-          setRecorridoId(null)
-          setVista('historial')
-        }}
+        onVolver={handleVolver}
       />
     )
   }
 
   return (
     <div className="min-h-svh bg-bg">
-      {/* Header */}
       <header className="sticky top-0 z-10 border-b border-border bg-bg px-4 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -59,7 +76,7 @@ export default function Ganado() {
           {puedeCrear && (
             <button
               type="button"
-              onClick={() => setVista('nuevo')}
+              onClick={() => { setRecorridoActivo(null); setVista('nuevo') }}
               className="flex items-center gap-2 rounded-xl bg-accent px-4 py-2.5 text-sm font-semibold text-highlight transition hover:opacity-90"
             >
               <span>+</span> Nuevo
@@ -68,14 +85,10 @@ export default function Ganado() {
         </div>
       </header>
 
-      {/* Historial */}
       <Historial
         recargar={recargar}
-        onVerDetalle={(id) => {
-          setRecorridoId(id)
-          setVista('detalle')
-        }}
-        onNuevo={() => setVista('nuevo')}
+        onVerDetalle={handleVerDetalle}
+        onNuevo={() => { setRecorridoActivo(null); setVista('nuevo') }}
       />
     </div>
   )

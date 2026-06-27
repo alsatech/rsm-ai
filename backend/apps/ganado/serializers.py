@@ -30,8 +30,18 @@ class ParadaRecorridoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ParadaRecorrido
-        fields = ('id', 'corraleta', 'corraleta_detalle', 'orden', 'hora_llegada')
+        fields = (
+            'id', 'corraleta', 'corraleta_detalle',
+            'nombre_libre', 'lat', 'lng', 'orden', 'hora_llegada',
+        )
         read_only_fields = ('id',)
+
+    def validate(self, data):
+        if not data.get('corraleta') and not data.get('nombre_libre'):
+            raise serializers.ValidationError(
+                'La parada debe tener corraleta o nombre de lugar.'
+            )
+        return data
 
 
 class FotoRecorridoSerializer(serializers.ModelSerializer):
@@ -60,6 +70,7 @@ class RecorridoGanadoSerializer(serializers.ModelSerializer):
     paradas = ParadaRecorridoSerializer(many=True, read_only=True)
     fotos = FotoRecorridoSerializer(many=True, read_only=True)
     estado_hato_display = serializers.CharField(source='get_estado_hato_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     color_display = serializers.CharField(source='get_color_display', read_only=True)
     created_by_nombre = serializers.SerializerMethodField()
 
@@ -68,6 +79,8 @@ class RecorridoGanadoSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'fecha',
+            'estado',
+            'estado_display',
             'responsable',
             'responsable_detalle',
             'asistentes',
@@ -81,20 +94,22 @@ class RecorridoGanadoSerializer(serializers.ModelSerializer):
             'observaciones',
             'paradas',
             'fotos',
+            'hora_inicio',
+            'hora_fin',
             'created_by',
             'created_by_nombre',
             'created_at',
             'updated_at',
         )
-        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'estado', 'hora_inicio', 'hora_fin', 'created_by', 'created_at', 'updated_at')
 
     def get_created_by_nombre(self, obj):
         return obj.created_by.get_full_name() or obj.created_by.username
 
 
 class RecorridoGanadoCreateSerializer(serializers.ModelSerializer):
+    """Serializer para el flujo antiguo: crear recorrido completo de una sola vez."""
     paradas = ParadaRecorridoSerializer(many=True)
-    # required=False porque si no viene, perform_create usa request.user
     responsable = serializers.PrimaryKeyRelatedField(
         queryset=User.objects.all(),
         required=False,
@@ -115,6 +130,16 @@ class RecorridoGanadoCreateSerializer(serializers.ModelSerializer):
             'paradas',
         )
         read_only_fields = ('id',)
+
+    def validate_estado_hato(self, value):
+        if not value:
+            raise serializers.ValidationError('Selecciona el estado del hato.')
+        return value
+
+    def validate_narrativa(self, value):
+        if not value or not value.strip():
+            raise serializers.ValidationError('La narrativa es requerida.')
+        return value
 
     def validate_paradas(self, value):
         if len(value) < 2:
@@ -145,3 +170,48 @@ class RecorridoGanadoCreateSerializer(serializers.ModelSerializer):
             for parada_data in paradas_data:
                 ParadaRecorrido.objects.create(recorrido=instance, **parada_data)
         return instance
+
+
+class IniciarRecorridoSerializer(serializers.ModelSerializer):
+    """Inicia un recorrido en estado en_curso (sin estado_hato ni narrativa todavía)."""
+    responsable = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.all(),
+        required=False,
+    )
+
+    class Meta:
+        model = RecorridoGanado
+        fields = ('id', 'fecha', 'responsable', 'asistentes', 'color', 'estado')
+        read_only_fields = ('id', 'estado')
+
+    def create(self, validated_data):
+        asistentes = validated_data.pop('asistentes', [])
+        recorrido = RecorridoGanado.objects.create(**validated_data)
+        recorrido.asistentes.set(asistentes)
+        return recorrido
+
+
+class AgregarParadaSerializer(serializers.ModelSerializer):
+    """Agrega una sola parada a un recorrido en_curso."""
+
+    class Meta:
+        model = ParadaRecorrido
+        fields = ('id', 'corraleta', 'nombre_libre', 'lat', 'lng')
+        read_only_fields = ('id',)
+
+    def validate(self, data):
+        if not data.get('corraleta') and not data.get('nombre_libre'):
+            raise serializers.ValidationError(
+                'Indica una corraleta del catálogo o escribe el nombre del lugar.'
+            )
+        return data
+
+
+class FinalizarRecorridoSerializer(serializers.ModelSerializer):
+    """Cierra el recorrido con los datos del hato y la narrativa."""
+    estado_hato = serializers.ChoiceField(choices=RecorridoGanado.EstadoHato.choices)
+    narrativa = serializers.CharField(min_length=1)
+
+    class Meta:
+        model = RecorridoGanado
+        fields = ('numero_cabezas', 'estado_hato', 'narrativa', 'observaciones', 'color')

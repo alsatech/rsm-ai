@@ -13,3 +13,11 @@ export const subirFotoRecorrido = (id, formData) =>
   })
 export const eliminarFotoRecorrido = (id, fotoId) =>
   api.delete(`/api/v1/ganado/recorridos/${id}/fotos/${fotoId}/`)
+
+export const iniciarRecorrido = (data) => api.post('/api/v1/ganado/recorridos/iniciar/', data)
+export const agregarParada = (id, data) =>
+  api.post(`/api/v1/ganado/recorridos/${id}/agregar-parada/`, data)
+export const eliminarParada = (recorridoId, paradaId) =>
+  api.delete(`/api/v1/ganado/recorridos/${recorridoId}/paradas/${paradaId}/`)
+export const finalizarRecorrido = (id, data) =>
+  api.patch(`/api/v1/ganado/recorridos/${id}/finalizar/`, data)
