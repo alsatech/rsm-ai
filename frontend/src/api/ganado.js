@@ -21,3 +21,6 @@ export const eliminarParada = (recorridoId, paradaId) =>
   api.delete(`/api/v1/ganado/recorridos/${recorridoId}/paradas/${paradaId}/`)
 export const finalizarRecorrido = (id, data) =>
   api.patch(`/api/v1/ganado/recorridos/${id}/finalizar/`, data)
+export const syncParadas = (id, paradas) =>
+  api.post(`/api/v1/ganado/recorridos/${id}/sync-paradas/`, { paradas })
+export const getHeatmap = (params) => api.get('/api/v1/ganado/heatmap/', { params })

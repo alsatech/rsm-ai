@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react'
 
 import { finalizarRecorrido, subirFotoRecorrido } from '../../../api/ganado'
+import { limpiarRecorridoLocal } from '../../../api/ganadoOffline'
 import { useToast } from '../../../hooks/useToast'
 import { COLOR_LABELS, COLOR_MAP, ESTADO_CONFIG } from './colorConfig'
 
@@ -8,15 +9,16 @@ const MAX_FOTOS = 4
 const COLORES = Object.keys(COLOR_MAP)
 const ESTADOS = ['bien', 'alerta', 'critico']
 
-export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver, onGuardado }) {
+export default function PantallaFinalizar({ recorridoLocal, onVolver, onGuardado }) {
   const { showToast } = useToast()
   const inputRef = useRef(null)
+  const recorridoId = recorridoLocal?.id
 
   const [estadoHato, setEstadoHato] = useState('')
   const [narrativa, setNarrativa] = useState('')
   const [observaciones, setObservaciones] = useState('')
   const [numeroCabezas, setNumeroCabezas] = useState('')
-  const [color, setColor] = useState(colorInicial ?? 'azul_claro')
+  const [color, setColor] = useState(recorridoLocal?.color ?? 'azul_claro')
   const [fotos, setFotos] = useState([])
   const [guardando, setGuardando] = useState(false)
   const [errorMsg, setErrorMsg] = useState('')
@@ -33,14 +35,9 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
 
   const handleGuardar = async () => {
     setErrorMsg('')
-    if (!estadoHato) {
-      setErrorMsg('Selecciona el estado del hato.')
-      return
-    }
-    if (!narrativa.trim()) {
-      setErrorMsg('La narrativa es requerida.')
-      return
-    }
+    if (!recorridoId) { setErrorMsg('El recorrido aún no se ha sincronizado. Espera a tener señal.'); return }
+    if (!estadoHato) { setErrorMsg('Selecciona cómo está el ganado.'); return }
+    if (!narrativa.trim()) { setErrorMsg('Cuéntanos qué pasó en el recorrido.'); return }
 
     setGuardando(true)
     try {
@@ -51,14 +48,13 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
         numero_cabezas: numeroCabezas ? parseInt(numeroCabezas) : null,
         color,
       })
-
       for (const f of fotos) {
         const fd = new FormData()
         fd.append('foto', f.file)
         await subirFotoRecorrido(recorridoId, fd)
       }
-
-      showToast('Recorrido guardado correctamente.', 'exito')
+      limpiarRecorridoLocal()
+      showToast('✅ Recorrido guardado correctamente.', 'exito')
       onGuardado()
     } catch (err) {
       const data = err?.response?.data
@@ -85,28 +81,28 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
           <button
             type="button"
             onClick={onVolver}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-text-secondary hover:border-accent hover:text-text"
+            className="flex h-12 w-12 items-center justify-center rounded-full border border-border text-xl text-text-secondary hover:border-accent hover:text-text"
           >
             ←
           </button>
           <div>
-            <h1 className="font-bold text-highlight">Finalizar recorrido</h1>
-            <p className="text-xs text-text-secondary">Estado del hato y narrativa</p>
+            <h1 className="text-lg font-bold text-highlight">Cerrar recorrido</h1>
+            <p className="text-sm text-text-secondary">Últimos datos antes de guardar</p>
           </div>
         </div>
       </header>
 
-      <div className="px-4 py-6 space-y-6">
+      <div className="px-4 py-6 space-y-8">
         {errorMsg && (
-          <div className="rounded-xl border border-error bg-card px-4 py-3 text-sm text-error">
-            {errorMsg}
+          <div className="flex items-center gap-3 rounded-2xl border-2 border-error bg-card px-4 py-4 text-base font-semibold text-error">
+            <span className="text-2xl">⚠️</span> {errorMsg}
           </div>
         )}
 
-        {/* Estado del hato */}
+        {/* Estado del hato — SECCIÓN MÁS IMPORTANTE */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-text-secondary">
-            Estado del hato <span className="text-error">*</span>
+          <label className="mb-4 block text-lg font-bold text-text">
+            ¿Cómo está el ganado? <span className="text-error">*</span>
           </label>
           <div className="grid grid-cols-3 gap-3">
             {ESTADOS.map((e) => {
@@ -117,14 +113,16 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
                   key={e}
                   type="button"
                   onClick={() => setEstadoHato(e)}
-                  className={`flex min-h-[56px] flex-col items-center justify-center rounded-xl border-2 px-2 py-3 text-sm font-semibold transition ${
+                  className={`flex flex-col items-center justify-center gap-2 rounded-2xl border-2 py-5 transition ${
                     activo
-                      ? `${cfg.border} ${cfg.text} bg-card`
-                      : 'border-border text-text-secondary hover:border-accent'
+                      ? `${cfg.border} bg-card scale-105`
+                      : 'border-border hover:border-accent'
                   }`}
                 >
-                  <span className="mb-1 text-xl">{cfg.icon}</span>
-                  {cfg.label}
+                  <span className="text-4xl">{cfg.icon}</span>
+                  <span className={`text-base font-bold ${activo ? cfg.text : 'text-text-secondary'}`}>
+                    {cfg.label}
+                  </span>
                 </button>
               )
             })}
@@ -133,8 +131,8 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
 
         {/* Número de cabezas */}
         <div>
-          <label className="mb-1 block text-sm font-medium text-text-secondary">
-            Número de cabezas <span className="text-xs opacity-60">(opcional)</span>
+          <label className="mb-2 block text-base font-bold text-text">
+            🐄 ¿Cuántas cabezas? <span className="text-sm font-normal text-text-secondary">(opcional)</span>
           </label>
           <input
             type="number"
@@ -142,14 +140,42 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
             value={numeroCabezas}
             onChange={(e) => setNumeroCabezas(e.target.value)}
             placeholder="Ej: 45"
-            className="w-full rounded-lg border border-border bg-card px-4 py-3 text-text focus:border-highlight focus:outline-none"
+            className="w-full rounded-xl border-2 border-border bg-card px-4 py-4 text-xl font-bold text-text focus:border-highlight focus:outline-none"
+          />
+        </div>
+
+        {/* Narrativa */}
+        <div>
+          <label className="mb-2 block text-base font-bold text-text">
+            📝 ¿Qué pasó en el recorrido? <span className="text-error">*</span>
+          </label>
+          <textarea
+            value={narrativa}
+            onChange={(e) => setNarrativa(e.target.value)}
+            rows={5}
+            placeholder="Ej: Salieron de los corrales nuevos al callejón y de ahí al aguaje norte. El ganado está tranquilo..."
+            className="w-full resize-none rounded-xl border-2 border-border bg-card px-4 py-4 text-base text-text placeholder-text-secondary/60 focus:border-highlight focus:outline-none"
+          />
+        </div>
+
+        {/* Observaciones */}
+        <div>
+          <label className="mb-2 block text-base font-bold text-text">
+            📌 Observaciones <span className="text-sm font-normal text-text-secondary">(opcional)</span>
+          </label>
+          <textarea
+            value={observaciones}
+            onChange={(e) => setObservaciones(e.target.value)}
+            rows={2}
+            placeholder="Novedades, fallas, incidencias..."
+            className="w-full resize-none rounded-xl border-2 border-border bg-card px-4 py-4 text-base text-text placeholder-text-secondary/60 focus:border-highlight focus:outline-none"
           />
         </div>
 
         {/* Color */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-text-secondary">
-            Color del recorrido
+          <label className="mb-3 block text-base font-bold text-text">
+            🎨 Color del recorrido
           </label>
           <div className="flex flex-wrap gap-3">
             {COLORES.map((c) => (
@@ -158,49 +184,21 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
                 type="button"
                 onClick={() => setColor(c)}
                 title={COLOR_LABELS[c]}
-                className={`flex h-10 w-10 items-center justify-center rounded-full border-2 transition ${
-                  color === c ? 'border-text scale-110' : 'border-transparent'
+                className={`flex h-12 w-12 items-center justify-center rounded-full border-4 transition ${
+                  color === c ? 'border-highlight scale-110' : 'border-transparent'
                 }`}
                 style={{ backgroundColor: COLOR_MAP[c] }}
               >
-                {color === c && <span className="text-sm font-bold text-bg">✓</span>}
+                {color === c && <span className="text-lg font-bold text-bg">✓</span>}
               </button>
             ))}
           </div>
         </div>
 
-        {/* Narrativa */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text-secondary">
-            Narrativa <span className="text-error">*</span>
-          </label>
-          <textarea
-            value={narrativa}
-            onChange={(e) => setNarrativa(e.target.value)}
-            rows={4}
-            placeholder="¿Qué pasó en el recorrido?"
-            className="w-full resize-none rounded-lg border border-border bg-card px-4 py-3 text-sm text-text placeholder-text-secondary focus:border-highlight focus:outline-none"
-          />
-        </div>
-
-        {/* Observaciones */}
-        <div>
-          <label className="mb-1 block text-sm font-medium text-text-secondary">
-            Observaciones <span className="text-xs opacity-60">(opcional)</span>
-          </label>
-          <textarea
-            value={observaciones}
-            onChange={(e) => setObservaciones(e.target.value)}
-            rows={2}
-            placeholder="Novedades, incidencias, etc."
-            className="w-full resize-none rounded-lg border border-border bg-card px-4 py-3 text-sm text-text placeholder-text-secondary focus:border-highlight focus:outline-none"
-          />
-        </div>
-
         {/* Fotos */}
         <div>
-          <label className="mb-2 block text-sm font-medium text-text-secondary">
-            Fotos <span className="text-xs opacity-60">(opcional, máx. {MAX_FOTOS})</span>
+          <label className="mb-3 block text-base font-bold text-text">
+            📷 Fotos <span className="text-sm font-normal text-text-secondary">(opcional, máx. {MAX_FOTOS})</span>
           </label>
           {fotos.length < MAX_FOTOS && (
             <>
@@ -216,47 +214,49 @@ export default function PantallaFinalizar({ recorridoId, colorInicial, onVolver,
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
-                className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-accent py-4 text-sm font-semibold text-highlight transition hover:bg-card"
+                className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-accent py-5 text-lg font-bold text-highlight transition hover:bg-card"
               >
-                <span className="text-xl">📷</span> Tomar foto
+                <span className="text-3xl">📷</span> Tomar foto
               </button>
             </>
           )}
           {fotos.length > 0 && (
             <div className="mt-3 grid grid-cols-2 gap-3">
               {fotos.map((f, i) => (
-                <div key={i} className="relative aspect-square overflow-hidden rounded-xl border border-border">
+                <div key={i} className="relative aspect-square overflow-hidden rounded-2xl border-2 border-border">
                   <img src={f.preview} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
                   <button
                     type="button"
                     onClick={() => setFotos((prev) => prev.filter((_, idx) => idx !== i))}
-                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-bg/80 text-error hover:bg-bg"
+                    className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-bg/90 text-lg text-error"
                   >
                     ✕
                   </button>
+                  <span className="absolute bottom-2 left-2 rounded-lg bg-bg/80 px-2 py-0.5 font-mono text-sm font-bold text-highlight">
+                    {i + 1}/{MAX_FOTOS}
+                  </span>
                 </div>
               ))}
             </div>
           )}
-          <p className="mt-1 text-center text-xs text-text-secondary">{fotos.length}/{MAX_FOTOS}</p>
         </div>
       </div>
 
-      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-bg px-4 py-4">
+      {/* Botón guardar */}
+      <div className="fixed bottom-0 left-0 right-0 border-t border-border bg-bg px-4 py-5">
         <button
           type="button"
           onClick={handleGuardar}
           disabled={guardando}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl bg-accent py-5 text-lg font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-3 rounded-2xl bg-highlight py-5 text-xl font-bold text-bg transition hover:opacity-90 disabled:opacity-50"
         >
-          {guardando ? (
-            <><span className="animate-spin">⏳</span> Guardando...</>
-          ) : (
-            '✅ Guardar recorrido'
-          )}
+          {guardando
+            ? <><span className="animate-spin text-2xl">⏳</span> Guardando...</>
+            : <><span className="text-2xl">✅</span> Guardar recorrido</>
+          }
         </button>
       </div>
-      <div className="h-28" />
+      <div className="h-32" />
     </div>
   )
 }

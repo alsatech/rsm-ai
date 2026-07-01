@@ -215,3 +215,26 @@ class FinalizarRecorridoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RecorridoGanado
         fields = ('numero_cabezas', 'estado_hato', 'narrativa', 'observaciones', 'color')
+
+
+class SyncParadaItemSerializer(serializers.Serializer):
+    """Una parada capturada offline, lista para subir en bloque."""
+    orden = serializers.IntegerField()
+    corraleta_id = serializers.PrimaryKeyRelatedField(
+        source='corraleta', queryset=Corraleta.objects.all(), required=False, allow_null=True,
+    )
+    nombre_libre = serializers.CharField(required=False, allow_null=True, allow_blank=True)
+    lat = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+    lng = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+    timestamp = serializers.DateTimeField(required=False, allow_null=True)
+
+    def validate(self, data):
+        if not data.get('corraleta') and not data.get('nombre_libre'):
+            raise serializers.ValidationError(
+                'Cada parada debe tener corraleta_id o nombre_libre.'
+            )
+        return data
+
+
+class SyncParadasSerializer(serializers.Serializer):
+    paradas = SyncParadaItemSerializer(many=True)

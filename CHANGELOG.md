@@ -72,6 +72,18 @@ _Se registran aquí al completar cada módulo._
 - Recorridos en_curso en el historial se reanudan tocándolos (redirige a PantallaEnCurso con paradas ya cargadas)
 - `MapaRecorrido` actualizado: API unificada `paradas=[{orden,tipo,lat,lng,nombre,corraleta_id}]`, puntos libres con coords se renderizan como círculo con borde punteado
 
+### v0.4.2 — Ganado: flujo offline con puntos de control, sync automático y heatmap de pastoreo (ajuste Módulo 4)
+- Migración `0004_alter_paradarecorrido_hora_llegada_and_more`: `ParadaRecorrido.hora_llegada` pasa de `TimeField` a `DateTimeField` para guardar fecha + hora exacta del punto de control
+- Nuevo endpoint `POST /api/v1/ganado/recorridos/{id}/sync-paradas/`: reemplaza todas las paradas del recorrido con las capturadas offline en una sola llamada; solo el responsable o `administrador`/`superadmin` pueden sincronizar
+- Nuevo endpoint `GET /api/v1/ganado/heatmap/`: coordenadas de paradas de recorridos finalizados agrupadas en celdas de ~100m (3 decimales) con `weight` de visitas; solo `administrador`/`superadmin`; filtros `fecha_desde`/`fecha_hasta`
+- 5 tests nuevos (19 totales en el módulo): sync reemplaza paradas existentes, sync solo responsable/admin, heatmap agrupa con peso, heatmap filtra por fecha, heatmap requiere admin
+- Frontend: `src/api/ganadoOffline.js` — localStorage (`rsm_recorrido_activo`) como fuente de verdad mientras el recorrido está en curso, con caché de corraletas (`rsm_corraletas_cache`) para que el catálogo funcione sin señal
+- `PantallaIniciar` ahora inicia el recorrido localmente si no hay señal (recorrido `pendiente_creacion`, se crea en el servidor al sincronizar) y muestra un banner para continuar un recorrido pendiente
+- `PantallaEnCurso` reescrita: agregar/deshacer parada es instantáneo y 100% local (sin llamadas al backend por cada toque), indicador de conectividad (📶/📵), grid de chips con buscador para las 27 corraletas, mapa reducido a 1/3 de pantalla. Al presionar "Finalizar recorrido": si hay señal, crea el recorrido (si fue offline) y sincroniza las paradas vía `sync-paradas` antes de pasar al formulario de cierre; si no hay señal, guarda `pendiente_sync` y muestra modal de aviso
+- Hook `useGanadoSync` (montado en `Ganado/index.jsx`) escucha el evento `online` del navegador y sincroniza automáticamente el recorrido pendiente en cuanto regresa la señal
+- Nueva vista `HeatmapPastoreo.jsx` (sub-vista del módulo, solo `administrador`/`superadmin`): mapa Leaflet a pantalla completa con capa de calor (`leaflet.heat`) sobre fondo satelital Esri, marcadores blancos de las 27 corraletas, filtros de periodo, leyenda y exportación de imagen (`html2canvas`)
+- `leaflet.heat` y `html2canvas` instalados como dependencias
+
 ### v0.5.0 — Flota vehicular
 > Pendiente
 

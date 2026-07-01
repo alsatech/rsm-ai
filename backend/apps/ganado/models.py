@@ -89,7 +89,7 @@ class ParadaRecorrido(models.Model):
     lat = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     lng = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
     orden = models.IntegerField()
-    hora_llegada = models.TimeField(null=True, blank=True)
+    hora_llegada = models.DateTimeField(null=True, blank=True)
 
     def clean(self):
         if not self.corraleta_id and not self.nombre_libre:

@@ -247,3 +247,135 @@ class IniciarFinalizarAPITest(APITestCase):
         rec.refresh_from_db()
         self.assertEqual(rec.estado, RecorridoGanado.Estado.FINALIZADO)
         self.assertIsNotNone(rec.hora_fin)
+
+
+class SyncParadasAPITest(APITestCase):
+    def setUp(self):
+        self.campo = crear_usuario('sync_campo', 'campo')
+        self.otro_campo = crear_usuario('sync_otro', 'campo')
+        self.admin = crear_usuario('sync_admin', 'administrador')
+        self.c1 = crear_corraleta('Sync-C1')
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _crear_en_curso(self, responsable=None):
+        return RecorridoGanado.objects.create(
+            fecha='2026-06-27',
+            responsable=responsable or self.campo,
+            created_by=responsable or self.campo,
+            color='verde',
+        )
+
+    def test_sync_paradas_reemplaza_existentes(self):
+        rec = self._crear_en_curso()
+        ParadaRecorrido.objects.create(recorrido=rec, nombre_libre='Vieja', orden=1)
+        self._auth(self.campo)
+        body = {
+            'paradas': [
+                {'orden': 1, 'corraleta_id': self.c1.id, 'timestamp': '2026-06-27T09:15:00Z'},
+                {
+                    'orden': 2,
+                    'nombre_libre': 'Orilla de la cerca del 3A',
+                    'lat': '29.521', 'lng': '-101.566',
+                    'timestamp': '2026-06-27T11:30:00Z',
+                },
+            ],
+        }
+        resp = self.client.post(
+            f'/api/v1/ganado/recorridos/{rec.id}/sync-paradas/', body, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        rec.refresh_from_db()
+        paradas = list(rec.paradas.all())
+        self.assertEqual(len(paradas), 2)
+        self.assertEqual(paradas[0].corraleta_id, self.c1.id)
+        self.assertEqual(paradas[1].nombre_libre, 'Orilla de la cerca del 3A')
+        self.assertIsNotNone(paradas[0].hora_llegada)
+
+    def test_sync_solo_responsable_o_admin(self):
+        rec = self._crear_en_curso()
+        body = {'paradas': [{'orden': 1, 'corraleta_id': self.c1.id, 'timestamp': '2026-06-27T09:15:00Z'}]}
+
+        self._auth(self.otro_campo)
+        resp = self.client.post(
+            f'/api/v1/ganado/recorridos/{rec.id}/sync-paradas/', body, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        self._auth(self.admin)
+        resp = self.client.post(
+            f'/api/v1/ganado/recorridos/{rec.id}/sync-paradas/', body, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+
+class HeatmapPastoreoAPITest(APITestCase):
+    def setUp(self):
+        self.campo = crear_usuario('heat_campo', 'campo')
+        self.admin = crear_usuario('heat_admin', 'administrador')
+        self.c1 = crear_corraleta('Heat-C1', lat=29.5, lng=-101.5)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _crear_finalizado(self, fecha):
+        rec = RecorridoGanado.objects.create(
+            fecha=fecha,
+            responsable=self.campo,
+            created_by=self.campo,
+            estado=RecorridoGanado.Estado.FINALIZADO,
+            estado_hato='bien',
+            narrativa='ok',
+            color='verde',
+        )
+        ParadaRecorrido.objects.create(recorrido=rec, corraleta=self.c1, orden=1)
+        ParadaRecorrido.objects.create(recorrido=rec, nombre_libre='Libre', lat='29.510', lng='-101.510', orden=2)
+        return rec
+
+    def test_heatmap_retorna_coordenadas_con_peso(self):
+        self._crear_finalizado('2026-06-20')
+        self._crear_finalizado('2026-06-21')
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/heatmap/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        total_peso = sum(p['weight'] for p in resp.data)
+        self.assertEqual(total_peso, 4)
+        corraleta_bucket = next(p for p in resp.data if p['weight'] >= 2)
+        self.assertEqual(corraleta_bucket['weight'], 2)
+
+    def test_heatmap_filtra_por_fecha(self):
+        self._crear_finalizado('2026-06-01')
+        self._crear_finalizado('2026-06-25')
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/heatmap/', {'fecha_desde': '2026-06-20'})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        total_peso = sum(p['weight'] for p in resp.data)
+        self.assertEqual(total_peso, 2)
+
+    def test_heatmap_requiere_admin(self):
+        self._crear_finalizado('2026-06-20')
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/ganado/heatmap/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_heatmap_no_infla_peso_por_paradas_vecinas_del_mismo_recorrido(self):
+        """Una ruta nueva con varias paradas cercanas en una sola salida cuenta como 1 visita por celda."""
+        c2 = crear_corraleta('Heat-C2', lat=29.7, lng=-101.7)
+        c3 = crear_corraleta('Heat-C3', lat=29.7001, lng=-101.7001)
+        rec = RecorridoGanado.objects.create(
+            fecha='2026-06-22',
+            responsable=self.campo,
+            created_by=self.campo,
+            estado=RecorridoGanado.Estado.FINALIZADO,
+            estado_hato='bien',
+            narrativa='primera vez en esta ruta',
+            color='verde',
+        )
+        ParadaRecorrido.objects.create(recorrido=rec, corraleta=c2, orden=1)
+        ParadaRecorrido.objects.create(recorrido=rec, corraleta=c3, orden=2)
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/heatmap/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        bucket_nuevo = next(p for p in resp.data if round(p['lat'], 3) == 29.7)
+        self.assertEqual(bucket_nuevo['weight'], 1)

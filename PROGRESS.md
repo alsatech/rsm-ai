@@ -99,4 +99,14 @@
 
 ---
 
+### 🟢 Push #7
+**Módulo:** Ajuste Módulo 4 — Ganado: flujo offline con puntos de control, sync automático y heatmap de pastoreo  
+**Fecha:** 2026-06-30  
+**Branch:** main  
+**Commit:** `[GANADO] feat: flujo offline con puntos de control, sync automático y heatmap de pastoreo`  
+**Descripción:** Realidad operativa: el vaquero suele perder señal a mitad del recorrido. El flujo ahora es 100% local mientras dura el recorrido — `localStorage` (`src/api/ganadoOffline.js`) es la fuente de verdad para `iniciar`/agregar parada/deshacer, y solo se sincroniza con el backend al presionar "Finalizar recorrido" (o automáticamente al recuperar señal, vía hook `useGanadoSync`). `ParadaRecorrido.hora_llegada` pasa de `TimeField` a `DateTimeField` (migración `0004`). Dos endpoints nuevos: `POST /recorridos/{id}/sync-paradas/` (reemplaza todas las paradas en bloque, solo responsable o admin/superadmin) y `GET /api/v1/ganado/heatmap/` (coordenadas de paradas de recorridos finalizados agrupadas en celdas de ~100m con peso de visitas, solo admin/superadmin, filtros de fecha). Frontend: `PantallaIniciar` arranca el recorrido localmente si no hay señal (se crea en el servidor al sincronizar) y muestra banner para continuar un recorrido pendiente; `PantallaEnCurso` reescrita para que agregar/deshacer parada sea instantáneo (sin llamada a API por toque), con indicador de conectividad, grid de chips + buscador para las 27 corraletas, mapa a 1/3 de pantalla, y modal de aviso si se finaliza sin señal. Nueva vista `HeatmapPastoreo.jsx` (sub-vista del módulo, solo admin/superadmin): mapa satelital con capa de calor (`leaflet.heat`), marcadores de corraletas, filtros de periodo, leyenda y exportación de imagen (`html2canvas`).  
+**Notas:** 19/19 tests del módulo Ganado OK (5 nuevos), 57/57 tests backend totales OK. Smoke test manual end-to-end contra el servidor real (iniciar → sync-paradas → finalizar → heatmap con filtro de fecha y permisos) confirmó el flujo completo. `npm run build` y `npm run lint` sin errores nuevos (el único error de lint es el preexistente en `VistaListaAdmin.jsx`, no tocado). No fue posible tomar screenshots de navegador en este entorno (sin Chromium headless).
+
+---
+
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._

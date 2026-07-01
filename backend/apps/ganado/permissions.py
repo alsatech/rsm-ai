@@ -40,3 +40,12 @@ class PuedeGestionarCorraletas(BasePermission):
             and request.user.is_authenticated
             and request.user.rol in ROLES_ADMIN
         )
+
+
+class PuedeVerHeatmap(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_ADMIN
+        )

@@ -10,6 +10,13 @@ function formatFecha(fecha) {
   return `${d}/${m}/${y}`
 }
 
+function formatHora(valor) {
+  if (!valor) return ''
+  const fecha = new Date(valor)
+  if (Number.isNaN(fecha.getTime())) return valor
+  return fecha.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })
+}
+
 export default function DetalleRecorrido({ id, onVolver }) {
   const [recorrido, setRecorrido] = useState(null)
   const [corraletas, setCorraletas] = useState([])
@@ -88,7 +95,7 @@ export default function DetalleRecorrido({ id, onVolver }) {
           paradas={paradasParaMapa}
           color={recorrido.color}
           readOnly
-          height="300px"
+          height="60svh"
         />
 
         {/* Ruta */}
@@ -107,7 +114,7 @@ export default function DetalleRecorrido({ id, onVolver }) {
                   {p.corraleta_detalle?.nombre ?? p.nombre_libre ?? 'Punto libre'}
                   {p.hora_llegada && (
                     <span className="ml-auto font-mono text-xs text-text-secondary">
-                      {p.hora_llegada}
+                      {formatHora(p.hora_llegada)}
                     </span>
                   )}
                 </div>

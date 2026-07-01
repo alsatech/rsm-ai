@@ -13,6 +13,7 @@ from .permissions import (
     PuedeCrearRecorrido,
     PuedeEliminarRecorrido,
     PuedeGestionarCorraletas,
+    PuedeVerHeatmap,
     PuedeVerRecorridos,
 )
 from .serializers import (
@@ -24,6 +25,7 @@ from .serializers import (
     ParadaRecorridoSerializer,
     RecorridoGanadoCreateSerializer,
     RecorridoGanadoSerializer,
+    SyncParadasSerializer,
 )
 
 ROLES_ADMIN = (User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
@@ -205,6 +207,82 @@ class EliminarParadaView(APIView):
         parada = get_object_or_404(ParadaRecorrido, pk=parada_id, recorrido=recorrido)
         parada.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class SyncParadasView(APIView):
+    """Reemplaza todas las paradas de un recorrido con las capturadas offline."""
+    permission_classes = [IsAuthenticated, PuedeCrearRecorrido]
+
+    def post(self, request, pk):
+        recorrido = get_object_or_404(RecorridoGanado, pk=pk)
+        es_admin = request.user.rol in ROLES_ADMIN
+        if recorrido.responsable_id != request.user.id and not es_admin:
+            return Response(
+                {'detail': 'No tienes permiso para sincronizar este recorrido.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        serializer = SyncParadasSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        recorrido.paradas.all().delete()
+        for item in serializer.validated_data['paradas']:
+            ParadaRecorrido.objects.create(
+                recorrido=recorrido,
+                corraleta=item.get('corraleta'),
+                nombre_libre=item.get('nombre_libre') or None,
+                lat=item.get('lat'),
+                lng=item.get('lng'),
+                orden=item['orden'],
+                hora_llegada=item.get('timestamp'),
+            )
+
+        recorrido.refresh_from_db()
+        return Response(RecorridoGanadoSerializer(recorrido).data)
+
+
+class HeatmapPastoreoView(APIView):
+    """Coordenadas de paradas de recorridos finalizados agrupadas en celdas de ~100m, con su peso de visitas."""
+    permission_classes = [IsAuthenticated, PuedeVerHeatmap]
+    GRID_DECIMALS = 3  # ~111m de precisión
+
+    def get(self, request):
+        qs = RecorridoGanado.objects.filter(estado=RecorridoGanado.Estado.FINALIZADO)
+        fecha_desde = request.query_params.get('fecha_desde')
+        fecha_hasta = request.query_params.get('fecha_hasta')
+        if fecha_desde:
+            qs = qs.filter(fecha__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(fecha__lte=fecha_hasta)
+
+        paradas = ParadaRecorrido.objects.filter(recorrido__in=qs).select_related('corraleta')
+
+        # El peso cuenta recorridos distintos por celda, no paradas: una sola
+        # salida con varias paradas vecinas (p.ej. un corral con 3 trampas) no
+        # debe inflar el peso como si llevara visitas acumuladas en el tiempo.
+        buckets = {}
+        vistos = set()
+        for parada in paradas:
+            if parada.corraleta_id:
+                lat, lng = parada.corraleta.lat, parada.corraleta.lng
+                nombre = parada.corraleta.nombre
+            else:
+                lat, lng = parada.lat, parada.lng
+                nombre = parada.nombre_libre or 'Punto libre'
+            if lat is None or lng is None:
+                continue
+            key = (round(float(lat), self.GRID_DECIMALS), round(float(lng), self.GRID_DECIMALS))
+            visto_key = (parada.recorrido_id, key)
+            if visto_key in vistos:
+                continue
+            vistos.add(visto_key)
+            if key not in buckets:
+                buckets[key] = {'lat': key[0], 'lng': key[1], 'nombre': nombre, 'weight': 0}
+            buckets[key]['weight'] += 1
+
+        data = list(buckets.values())
+        return Response(data)
 
 
 class FinalizarRecorridoView(APIView):
