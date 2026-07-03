@@ -7,8 +7,8 @@ User = get_user_model()
 
 class Corraleta(models.Model):
     nombre = models.CharField(max_length=100, unique=True)
-    lat = models.DecimalField(max_digits=10, decimal_places=7)
-    lng = models.DecimalField(max_digits=10, decimal_places=7)
+    lat = models.DecimalField(max_digits=18, decimal_places=12)
+    lng = models.DecimalField(max_digits=18, decimal_places=12)
     activa = models.BooleanField(default=True)
 
     class Meta:
@@ -86,8 +86,8 @@ class ParadaRecorrido(models.Model):
         Corraleta, on_delete=models.PROTECT, null=True, blank=True
     )
     nombre_libre = models.CharField(max_length=150, null=True, blank=True)
-    lat = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
-    lng = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    lat = models.DecimalField(max_digits=18, decimal_places=12, null=True, blank=True)
+    lng = models.DecimalField(max_digits=18, decimal_places=12, null=True, blank=True)
     orden = models.IntegerField()
     hora_llegada = models.DateTimeField(null=True, blank=True)
 

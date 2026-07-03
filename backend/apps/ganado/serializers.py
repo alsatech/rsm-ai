@@ -224,8 +224,8 @@ class SyncParadaItemSerializer(serializers.Serializer):
         source='corraleta', queryset=Corraleta.objects.all(), required=False, allow_null=True,
     )
     nombre_libre = serializers.CharField(required=False, allow_null=True, allow_blank=True)
-    lat = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
-    lng = serializers.DecimalField(max_digits=10, decimal_places=7, required=False, allow_null=True)
+    lat = serializers.DecimalField(max_digits=18, decimal_places=12, required=False, allow_null=True)
+    lng = serializers.DecimalField(max_digits=18, decimal_places=12, required=False, allow_null=True)
     timestamp = serializers.DateTimeField(required=False, allow_null=True)
 
     def validate(self, data):
