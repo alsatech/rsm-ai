@@ -49,3 +49,21 @@ class PuedeVerHeatmap(BasePermission):
             and request.user.is_authenticated
             and request.user.rol in ROLES_ADMIN
         )
+
+
+class PuedeVerClasificacion(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_ADMIN
+        )
+
+
+class PuedeGestionarPlan(BasePermission):
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_ADMIN
+        )

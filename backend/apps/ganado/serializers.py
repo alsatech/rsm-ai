@@ -79,6 +79,8 @@ class RecorridoGanadoSerializer(serializers.ModelSerializer):
         fields = (
             'id',
             'fecha',
+            'tipo',
+            'plan_referencia',
             'estado',
             'estado_display',
             'responsable',
@@ -101,7 +103,10 @@ class RecorridoGanadoSerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         )
-        read_only_fields = ('id', 'estado', 'hora_inicio', 'hora_fin', 'created_by', 'created_at', 'updated_at')
+        read_only_fields = (
+            'id', 'tipo', 'plan_referencia', 'estado', 'hora_inicio', 'hora_fin',
+            'created_by', 'created_at', 'updated_at',
+        )
 
     def get_created_by_nombre(self, obj):
         return obj.created_by.get_full_name() or obj.created_by.username
@@ -238,3 +243,46 @@ class SyncParadaItemSerializer(serializers.Serializer):
 
 class SyncParadasSerializer(serializers.Serializer):
     paradas = SyncParadaItemSerializer(many=True)
+
+
+class PlanRecorridoSerializer(serializers.ModelSerializer):
+    """Representa un recorrido tipo=planeado, incluyendo si ya tiene un recorrido real vinculado."""
+    paradas = ParadaRecorridoSerializer(many=True, read_only=True)
+    recorrido_vinculado_id = serializers.SerializerMethodField()
+
+    class Meta:
+        model = RecorridoGanado
+        fields = ('id', 'fecha', 'narrativa', 'paradas', 'recorrido_vinculado_id', 'created_at')
+        read_only_fields = fields
+
+    def get_recorrido_vinculado_id(self, obj):
+        real = obj.recorridos_reales.first()
+        return real.id if real else None
+
+
+class PlanParadaItemSerializer(serializers.Serializer):
+    corraleta_id = serializers.PrimaryKeyRelatedField(
+        source='corraleta', queryset=Corraleta.objects.all(),
+    )
+    orden = serializers.IntegerField()
+
+
+class CrearPlanSerializer(serializers.Serializer):
+    fecha = serializers.DateField()
+    narrativa_plan = serializers.CharField(required=False, allow_blank=True, default='')
+    paradas = PlanParadaItemSerializer(many=True)
+
+    def validate_paradas(self, value):
+        if not value:
+            raise serializers.ValidationError('El plan debe tener al menos una parada.')
+        return value
+
+
+class EditarPlanSerializer(serializers.Serializer):
+    narrativa_plan = serializers.CharField(required=False, allow_blank=True, default='')
+    paradas = PlanParadaItemSerializer(many=True)
+
+    def validate_paradas(self, value):
+        if not value:
+            raise serializers.ValidationError('El plan debe tener al menos una parada.')
+        return value

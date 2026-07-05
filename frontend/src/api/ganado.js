@@ -24,3 +24,11 @@ export const finalizarRecorrido = (id, data) =>
 export const syncParadas = (id, paradas) =>
   api.post(`/api/v1/ganado/recorridos/${id}/sync-paradas/`, { paradas })
 export const getHeatmap = (params) => api.get('/api/v1/ganado/heatmap/', { params })
+
+export const getClasificacionCorraletas = (params) =>
+  api.get('/api/v1/ganado/corraletas/clasificacion/', { params })
+export const crearPlanDelDia = (data) => api.post('/api/v1/ganado/recorridos/crear-plan/', data)
+export const editarPlanDelDia = (id, data) =>
+  api.patch(`/api/v1/ganado/recorridos/${id}/editar-plan/`, data)
+export const getPlanDelDia = (fecha) =>
+  api.get('/api/v1/ganado/recorridos/plan-del-dia/', { params: { fecha } })

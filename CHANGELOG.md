@@ -84,6 +84,19 @@ _Se registran aquí al completar cada módulo._
 - Nueva vista `HeatmapPastoreo.jsx` (sub-vista del módulo, solo `administrador`/`superadmin`): mapa Leaflet a pantalla completa con capa de calor (`leaflet.heat`) sobre fondo satelital Esri, marcadores blancos de las 27 corraletas, filtros de periodo, leyenda y exportación de imagen (`html2canvas`)
 - `leaflet.heat` y `html2canvas` instalados como dependencias
 
+### v0.4.3 — Ganado: clasificación de pastoreo y Planned vs Actual (ajuste Módulo 4)
+- Migración `0006`: `RecorridoGanado` recibe `tipo` (`planeado`/`real`, default `real`) y `plan_referencia` (FK a sí mismo, `on_delete=SET_NULL`, `related_name='recorridos_reales'`)
+- Nuevos endpoints: `POST /api/v1/ganado/recorridos/crear-plan/`, `PATCH /api/v1/ganado/recorridos/{id}/editar-plan/`, `GET /api/v1/ganado/recorridos/plan-del-dia/?fecha=`, `GET /api/v1/ganado/corraletas/clasificacion/`
+- Solo un plan por fecha; el plan deja de ser editable en cuanto un recorrido real se vincula a él
+- Vinculación automática plan↔recorrido real por fecha coincidente, tanto en el flujo de finalizar como en el flujo antiguo de creación directa
+- Clasificación de corraletas por percentiles (25/75, interpolación lineal) de visitas históricas: `alta`/`media`/`baja`/`sin_uso`, con filtros `fecha_desde`/`fecha_hasta`
+- `_qs_recorrido_base` y `HeatmapPastoreoView` filtran `tipo=real` para que los planes no aparezcan en historial/heatmap
+- 12 tests nuevos (69 totales en el backend)
+- Frontend: tabs `[Recorridos][Heatmap][Clasificación][Plan vs Real]` en `/ganado` (las dos nuevas solo para `administrador`/`superadmin`)
+- `VistaClasificacion.jsx`: mapa satelital con marcadores por clase, filtros de periodo, leyenda con rangos del dataset, lista ordenada y exportación CSV
+- `VistaPlanVsReal.jsx`: crear/editar plan del día (chips de corraletas en orden + instrucciones) y comparación visual plan vs recorrido real (mapa con dos rutas, marcadores con borde rojo/verde para no-visitadas/extra, barra de cumplimiento)
+- `SelectorCorraletasOrden.jsx`, `MapaComparacionPlanReal.jsx`, `TabsGanado.jsx` — componentes nuevos del módulo
+
 ### v0.5.0 — Flota vehicular
 > Pendiente
 

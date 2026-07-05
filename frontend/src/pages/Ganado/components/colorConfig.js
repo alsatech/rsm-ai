@@ -21,3 +21,10 @@ export const ESTADO_CONFIG = {
   alerta: { label: 'Alerta', icon: '⚠️', bg: 'bg-card', text: 'text-warning', border: 'border-warning' },
   critico: { label: 'Crítico', icon: '🔴', bg: 'bg-card', text: 'text-error', border: 'border-error' },
 }
+
+export const CLASE_CONFIG = {
+  alta: { label: 'Alta presión', icon: '🔴', color: '#f87171' },
+  media: { label: 'Media presión', icon: '🟡', color: '#fbbf24' },
+  baja: { label: 'Baja presión', icon: '🟢', color: '#4ade80' },
+  sin_uso: { label: 'Sin visitas', icon: '⚪', color: '#9ca3af' },
+}

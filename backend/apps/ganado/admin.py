@@ -23,8 +23,8 @@ class FotoRecorridoInline(admin.TabularInline):
 
 @admin.register(RecorridoGanado)
 class RecorridoGanadoAdmin(admin.ModelAdmin):
-    list_display = ('fecha', 'responsable', 'estado_hato', 'numero_cabezas', 'color')
-    list_filter = ('estado_hato', 'fecha', 'color')
+    list_display = ('fecha', 'tipo', 'responsable', 'estado_hato', 'numero_cabezas', 'color')
+    list_filter = ('tipo', 'estado_hato', 'fecha', 'color')
     search_fields = ('responsable__username', 'narrativa')
     inlines = [ParadaRecorridoInline, FotoRecorridoInline]
-    raw_id_fields = ('responsable', 'created_by')
+    raw_id_fields = ('responsable', 'created_by', 'plan_referencia')

@@ -38,6 +38,18 @@ class RecorridoGanado(models.Model):
         EN_CURSO = 'en_curso', 'En curso'
         FINALIZADO = 'finalizado', 'Finalizado'
 
+    class Tipo(models.TextChoices):
+        PLANEADO = 'planeado', 'Planeado'
+        REAL = 'real', 'Real'
+
+    tipo = models.CharField(max_length=10, choices=Tipo.choices, default=Tipo.REAL)
+    plan_referencia = models.ForeignKey(
+        'self',
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='recorridos_reales',
+    )
     fecha = models.DateField()
     responsable = models.ForeignKey(
         User, on_delete=models.PROTECT, related_name='recorridos_responsable'

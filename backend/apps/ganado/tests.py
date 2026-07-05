@@ -379,3 +379,205 @@ class HeatmapPastoreoAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         bucket_nuevo = next(p for p in resp.data if round(p['lat'], 3) == 29.7)
         self.assertEqual(bucket_nuevo['weight'], 1)
+
+
+class PlanRecorridoAPITest(APITestCase):
+    def setUp(self):
+        self.admin = crear_usuario('plan_admin', 'administrador')
+        self.campo = crear_usuario('plan_campo', 'campo')
+        self.c1 = crear_corraleta('Plan-C1')
+        self.c2 = crear_corraleta('Plan-C2', lat=29.6)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _crear_plan(self, fecha='2026-07-01'):
+        self._auth(self.admin)
+        return self.client.post(
+            '/api/v1/ganado/recorridos/crear-plan/',
+            {
+                'fecha': fecha,
+                'narrativa_plan': 'Pasar por el sector norte primero.',
+                'paradas': [
+                    {'corraleta_id': self.c1.id, 'orden': 1},
+                    {'corraleta_id': self.c2.id, 'orden': 2},
+                ],
+            },
+            format='json',
+        )
+
+    def test_solo_administrador_crea_plan(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/ganado/recorridos/crear-plan/',
+            {'fecha': '2026-07-01', 'paradas': [{'corraleta_id': self.c1.id, 'orden': 1}]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_solo_un_plan_por_fecha(self):
+        resp1 = self._crear_plan('2026-07-01')
+        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED)
+
+        resp2 = self._crear_plan('2026-07-01')
+        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(
+            RecorridoGanado.objects.filter(fecha='2026-07-01', tipo='planeado').count(), 1,
+        )
+
+    def test_plan_del_dia_visible_para_cualquier_rol_autenticado(self):
+        self._crear_plan('2026-07-02')
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/ganado/recorridos/plan-del-dia/', {'fecha': '2026-07-02'})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data['paradas']), 2)
+        self.assertIsNone(resp.data['recorrido_vinculado_id'])
+
+    def test_plan_del_dia_404_si_no_existe(self):
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/ganado/recorridos/plan-del-dia/', {'fecha': '2026-07-03'})
+        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
+
+    def test_vinculacion_automatica_plan_recorrido(self):
+        resp_plan = self._crear_plan('2026-07-04')
+        plan_id = resp_plan.data['id']
+
+        self._auth(self.campo)
+        data = {
+            'fecha': '2026-07-04',
+            'estado_hato': 'bien',
+            'color': 'verde',
+            'narrativa': 'Salieron temprano, todo tranquilo.',
+            'paradas': [
+                {'corraleta': self.c1.id, 'orden': 1},
+                {'corraleta': self.c2.id, 'orden': 2},
+            ],
+        }
+        resp = self.client.post('/api/v1/ganado/recorridos/', data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        recorrido = RecorridoGanado.objects.get(pk=resp.data['id'])
+        self.assertEqual(recorrido.plan_referencia_id, plan_id)
+
+    def test_recorrido_sin_plan_no_se_vincula(self):
+        self._auth(self.campo)
+        data = {
+            'fecha': '2026-07-05',
+            'estado_hato': 'bien',
+            'color': 'verde',
+            'narrativa': 'Sin plan para hoy.',
+            'paradas': [
+                {'corraleta': self.c1.id, 'orden': 1},
+                {'corraleta': self.c2.id, 'orden': 2},
+            ],
+        }
+        resp = self.client.post('/api/v1/ganado/recorridos/', data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        recorrido = RecorridoGanado.objects.get(pk=resp.data['id'])
+        self.assertIsNone(recorrido.plan_referencia_id)
+
+    def test_plan_no_editable_si_tiene_recorrido_vinculado(self):
+        resp_plan = self._crear_plan('2026-07-06')
+        plan_id = resp_plan.data['id']
+
+        self._auth(self.campo)
+        data = {
+            'fecha': '2026-07-06',
+            'estado_hato': 'bien',
+            'color': 'verde',
+            'narrativa': 'Recorrido real del día.',
+            'paradas': [
+                {'corraleta': self.c1.id, 'orden': 1},
+                {'corraleta': self.c2.id, 'orden': 2},
+            ],
+        }
+        self.client.post('/api/v1/ganado/recorridos/', data, format='json')
+
+        self._auth(self.admin)
+        resp = self.client.patch(
+            f'/api/v1/ganado/recorridos/{plan_id}/editar-plan/',
+            {'narrativa_plan': 'Cambio de instrucciones', 'paradas': [{'corraleta_id': self.c1.id, 'orden': 1}]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_plan_editable_si_no_tiene_recorrido_vinculado(self):
+        resp_plan = self._crear_plan('2026-07-07')
+        plan_id = resp_plan.data['id']
+
+        self._auth(self.admin)
+        resp = self.client.patch(
+            f'/api/v1/ganado/recorridos/{plan_id}/editar-plan/',
+            {'narrativa_plan': 'Cambio de instrucciones', 'paradas': [{'corraleta_id': self.c1.id, 'orden': 1}]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data['paradas']), 1)
+        self.assertEqual(resp.data['narrativa'], 'Cambio de instrucciones')
+
+
+class ClasificacionCorraletasAPITest(APITestCase):
+    def setUp(self):
+        self.admin = crear_usuario('clasif_admin', 'administrador')
+        self.campo = crear_usuario('clasif_campo', 'campo')
+        # Corraletas con 1, 2, 3 y 10 visitas respectivamente + una sin uso.
+        self.baja = crear_corraleta('Clasif-Baja', lat=29.1)
+        self.media_1 = crear_corraleta('Clasif-Media1', lat=29.2)
+        self.media_2 = crear_corraleta('Clasif-Media2', lat=29.3)
+        self.alta = crear_corraleta('Clasif-Alta', lat=29.4)
+        self.sin_uso = crear_corraleta('Clasif-SinUso', lat=29.9)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _visitar(self, corraleta, veces):
+        for i in range(veces):
+            rec = RecorridoGanado.objects.create(
+                fecha='2026-06-15',
+                responsable=self.campo,
+                created_by=self.campo,
+                estado=RecorridoGanado.Estado.FINALIZADO,
+                estado_hato='bien',
+                narrativa='visita',
+                color='verde',
+            )
+            ParadaRecorrido.objects.create(recorrido=rec, corraleta=corraleta, orden=1)
+
+    def test_clasificacion_requiere_admin(self):
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/ganado/corraletas/clasificacion/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_clasificacion_percentiles_correctos(self):
+        # visitas: baja=1, media_1=2, media_2=3, alta=10, sin_uso=0
+        # sorted valores no-cero = [1, 2, 3, 10]
+        # p25 (interp lineal) = 1.75 -> baja: visitas <= 1.75
+        # p75 (interp lineal) = 4.75 -> alta: visitas >= 4.75
+        self._visitar(self.baja, 1)
+        self._visitar(self.media_1, 2)
+        self._visitar(self.media_2, 3)
+        self._visitar(self.alta, 10)
+
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/corraletas/clasificacion/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        por_nombre = {c['nombre']: c for c in resp.data}
+        self.assertEqual(por_nombre['Clasif-Baja']['clase'], 'baja')
+        self.assertEqual(por_nombre['Clasif-Media1']['clase'], 'media')
+        self.assertEqual(por_nombre['Clasif-Media2']['clase'], 'media')
+        self.assertEqual(por_nombre['Clasif-Alta']['clase'], 'alta')
+        self.assertEqual(por_nombre['Clasif-SinUso']['clase'], 'sin_uso')
+        self.assertEqual(por_nombre['Clasif-SinUso']['visitas'], 0)
+        self.assertEqual(por_nombre['Clasif-Alta']['visitas'], 10)
+
+    def test_clasificacion_filtra_por_fecha(self):
+        self._visitar(self.alta, 5)
+        RecorridoGanado.objects.filter(fecha='2026-06-15').update(fecha='2026-01-01')
+        self._auth(self.admin)
+        resp = self.client.get(
+            '/api/v1/ganado/corraletas/clasificacion/', {'fecha_desde': '2026-06-01'},
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        por_nombre = {c['nombre']: c for c in resp.data}
+        self.assertEqual(por_nombre['Clasif-Alta']['visitas'], 0)
