@@ -4,6 +4,9 @@ import { useEffect, useState } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip } from 'react-leaflet'
 
 import { getClasificacionCorraletas } from '../../api/ganado'
+import BotonToggleCercas from '../../components/mapa/BotonToggleCercas'
+import CapaCercas from '../../components/mapa/CapaCercas'
+import { useCercasVisibles } from '../../hooks/useCercasVisibles'
 import { useToast } from '../../hooks/useToast'
 import { CLASE_CONFIG } from './components/colorConfig'
 
@@ -39,6 +42,7 @@ export default function VistaClasificacion() {
   const [filtro, setFiltro] = useState('trimestre')
   const [corraletas, setCorraletas] = useState([])
   const [loading, setLoading] = useState(true)
+  const [cercasVisibles, toggleCercas] = useCercasVisibles()
 
   useEffect(() => {
     const dias = FILTROS.find((f) => f.id === filtro)?.dias
@@ -71,12 +75,14 @@ export default function VistaClasificacion() {
     <div className="min-h-svh bg-bg">
       <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row">
         {/* Mapa */}
-        <div className="flex-1 overflow-hidden rounded-2xl" style={{ height: '70svh' }}>
+        <div className="relative flex-1 overflow-hidden rounded-2xl" style={{ height: '70svh' }}>
+          <BotonToggleCercas visible={cercasVisibles} onToggle={toggleCercas} />
           <MapContainer center={CENTER} zoom={ZOOM} style={{ height: '100%', width: '100%' }}>
             <TileLayer
               attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
+            {cercasVisibles && <CapaCercas />}
             {corraletas.map((c) => (
               <CircleMarker
                 key={c.id}

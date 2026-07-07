@@ -119,4 +119,14 @@
 
 ---
 
+### 🟢 Push #9
+**Módulo:** Ajuste Módulo 4 — Ganado: capa visual de cercas del rancho  
+**Fecha:** 2026-07-07  
+**Branch:** main  
+**Commit:** `[GANADO] feat: capa visual de cercas del rancho con tooltips de nombre en todos los mapas`  
+**Descripción:** Capa de referencia visual (no seleccionable) con las cercas/lindes reales del rancho, para que Alberto y los vaqueros se orienten igual que en Google Earth. `src/constants/cercasRancho.js` guarda las 13 cercas hardcodeadas (2 polígonos, 11 líneas) con sus coordenadas GPS. Componente global reutilizable `src/components/mapa/CapaCercas.jsx` dibuja cada cerca (`Polygon` o `Polyline` según su tipo) en naranja `#FFA500`, con tooltip `sticky` que muestra el nombre al pasar el cursor (estilo definido en `.tooltip-cerca` dentro de `index.css`). Botón de toggle reutilizable `src/components/mapa/BotonToggleCercas.jsx` y hook `src/hooks/useCercasVisibles.js` (persiste la preferencia en `localStorage` bajo `rsm_cercas_visibles`, default visible). Integrado en los 6 mapas del módulo: `MapaRecorrido.jsx` (cubre de una sola vez el detalle de recorrido, la pantalla en curso del vaquero y el selector de paradas del wizard, al ser un componente compartido), `HeatmapPastoreo.jsx`, `VistaClasificacion.jsx`, `MapaComparacionPlanReal.jsx` (usado por Plan vs Real) y `SimulacionRecorrido.jsx`.  
+**Notas:** Sin cambios de backend/modelos. `npm run build` y `npm run lint` sin errores nuevos. No fue posible probar visualmente en navegador en este entorno (sin Chromium headless); se verificó compilación, lint y revisión manual de la integración en cada vista.
+
+---
+
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._

@@ -97,6 +97,14 @@ _Se registran aquí al completar cada módulo._
 - `VistaPlanVsReal.jsx`: crear/editar plan del día (chips de corraletas en orden + instrucciones) y comparación visual plan vs recorrido real (mapa con dos rutas, marcadores con borde rojo/verde para no-visitadas/extra, barra de cumplimiento)
 - `SelectorCorraletasOrden.jsx`, `MapaComparacionPlanReal.jsx`, `TabsGanado.jsx` — componentes nuevos del módulo
 
+### v0.4.4 — Ganado: capa visual de cercas del rancho (ajuste Módulo 4)
+- `src/constants/cercasRancho.js`: 13 cercas hardcodeadas (2 polígonos, 11 líneas) con coordenadas GPS reales, color `#FFA500`
+- `src/components/mapa/CapaCercas.jsx`: componente global reutilizable que dibuja cada cerca como `Polygon` o `Polyline` según su tipo — solo referencia visual, no seleccionable
+- Tooltip `sticky` (sigue al cursor) con el nombre de la cerca al pasar el mouse, estilizado vía clase `.tooltip-cerca` en `index.css`
+- `src/components/mapa/BotonToggleCercas.jsx` + hook `src/hooks/useCercasVisibles.js`: botón "🔲 Cercas" arriba a la derecha de cada mapa, preferencia persistida en `localStorage` (`rsm_cercas_visibles`, default visible)
+- Integrado en los 6 mapas del módulo: `MapaRecorrido.jsx` (detalle de recorrido, pantalla en curso del vaquero y wizard), `HeatmapPastoreo.jsx`, `VistaClasificacion.jsx`, `MapaComparacionPlanReal.jsx` (Plan vs Real) y `SimulacionRecorrido.jsx`
+- Las 27 corraletas siguen siendo los únicos puntos seleccionables del mapa
+
 ### v0.5.0 — Flota vehicular
 > Pendiente
 

@@ -6,6 +6,9 @@ import { useEffect, useRef, useState } from 'react'
 import { CircleMarker, MapContainer, TileLayer, Tooltip, useMap } from 'react-leaflet'
 
 import { getCorraletas, getHeatmap, getRecorridos } from '../../api/ganado'
+import BotonToggleCercas from '../../components/mapa/BotonToggleCercas'
+import CapaCercas from '../../components/mapa/CapaCercas'
+import { useCercasVisibles } from '../../hooks/useCercasVisibles'
 import { useToast } from '../../hooks/useToast'
 
 // leaflet.heat espera un global `L` (build sin módulos) — hay que exponerlo
@@ -76,6 +79,7 @@ export default function HeatmapPastoreo({ onVolver }) {
   const [loading, setLoading] = useState(true)
   const [exportando, setExportando] = useState(false)
   const mapWrapperRef = useRef(null)
+  const [cercasVisibles, toggleCercas] = useCercasVisibles()
 
   useEffect(() => {
     getCorraletas().then(({ data }) => setCorraletas(data)).catch(() => {})
@@ -138,12 +142,18 @@ export default function HeatmapPastoreo({ onVolver }) {
 
       <div className="flex flex-col gap-4 px-4 py-4 lg:flex-row">
         {/* Mapa */}
-        <div ref={mapWrapperRef} className="flex-1 overflow-hidden rounded-2xl" style={{ height: '70svh' }}>
+        <div
+          ref={mapWrapperRef}
+          className="relative flex-1 overflow-hidden rounded-2xl"
+          style={{ height: '70svh' }}
+        >
+          <BotonToggleCercas visible={cercasVisibles} onToggle={toggleCercas} />
           <MapContainer center={CENTER} zoom={ZOOM} style={{ height: '100%', width: '100%' }}>
             <TileLayer
               attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>'
               url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
             />
+            {cercasVisibles && <CapaCercas />}
             <HeatLayer puntos={puntos} />
             {corraletas.map((c) => (
               <CircleMarker

@@ -12,6 +12,9 @@ import {
 } from 'react-leaflet'
 
 import { finalizarRecorrido, getRecorrido, iniciarRecorrido, syncParadas } from '../../api/ganado'
+import BotonToggleCercas from '../../components/mapa/BotonToggleCercas'
+import CapaCercas from '../../components/mapa/CapaCercas'
+import { useCercasVisibles } from '../../hooks/useCercasVisibles'
 import { useToast } from '../../hooks/useToast'
 
 // ⚠️ Puntos de PRUEBA en El Paso, TX — NO son las corraletas reales del rancho.
@@ -90,6 +93,7 @@ export default function SimulacionRecorrido() {
   const [sincronizando, setSincronizando] = useState(false)
   const [resumen, setResumen] = useState(null)
   const [mostrarConfirmCancelar, setMostrarConfirmCancelar] = useState(false)
+  const [cercasVisibles, toggleCercas] = useCercasVisibles()
 
   // Punto libre manual
   const [nombreLibre, setNombreLibre] = useState('')
@@ -391,7 +395,8 @@ export default function SimulacionRecorrido() {
       {/* Mapa (siempre visible salvo en el resumen) */}
       {fase !== 'resumen' && (
         <div className="px-4 pt-4">
-          <div style={{ height: '38svh', width: '100%', borderRadius: '12px', overflow: 'hidden' }}>
+          <div style={{ height: '38svh', width: '100%', borderRadius: '12px', overflow: 'hidden', position: 'relative' }}>
+            <BotonToggleCercas visible={cercasVisibles} onToggle={toggleCercas} />
             <MapContainer
               center={[PUNTOS_PRUEBA[0].lat, PUNTOS_PRUEBA[0].lng]}
               zoom={17}
@@ -402,6 +407,8 @@ export default function SimulacionRecorrido() {
                 attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics'
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               />
+
+              {cercasVisibles && <CapaCercas />}
 
               {/* Los 3 puntos de prueba */}
               {PUNTOS_PRUEBA.map((p) => {

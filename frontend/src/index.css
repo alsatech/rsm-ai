@@ -26,6 +26,18 @@ body {
   min-height: 100svh;
 }
 
+.tooltip-cerca.leaflet-tooltip {
+  background-color: #0d1a11;
+  color: #4ade80;
+  border: 1px solid #1f6b3e;
+  font-size: 12px;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.tooltip-cerca.leaflet-tooltip-top::before {
+  border-top-color: #1f6b3e;
+}
+
 @keyframes scaleIn {
   from {
     opacity: 0;

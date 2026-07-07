@@ -2,6 +2,10 @@ import 'leaflet/dist/leaflet.css'
 
 import { CircleMarker, MapContainer, Polyline, TileLayer, Tooltip } from 'react-leaflet'
 
+import BotonToggleCercas from '../../../components/mapa/BotonToggleCercas'
+import CapaCercas from '../../../components/mapa/CapaCercas'
+import { useCercasVisibles } from '../../../hooks/useCercasVisibles'
+
 const CENTER = [29.515, -101.545]
 const ZOOM = 12
 
@@ -73,14 +77,18 @@ export default function MapaComparacionPlanReal({ plan, real, height = '60svh' }
   const lineaPlan = paradasPlan.map(paradaCoords).filter(Boolean)
   const lineaReal = paradasReal.map(paradaCoords).filter(Boolean)
   const marcadores = construirMarcadores(plan, real)
+  const [cercasVisibles, toggleCercas] = useCercasVisibles()
 
   return (
-    <div style={{ height, width: '100%', borderRadius: '16px', overflow: 'hidden' }}>
+    <div style={{ height, width: '100%', borderRadius: '16px', overflow: 'hidden', position: 'relative' }}>
+      <BotonToggleCercas visible={cercasVisibles} onToggle={toggleCercas} />
       <MapContainer center={CENTER} zoom={ZOOM} style={{ height: '100%', width: '100%' }}>
         <TileLayer
           attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>'
           url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
         />
+
+        {cercasVisibles && <CapaCercas />}
 
         {lineaPlan.length >= 2 && (
           <Polyline

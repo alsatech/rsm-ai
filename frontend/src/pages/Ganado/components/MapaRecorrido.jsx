@@ -12,6 +12,9 @@ import {
   useMapEvents,
 } from 'react-leaflet'
 
+import BotonToggleCercas from '../../../components/mapa/BotonToggleCercas'
+import CapaCercas from '../../../components/mapa/CapaCercas'
+import { useCercasVisibles } from '../../../hooks/useCercasVisibles'
 import { COLOR_MAP } from './colorConfig'
 
 const CENTER = [29.515, -101.545]
@@ -66,6 +69,7 @@ export default function MapaRecorrido({
   const [query, setQuery] = useState('')
   const [marcador, setMarcador] = useState(null)
   const [error, setError] = useState('')
+  const [cercasVisibles, toggleCercas] = useCercasVisibles()
 
   const selectedCorraletaIds = new Set(
     paradas.filter((p) => p.tipo === 'corraleta' && p.corraleta_id).map((p) => p.corraleta_id),
@@ -91,7 +95,8 @@ export default function MapaRecorrido({
 
   return (
     <div>
-      <div style={{ height, width: '100%', borderRadius: '8px', overflow: 'hidden' }}>
+      <div style={{ height, width: '100%', borderRadius: '8px', overflow: 'hidden', position: 'relative' }}>
+        <BotonToggleCercas visible={cercasVisibles} onToggle={toggleCercas} />
         <MapContainer
           center={CENTER}
           zoom={ZOOM}
@@ -102,6 +107,8 @@ export default function MapaRecorrido({
             attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a> &mdash; Source: Esri, Maxar, Earthstar Geographics'
             url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
           />
+
+          {cercasVisibles && <CapaCercas />}
 
           {corraletas.map((c) => {
             const isSelected = selectedCorraletaIds.has(c.id)
