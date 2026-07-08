@@ -14,15 +14,26 @@ export function useGanadoSync() {
 
       try {
         let id = recorrido.id
-        if (recorrido.pendiente_creacion) {
+        const crearRecorrido = async () => {
           const { data } = await iniciarRecorrido({
             fecha: recorrido.fecha,
             color: recorrido.color,
             asistentes: recorrido.asistentes,
           })
-          id = data.id
+          return data.id
         }
-        await syncParadas(id, recorrido.paradas)
+        if (recorrido.pendiente_creacion || !id) {
+          id = await crearRecorrido()
+        }
+        try {
+          await syncParadas(id, recorrido.paradas)
+        } catch (err) {
+          // Si el recorrido guardado ya no existe en el backend, creamos
+          // uno nuevo y reintentamos antes de avisar del fallo.
+          if (err?.response?.status !== 404) throw err
+          id = await crearRecorrido()
+          await syncParadas(id, recorrido.paradas)
+        }
         guardarRecorridoLocal({
           ...recorrido,
           id,

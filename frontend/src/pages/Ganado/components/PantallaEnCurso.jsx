@@ -135,15 +135,28 @@ export default function PantallaEnCurso({
     setSincronizando(true)
     try {
       let id = recorridoLocal.id
-      if (recorridoLocal.pendiente_creacion) {
+      // Si todavía no hay recorrido en el backend (o el id guardado apunta a
+      // un recorrido que ya no existe), creamos uno nuevo antes de sincronizar.
+      const crearRecorrido = async () => {
         const { data } = await iniciarRecorrido({
           fecha: recorridoLocal.fecha,
           color: recorridoLocal.color,
           asistentes: recorridoLocal.asistentes,
         })
-        id = data.id
+        return data.id
       }
-      await syncParadas(id, paradas.map(paradaParaSync))
+      if (recorridoLocal.pendiente_creacion || !id) {
+        id = await crearRecorrido()
+      }
+      try {
+        await syncParadas(id, paradas.map(paradaParaSync))
+      } catch (err) {
+        // Si el backend dice 404, el recorrido guardado se borró o nunca
+        // existió. Creamos uno nuevo y reintentamos una sola vez.
+        if (err?.response?.status !== 404) throw err
+        id = await crearRecorrido()
+        await syncParadas(id, paradas.map(paradaParaSync))
+      }
       const actualizado = {
         ...recorridoLocal,
         id,
@@ -154,8 +167,13 @@ export default function PantallaEnCurso({
       }
       guardarRecorridoLocal(actualizado)
       onFinalizado(actualizado)
-    } catch {
-      showToast('No se pudo sincronizar. Intenta de nuevo.', 'error')
+    } catch (err) {
+      const status = err?.response?.status
+      const detail = err?.response?.data?.detail
+      const msg = status === 404
+        ? 'No se pudo crear el recorrido en el servidor.'
+        : detail || 'No se pudo sincronizar. Intenta de nuevo.'
+      showToast(msg, 'error')
     } finally {
       setSincronizando(false)
     }

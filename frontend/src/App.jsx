@@ -3,7 +3,6 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import ProtectedRoute from './components/ProtectedRoute'
 import Dashboard from './pages/Dashboard'
 import Ganado from './pages/Ganado'
-import SimulacionRecorrido from './pages/Ganado/SimulacionRecorrido'
 import Hidraulica from './pages/Hidraulica'
 import Login from './pages/Login'
 import Pendientes from './pages/Pendientes'
@@ -41,14 +40,6 @@ function App() {
         element={
           <ProtectedRoute roles={['campo', 'administrador', 'superadmin']}>
             <Ganado />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/ganado/simulacion"
-        element={
-          <ProtectedRoute roles={['superadmin']}>
-            <SimulacionRecorrido />
           </ProtectedRoute>
         }
       />

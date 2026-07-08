@@ -1,6 +1,6 @@
 /**
  * Grid de chips para armar una ruta en orden por click — mismo patrón visual
- * que usa el vaquero al agregar paradas (ver PantallaEnCurso).
+ * que usa la persona que hace el recorrido al agregar paradas (ver PantallaEnCurso).
  * seleccion: [{id, nombre}] en el orden en que se agregaron.
  */
 export default function SelectorCorraletasOrden({ corraletas, seleccion, onAgregar, onQuitarUltima }) {

@@ -30,7 +30,6 @@ export default function Ganado() {
   const puedeCrear = ['campo', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeVerHeatmap = ['administrador', 'superadmin'].includes(user?.rol)
   const puedeVerAnalitica = ['administrador', 'superadmin'].includes(user?.rol)
-  const puedeSimular = user?.rol === 'superadmin'
   const tabsVisibles = TABS.filter((t) => !t.soloAdmin || puedeVerAnalitica)
 
   const handleVerDetalle = (recorrido) => {
@@ -124,14 +123,6 @@ export default function Ganado() {
           </div>
 
           <div className="flex items-center gap-2">
-            {puedeSimular && (
-              <Link
-                to="/ganado/simulacion"
-                className="flex items-center gap-2 rounded-xl border border-[#f97316]/60 px-3 py-2.5 text-sm font-semibold text-[#f97316] transition hover:bg-[#f97316]/10"
-              >
-                🧪 Modo simulación
-              </Link>
-            )}
             {puedeCrear && (
               <button
                 type="button"

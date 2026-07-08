@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { getRecorridos } from '../../../api/ganado'
+import { deleteRecorrido, getRecorridos } from '../../../api/ganado'
 import { useAuth } from '../../../hooks/useAuth'
+import { useConfirm } from '../../../hooks/useConfirm'
+import { useToast } from '../../../hooks/useToast'
 import { ESTADO_CONFIG } from './colorConfig'
 import TarjetaRecorrido from './TarjetaRecorrido'
 
@@ -22,11 +24,14 @@ function formatFechaGrupo(fecha) {
 
 export default function Historial({ recargar, onVerDetalle, onNuevo }) {
   const { user } = useAuth()
+  const confirm = useConfirm()
+  const { showToast } = useToast()
   const [recorridos, setRecorridos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
   const esCampo = user?.rol === 'campo'
+  const esSuperadmin = user?.rol === 'superadmin'
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -42,6 +47,27 @@ export default function Historial({ recargar, onVerDetalle, onNuevo }) {
   }, [])
 
   useEffect(() => { cargar() }, [cargar, recargar])
+
+  const handleEliminar = async (recorrido) => {
+    const ok = await confirm({
+      titulo: '¿Borrar este recorrido?',
+      mensaje: `Se eliminará permanentemente el recorrido del ${recorrido.fecha}${
+        recorrido.estado === 'en_curso' ? ' (en curso)' : ''
+      }, junto con sus paradas y fotos.`,
+      confirmText: 'Sí, borrar',
+      cancelText: 'Cancelar',
+      variante: 'peligro',
+    })
+    if (!ok) return
+
+    try {
+      await deleteRecorrido(recorrido.id)
+      setRecorridos((prev) => prev.filter((r) => r.id !== recorrido.id))
+      showToast('🗑️ Recorrido borrado', 'exito')
+    } catch {
+      showToast('No se pudo borrar el recorrido.', 'error')
+    }
+  }
 
   const grupos = agruparPorFecha(recorridos)
 
@@ -111,6 +137,7 @@ export default function Historial({ recargar, onVerDetalle, onNuevo }) {
                     key={r.id}
                     recorrido={r}
                     onClick={() => onVerDetalle(r)}
+                    onEliminar={esSuperadmin ? handleEliminar : undefined}
                   />
                 ))}
               </div>
