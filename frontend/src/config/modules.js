@@ -32,6 +32,7 @@ export const MODULOS = [
     descripcion: 'Checklist de salida/llegada y mantenimiento de vehículos',
     icono: '🚚',
     roles: ['campo', 'operaciones', 'administrador', 'superadmin'],
+    ruta: '/flota',
   },
   {
     id: 'inventario',

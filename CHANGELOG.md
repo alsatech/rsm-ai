@@ -106,7 +106,18 @@ _Se registran aquí al completar cada módulo._
 - Las 27 corraletas siguen siendo los únicos puntos seleccionables del mapa
 
 ### v0.5.0 — Flota vehicular
-> Pendiente
+- App `apps/flota`: modelos `Vehiculo` (tipo, marca/modelo/año, kilometraje, estado activo/en_taller/de_baja, vencimientos de tenencia/placas, foto), `ChecklistVehiculo` (salida/llegada, responsable, km, 17 ítems booleanos de inspección visual/mecánica/accesorios + nivel de combustible, validación), `FotoChecklist` (máx. 6 fotos) y `AlertaFlota` (tipo, km_alerta o fecha_alerta, activa/resuelta)
+- Data migration `0002_precarga_vehiculos` carga los 6 vehículos reales del rancho (Savana, Blazer, Polaris, Cuatrimoto Roja, Moto Azul, Camión) como placeholder hasta recibir el Excel definitivo
+- Señales (`signals.py`): al guardar un checklist de llegada, sube `kilometraje_actual` del vehículo si el km reportado es mayor; al guardar un vehículo, crea `AlertaFlota` si tenencia o placas vencen en los próximos 30 días
+- Tarea Celery `revisar_alertas_flota` (diaria, 6:00 am): notifica (consola) alertas activas por km/fecha, genera alerta de cambio de aceite cada 5,000 km y de calibración de llantas si pasan 90 días sin checklist
+- Endpoints: `GET/POST /api/v1/flota/vehiculos/`, `GET/PATCH/DELETE /api/v1/flota/vehiculos/{id}/` (eliminar solo `superadmin`), `GET /api/v1/flota/vehiculos/{id}/historial/`, `GET/POST /api/v1/flota/checklists/`, `GET/PATCH /api/v1/flota/checklists/{id}/` (validar), fotos de checklist (subir/eliminar), `GET /api/v1/flota/alertas/`, `PATCH /api/v1/flota/alertas/{id}/resolver/`, `GET /api/v1/flota/resumen/`
+- Permisos: `campo`/`administrador`/`superadmin` crean checklist; solo `administrador`/`superadmin` validan y gestionan alertas; solo `operaciones`/`superadmin` editan vehículos; solo `superadmin` elimina
+- 13 tests backend (82 totales): checklist salida/llegada, actualización de km al llegar (sube y no retrocede), máximo 6 fotos, alerta de vencimiento a 30 días, permisos de validación y edición de vehículo, resolver alerta, resumen
+- Frontend: dashboard `/flota` con grid de tarjetas por vehículo (foto/ícono según tipo, estado, km, último checklist, badge de alertas activas) y panel lateral de alertas activas para `administrador`/`superadmin`
+- Wizard de checklist de 3 pasos: identificación (selector de vehículo con cards, salida/llegada, responsable, km, slider de combustible con color), inspección (3 secciones colapsables con 17 checkboxes + contador de ítems verificados), evidencia fotográfica (hasta 6 fotos)
+- Vista detalle de vehículo (editable para `operaciones`/`superadmin`), alertas activas con botón "Marcar como resuelta", historial de checklists con detalle completo (fotos + validación con observaciones para `administrador`/`superadmin`)
+- Vista de alertas de toda la flota (solo `administrador`/`superadmin`) con filtros por vehículo/tipo, badge de urgencia (🔴 crítico / 🟡 próximo / 🟢 preventivo) y resolución con notas
+- Widget `ResumenFlota` exportable para el dashboard (vehículos activos, alertas activas/críticas, vehículos sin checklist en 48h)
 
 ### v0.6.0 — Inventarios
 > Pendiente

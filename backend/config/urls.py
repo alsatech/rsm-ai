@@ -9,6 +9,7 @@ urlpatterns = [
     path('api/v1/hidraulica/', include('apps.hidraulica.urls')),
     path('api/v1/pendientes/', include('apps.pendientes.urls')),
     path('api/v1/ganado/', include('apps.ganado.urls')),
+    path('api/v1/flota/', include('apps.flota.urls')),
 ]
 
 if settings.DEBUG:

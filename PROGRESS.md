@@ -7,8 +7,8 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 4 / 11  
-**Fase actual:** Mes 1
+**Módulos completados:** 5 / 11  
+**Fase actual:** Mes 2
 
 ---
 
@@ -21,7 +21,7 @@
 
 ### Fase 2 — Mes 2 (Días 31–60)
 - [x] **Módulo 4** — Ganado — recorridos GPS
-- [ ] **Módulo 5** — Flota vehicular
+- [x] **Módulo 5** — Flota vehicular
 - [ ] **Módulo 6** — Inventarios
 - [ ] **Módulo 7** — Registro de ganado por arete
 
@@ -126,6 +126,16 @@
 **Commit:** `[GANADO] feat: capa visual de cercas del rancho con tooltips de nombre en todos los mapas`  
 **Descripción:** Capa de referencia visual (no seleccionable) con las cercas/lindes reales del rancho, para que Alberto y los vaqueros se orienten igual que en Google Earth. `src/constants/cercasRancho.js` guarda las 13 cercas hardcodeadas (2 polígonos, 11 líneas) con sus coordenadas GPS. Componente global reutilizable `src/components/mapa/CapaCercas.jsx` dibuja cada cerca (`Polygon` o `Polyline` según su tipo) en naranja `#FFA500`, con tooltip `sticky` que muestra el nombre al pasar el cursor (estilo definido en `.tooltip-cerca` dentro de `index.css`). Botón de toggle reutilizable `src/components/mapa/BotonToggleCercas.jsx` y hook `src/hooks/useCercasVisibles.js` (persiste la preferencia en `localStorage` bajo `rsm_cercas_visibles`, default visible). Integrado en los 6 mapas del módulo: `MapaRecorrido.jsx` (cubre de una sola vez el detalle de recorrido, la pantalla en curso del vaquero y el selector de paradas del wizard, al ser un componente compartido), `HeatmapPastoreo.jsx`, `VistaClasificacion.jsx`, `MapaComparacionPlanReal.jsx` (usado por Plan vs Real) y `SimulacionRecorrido.jsx`.  
 **Notas:** Sin cambios de backend/modelos. `npm run build` y `npm run lint` sin errores nuevos. No fue posible probar visualmente en navegador en este entorno (sin Chromium headless); se verificó compilación, lint y revisión manual de la integración en cada vista.
+
+---
+
+### 🟢 Push #10
+**Módulo:** Módulo 5 — Flota vehicular  
+**Fecha:** 2026-07-08  
+**Branch:** main  
+**Commit:** `[FLOTA] feat: módulo completo de flota vehicular con checklist, alertas y validación`  
+**Descripción:** App `apps/flota` con modelos `Vehiculo` (tipo, marca/modelo/año, kilometraje, estado, vencimientos de tenencia/placas, foto), `ChecklistVehiculo` (salida/llegada, responsable, km, 17 ítems booleanos de inspección visual/mecánica/accesorios + nivel de combustible, validación), `FotoChecklist` (máx. 6 fotos) y `AlertaFlota` (km_alerta o fecha_alerta, activa/resuelta). Data migration `0002_precarga_vehiculos` carga los 6 vehículos reales (Savana, Blazer, Polaris, Cuatrimoto Roja, Moto Azul, Camión) como placeholder. Señales (`signals.py`): checklist de llegada sube `kilometraje_actual` si el km reportado es mayor; guardar un vehículo crea alertas de vencimiento si tenencia/placas vencen en los próximos 30 días. Tarea Celery `revisar_alertas_flota` (diaria 6 AM): notifica alertas por km/fecha, genera alerta de cambio de aceite cada 5,000 km y de calibración de llantas si pasan 90 días sin checklist. Endpoints: vehículos (CRUD con permisos por rol), checklists (crear/validar), fotos de checklist, alertas (listar/resolver), `resumen/` para dashboard, `vehiculos/{id}/historial/`. Permisos: `campo`/`administrador`/`superadmin` crean checklist; solo `administrador`/`superadmin` validan y gestionan alertas; solo `operaciones`/`superadmin` editan vehículos; solo `superadmin` elimina. Frontend: dashboard `/flota` con grid de tarjetas por vehículo + panel de alertas activas, wizard de checklist de 3 pasos (identificación con selector de vehículo por cards y slider de combustible, inspección con 3 secciones colapsables y contador de ítems, evidencia fotográfica hasta 6 fotos), vista detalle de vehículo (editable, alertas con botón resolver, historial de checklists con detalle y validación), vista de alertas de toda la flota con filtros y badge de urgencia, widget `ResumenFlota` exportable.  
+**Notas:** 13 tests nuevos (82/82 backend totales OK). Verificado con llamadas HTTP reales contra el servidor de desarrollo con usuarios de cada rol: creación de checklist salida/llegada (confirmado que el km del vehículo sube y no retrocede), validación por administrador, edición de vehículo por operaciones y bloqueo para campo (403), señal de vencimiento de placas a 30 días generando alerta crítica automáticamente, resolución de alerta, endpoint de resumen y de historial, y ejecución manual de la tarea Celery `revisar_alertas_flota` (disparó correctamente la alerta de cambio de aceite sobre el vehículo con más kilometraje). Datos de prueba limpiados al terminar. `npm run build` y `npm run lint` sin errores nuevos (el único error de lint es el preexistente en `VistaListaAdmin.jsx` del Módulo 3, no tocado). No fue posible tomar screenshots de navegador real en este entorno (sin Chromium headless).
 
 ---
 

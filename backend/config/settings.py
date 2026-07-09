@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     'apps.hidraulica',
     'apps.pendientes',
     'apps.ganado',
+    'apps.flota',
 ]
 
 MIDDLEWARE = [
@@ -160,6 +161,10 @@ CELERY_TASK_EAGER_PROPAGATES = True
 CELERY_BEAT_SCHEDULE = {
     'revisar-alertas-generadores': {
         'task': 'apps.hidraulica.tasks.revisar_alertas_generadores',
+        'schedule': crontab(hour=6, minute=0),
+    },
+    'revisar-alertas-flota': {
+        'task': 'apps.flota.tasks.revisar_alertas_flota',
         'schedule': crontab(hour=6, minute=0),
     },
 }
