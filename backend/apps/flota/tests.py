@@ -11,7 +11,7 @@ from apps.users.models import User
 
 from .models import AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
 
-TOTAL_VEHICULOS_PRECARGADOS = 6
+TOTAL_VEHICULOS_PRECARGADOS = 20
 
 
 def token(user):

@@ -119,7 +119,7 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
             </button>
             <div>
               <h1 className="font-bold text-highlight">{vehiculo.nombre}</h1>
-              <p className="text-xs text-text-secondary">{TIPO_LABELS[vehiculo.tipo]}</p>
+              <p className="text-xs text-text-secondary">{TIPO_LABELS[vehiculo.tipo] ?? vehiculo.tipo}</p>
             </div>
           </div>
           {puedeGestionarVehiculo && (

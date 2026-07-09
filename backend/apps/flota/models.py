@@ -12,6 +12,13 @@ class Vehiculo(models.Model):
         MOTO = 'moto', 'Moto'
         CUATRIMOTO = 'cuatrimoto', 'Cuatrimoto'
         UTV = 'utv', 'UTV'
+        POLARIS = 'polaris', 'Polaris'
+        CAN_AM = 'can_am', 'CAN AM'
+        REMOLQUE = 'remolque', 'Remolque'
+        TRAILA = 'traila', 'Traila'
+        MAQUINARIA = 'maquinaria', 'Maquinaria'
+        PLATAFORMA = 'plataforma', 'Plataforma'
+        VAN = 'van', 'Van'
         OTRO = 'otro', 'Otro'
 
     class Estado(models.TextChoices):
@@ -19,11 +26,12 @@ class Vehiculo(models.Model):
         EN_TALLER = 'en_taller', 'En taller'
         DE_BAJA = 'de_baja', 'De baja'
 
+    equipo = models.CharField(max_length=150, blank=True)
     nombre = models.CharField(max_length=100)
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
     marca = models.CharField(max_length=100)
     modelo = models.CharField(max_length=100)
-    anio = models.IntegerField()
+    anio = models.IntegerField(null=True, blank=True)
     color = models.CharField(max_length=50)
     placas = models.CharField(max_length=20, blank=True)
     numero_serie = models.CharField(max_length=50, blank=True)

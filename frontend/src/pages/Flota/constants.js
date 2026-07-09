@@ -4,6 +4,13 @@ export const TIPO_ICONOS = {
   moto: '🏍️',
   cuatrimoto: '🏎️',
   utv: '🚙',
+  polaris: '🏁',
+  can_am: '🏁',
+  remolque: '🚚',
+  traila: '🚛',
+  maquinaria: '🚜',
+  plataforma: '🚚',
+  van: '🚐',
   otro: '🚗',
 }
 
@@ -13,6 +20,13 @@ export const TIPO_LABELS = {
   moto: 'Moto',
   cuatrimoto: 'Cuatrimoto',
   utv: 'UTV',
+  polaris: 'Polaris',
+  can_am: 'CAN AM',
+  remolque: 'Remolque',
+  traila: 'Traila',
+  maquinaria: 'Maquinaria',
+  plataforma: 'Plataforma',
+  van: 'Van',
   otro: 'Otro',
 }
 

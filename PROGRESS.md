@@ -139,4 +139,14 @@
 
 ---
 
+### 🟢 Push #11
+**Módulo:** Ajuste Módulo 5 — Flota: reemplazo de vehículos placeholder por los 20 vehículos reales  
+**Fecha:** 2026-07-09  
+**Branch:** main  
+**Commit:** `[FLOTA] feat: migración de 20 vehículos reales RSM`  
+**Descripción:** Se reciben los datos reales de la flota y se reemplazan los 6 vehículos placeholder de `0002_precarga_vehiculos`. Migración `0003_vehiculo_equipo_tipos_anio_opcional`: agrega el campo `equipo` (nombre oficial del equipo, separado del apodo interno en `nombre`) y amplía `Vehiculo.Tipo` con `polaris`, `can_am`, `remolque`, `traila`, `maquinaria`, `plataforma` y `van`; `anio` pasa a `null=True, blank=True` para los vehículos con año pendiente o N/A (Caterpillar, remolques, plataforma). Data migration `0004_reemplazo_vehiculos_reales`: elimina los 6 placeholders por nombre y carga (`get_or_create` por `equipo`, idempotente) los 20 vehículos reales — cuatrimotos, Polaris/CAN AM, 4 remolques + traila fabricada + remolque de hechizos, plataforma ganadera, maquinaria Caterpillar, y las unidades con placas (Sierra, Blazer, Tacoma, Savana, F250) con su kilometraje real; donde el Excel decía "N/A" o "PDTE" se usó `0.0` en kilometraje. Serializer y admin actualizados para exponer `equipo`. Frontend: `TIPO_ICONOS`/`TIPO_LABELS` (`constants.js`) ampliados con los 7 tipos nuevos y fallback agregado en `DetalleVehiculo.jsx` para que ningún vehículo real quede sin ícono o etiqueta.  
+**Notas:** Migración probada con `migrate`/reversa/reaplicar (`0003`→`0004`→`0003`→`0004`) sin errores. Constante `TOTAL_VEHICULOS_PRECARGADOS` del test `VehiculosPrecargadosTest` actualizada de 6 a 20. 13/13 tests de `apps.flota` OK. `npm run build` sin errores. No se tocó el formulario de edición de vehículo (`FormularioVehiculo.jsx`) — sigue sin exponer `equipo` ni permitir año vacío; fuera del alcance pedido, pendiente si se requiere editar esos campos desde la UI.
+
+---
+
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._

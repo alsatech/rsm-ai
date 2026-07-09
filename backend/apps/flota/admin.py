@@ -5,9 +5,9 @@ from .models import AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
 
 @admin.register(Vehiculo)
 class VehiculoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'tipo', 'marca', 'modelo', 'anio', 'estado', 'kilometraje_actual')
+    list_display = ('equipo', 'nombre', 'tipo', 'marca', 'modelo', 'anio', 'estado', 'kilometraje_actual')
     list_filter = ('tipo', 'estado')
-    search_fields = ('nombre', 'marca', 'modelo', 'placas', 'numero_serie')
+    search_fields = ('equipo', 'nombre', 'marca', 'modelo', 'placas', 'numero_serie')
 
 
 class FotoChecklistInline(admin.TabularInline):

@@ -119,6 +119,13 @@ _Se registran aquí al completar cada módulo._
 - Vista de alertas de toda la flota (solo `administrador`/`superadmin`) con filtros por vehículo/tipo, badge de urgencia (🔴 crítico / 🟡 próximo / 🟢 preventivo) y resolución con notas
 - Widget `ResumenFlota` exportable para el dashboard (vehículos activos, alertas activas/críticas, vehículos sin checklist en 48h)
 
+### v0.5.1 — Flota: 20 vehículos reales (ajuste Módulo 5)
+- Migración `0003_vehiculo_equipo_tipos_anio_opcional`: agrega campo `equipo` (`CharField`, blank) para el nombre oficial del equipo; `Vehiculo.Tipo` gana `polaris`, `can_am`, `remolque`, `traila`, `maquinaria`, `plataforma`, `van`; `anio` pasa a `null=True, blank=True`
+- Data migration `0004_reemplazo_vehiculos_reales`: elimina los 6 vehículos placeholder (Savana, Blazer, Polaris, Cuatrimoto Roja, Moto Azul, Camión) y carga los 20 vehículos reales de la Reserva con marca/modelo/año/serie/km reales; año pendiente/N/A → `None`, kilometraje N/A o PDTE → `0.0`
+- Serializer (`VehiculoSerializer`) y admin actualizados para exponer/buscar por `equipo`
+- Frontend: `TIPO_ICONOS`/`TIPO_LABELS` ampliados con los 7 tipos nuevos; fallback de etiqueta en `DetalleVehiculo.jsx`
+- Test `TOTAL_VEHICULOS_PRECARGADOS` actualizado de 6 a 20; 13/13 tests de flota OK
+
 ### v0.6.0 — Inventarios
 > Pendiente
 

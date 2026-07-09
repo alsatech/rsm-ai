@@ -29,7 +29,7 @@ class VehiculoSerializer(serializers.ModelSerializer):
     class Meta:
         model = Vehiculo
         fields = (
-            'id', 'nombre', 'tipo', 'tipo_display', 'marca', 'modelo', 'anio', 'color',
+            'id', 'equipo', 'nombre', 'tipo', 'tipo_display', 'marca', 'modelo', 'anio', 'color',
             'placas', 'numero_serie', 'kilometraje_actual', 'uso_asignacion',
             'estado', 'estado_display', 'fecha_vencimiento_tenencia', 'fecha_vencimiento_placas',
             'foto', 'notas', 'ultimo_checklist', 'alertas_activas_count',
