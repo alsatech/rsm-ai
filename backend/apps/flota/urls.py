@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AdvertenciaChecklistCreateView,
     AlertaFlotaListView,
     ChecklistDetailView,
     ChecklistListCreateView,
@@ -24,6 +25,11 @@ urlpatterns = [
         'checklists/<int:pk>/fotos/<int:foto_id>/',
         FotoChecklistDeleteView.as_view(),
         name='checklist-foto-delete',
+    ),
+    path(
+        'checklists/<int:pk>/advertencias/',
+        AdvertenciaChecklistCreateView.as_view(),
+        name='checklist-advertencia',
     ),
     path('alertas/', AlertaFlotaListView.as_view(), name='alerta-list'),
     path('alertas/<int:pk>/resolver/', ResolverAlertaView.as_view(), name='alerta-resolver'),

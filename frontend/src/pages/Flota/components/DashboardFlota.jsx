@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { createVehiculo, getAlertasFlota, getVehiculos } from '../../../api/flota'
+import { createVehiculo, getAlertasFlota, getResumenFlota, getVehiculos } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import FormularioVehiculo from './FormularioVehiculo'
@@ -12,6 +12,7 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
   const { showToast } = useToast()
   const [vehiculos, setVehiculos] = useState([])
   const [alertas, setAlertas] = useState([])
+  const [resumen, setResumen] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadingAlertas, setLoadingAlertas] = useState(true)
   const [error, setError] = useState('')
@@ -49,8 +50,19 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
     }
   }, [puedeVerAlertas])
 
+  const cargarResumen = useCallback(async () => {
+    if (!puedeVerAlertas) return
+    try {
+      const { data } = await getResumenFlota()
+      setResumen(data)
+    } catch {
+      setResumen(null)
+    }
+  }, [puedeVerAlertas])
+
   useEffect(() => { cargarVehiculos() }, [cargarVehiculos, recargar])
   useEffect(() => { cargarAlertas() }, [cargarAlertas, recargar])
+  useEffect(() => { cargarResumen() }, [cargarResumen, recargar])
 
   const handleCrearVehiculo = async (formData) => {
     setGuardando(true)
@@ -108,7 +120,14 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
       </div>
 
       {puedeVerAlertas && (
-        <div>
+        <div className="flex flex-col gap-4">
+          {resumen?.checklists_sin_validar > 0 && (
+            <div className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3">
+              <p className="text-sm font-semibold text-warning">
+                ⚠️ {resumen.checklists_sin_validar} checklist{resumen.checklists_sin_validar !== 1 ? 's' : ''} sin validar
+              </p>
+            </div>
+          )}
           <PanelAlertas alertas={alertas} loading={loadingAlertas} />
         </div>
       )}

@@ -14,6 +14,7 @@ from .permissions import (
     PuedeVerAlertas,
 )
 from .serializers import (
+    AdvertenciaChecklistSerializer,
     AlertaFlotaSerializer,
     ChecklistVehiculoSerializer,
     FotoChecklistSerializer,
@@ -51,8 +52,10 @@ class VehiculoHistorialView(APIView):
 
     def get(self, request, pk):
         vehiculo = get_object_or_404(Vehiculo, pk=pk)
-        checklists = vehiculo.checklists.select_related('responsable', 'validado_por').prefetch_related('fotos')
-        serializer = ChecklistVehiculoSerializer(checklists, many=True)
+        checklists = vehiculo.checklists.select_related('responsable', 'validado_por', 'traila').prefetch_related(
+            'fotos', 'advertencias__creada_por',
+        )
+        serializer = ChecklistVehiculoSerializer(checklists, many=True, context={'request': request})
         return Response(serializer.data)
 
 
@@ -66,8 +69,8 @@ class ChecklistListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         qs = ChecklistVehiculo.objects.select_related(
-            'vehiculo', 'responsable', 'validado_por'
-        ).prefetch_related('fotos')
+            'vehiculo', 'responsable', 'validado_por', 'traila'
+        ).prefetch_related('fotos', 'advertencias__creada_por')
         p = self.request.query_params
 
         vehiculo = p.get('vehiculo')
@@ -98,8 +101,8 @@ class ChecklistListCreateView(generics.ListCreateAPIView):
 
 class ChecklistDetailView(generics.RetrieveUpdateAPIView):
     queryset = ChecklistVehiculo.objects.select_related(
-        'vehiculo', 'responsable', 'validado_por'
-    ).prefetch_related('fotos')
+        'vehiculo', 'responsable', 'validado_por', 'traila'
+    ).prefetch_related('fotos', 'advertencias__creada_por')
     http_method_names = ['get', 'patch', 'head', 'options']
 
     def get_serializer_class(self):
@@ -127,6 +130,22 @@ class FotoChecklistListView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
         serializer.save(checklist=checklist, uploaded_by=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AdvertenciaChecklistCreateView(APIView):
+    """POST /checklists/{id}/advertencias/ — el checklist siempre se valida aparte;
+    esto solo deja una nota de advertencia para el responsable."""
+    permission_classes = [IsAuthenticated, PuedeValidarChecklist]
+
+    def post(self, request, pk):
+        checklist = get_object_or_404(ChecklistVehiculo, pk=pk)
+
+        serializer = AdvertenciaChecklistSerializer(data=request.data)
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer.save(checklist=checklist, creada_por=request.user)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
@@ -173,7 +192,7 @@ class ResolverAlertaView(APIView):
         if not serializer.is_valid():
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
-        return Response(AlertaFlotaSerializer(alerta).data)
+        return Response(AlertaFlotaSerializer(alerta, context={'request': request}).data)
 
 
 class ResumenFlotaView(APIView):
@@ -193,9 +212,12 @@ class ResumenFlotaView(APIView):
             checklists__fecha_hora__gte=hace_48h
         ).count()
 
+        checklists_sin_validar = ChecklistVehiculo.objects.filter(validado=False).count()
+
         return Response({
             'vehiculos_activos': vehiculos_activos,
             'alertas_activas': alertas_activas,
             'alertas_criticas': alertas_criticas,
             'vehiculos_sin_checklist_48h': vehiculos_sin_checklist,
+            'checklists_sin_validar': checklists_sin_validar,
         })

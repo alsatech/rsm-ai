@@ -1,8 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
-import { createChecklist, getVehiculos, subirFotoChecklist } from '../../../api/flota'
+import { createChecklist, subirFotoChecklist } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
+import {
+  CHECKLIST_ITEMS,
+  ESTADO_FISICO_LADOS,
+  NIVEL_COMBUSTIBLE_MINIMO_SALIDA,
+  TRAILA_ITEMS,
+  esTraila,
+  resumenChecklist,
+} from '../constants'
 import Paso1Identificacion from './Paso1Identificacion'
 import Paso2Inspeccion from './Paso2Inspeccion'
 import Paso3Evidencia from './Paso3Evidencia'
@@ -13,30 +21,34 @@ const PASOS = [
   { num: 3, titulo: 'Evidencia' },
 ]
 
+const CHECKLIST_ITEM_KEYS = [...CHECKLIST_ITEMS.map((item) => item.key), ...TRAILA_ITEMS.map((item) => item.key)]
+const ESTADO_FISICO_LADO_KEYS = ESTADO_FISICO_LADOS.map((lado) => lado.key)
+
 function estadoInicial(vehiculoPreseleccionado) {
+  const esTrailaVehiculo = esTraila(vehiculoPreseleccionado?.tipo)
+  const noPuedeSalir = ['en_taller', 'de_baja'].includes(vehiculoPreseleccionado?.estado)
   return {
     vehiculo: vehiculoPreseleccionado?.id ?? null,
-    tipo_reporte: 'salida',
+    tipo_reporte: noPuedeSalir ? 'llegada' : 'salida',
     responsable: null,
-    km_reporte: '',
-    nivel_combustible: 50,
-    carroceria_pintura: false,
-    parabrisas_vidrios: false,
-    neumaticos_presion: false,
-    luces_delanteras_traseras: false,
-    interiores_asientos: false,
-    nivel_aceite: false,
-    nivel_refrigerante: false,
-    nivel_liquido_frenos: false,
-    frenos_respuesta: false,
-    direccion_volante: false,
-    suspension_amortiguadores: false,
-    filtro_aire: false,
-    gato: false,
-    cruzeta: false,
-    llanta_refaccion: false,
-    caja_herramientas: false,
-    cables_corriente: false,
+    proyecto: null,
+    km_reporte: vehiculoPreseleccionado?.kilometraje_actual != null
+      ? String(vehiculoPreseleccionado.kilometraje_actual)
+      : '',
+    nivel_combustible: esTrailaVehiculo ? 0 : null,
+    estado_fisico: false,
+    lavado: false,
+    soplado_filtro_aire: false,
+    presion_llantas: '',
+    llanta_cambiada: false,
+    anticongelante: false,
+    nivel_aceite_motor: false,
+    nivel_aceite_transmision: false,
+    carga_traila: false,
+    traila: null,
+    limpieza: false,
+    sin_herramientas: false,
+    sin_carga: false,
     observaciones: '',
   }
 }
@@ -45,18 +57,68 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
   const { user } = useAuth()
   const { showToast } = useToast()
   const [paso, setPaso] = useState(1)
-  const [vehiculos, setVehiculos] = useState([])
   const [form, setForm] = useState(() => estadoInicial(vehiculoPreseleccionado))
   const [fotos, setFotos] = useState([])
   const [guardando, setGuardando] = useState(false)
 
-  useEffect(() => {
-    getVehiculos()
-      .then(({ data }) => setVehiculos(data))
-      .catch(() => setVehiculos([]))
-  }, [])
+  const kilometrajeActual = vehiculoPreseleccionado?.kilometraje_actual != null
+    ? Number(vehiculoPreseleccionado.kilometraje_actual)
+    : null
 
-  const puedeAvanzar1 = Boolean(form.vehiculo && form.responsable && form.km_reporte !== '')
+  const noPuedeSalir = ['en_taller', 'de_baja'].includes(vehiculoPreseleccionado?.estado)
+  const puedeAvanzar1 = Boolean(form.vehiculo && form.responsable && !(noPuedeSalir && form.tipo_reporte === 'salida'))
+
+  const gasolinaValida = esTraila(vehiculoPreseleccionado?.tipo) || Boolean(
+    form.nivel_combustible !== null
+    && (form.tipo_reporte !== 'salida' || form.nivel_combustible >= NIVEL_COMBUSTIBLE_MINIMO_SALIDA)
+  )
+
+  const { verificados, total, completo: itemsCompletos } = resumenChecklist({
+    form, fotos, tipoVehiculo: vehiculoPreseleccionado?.tipo, kilometrajeActual,
+  })
+  const itemsFaltantes = total - verificados
+  const puedeAvanzar2 = itemsCompletos && gasolinaValida
+
+  const actualizarEstadoFisico = (fotosActuales) => {
+    const completo = ESTADO_FISICO_LADO_KEYS.every((key) => fotosActuales.some((f) => f.item === key))
+    setForm((prev) => ({ ...prev, estado_fisico: completo }))
+  }
+
+  const handleAgregarFoto = (item, file) => {
+    setFotos((prev) => {
+      const nuevas = [...prev, { file, preview: URL.createObjectURL(file), descripcion: '', item }]
+      if (ESTADO_FISICO_LADO_KEYS.includes(item)) {
+        actualizarEstadoFisico(nuevas)
+      } else if (item === 'carga_traila') {
+        setForm((prevForm) => ({ ...prevForm, carga_traila: true }))
+      } else if (CHECKLIST_ITEM_KEYS.includes(item)) {
+        setForm((prevForm) => ({ ...prevForm, [item]: true }))
+      }
+      return nuevas
+    })
+  }
+
+  const handleEliminarFoto = (index) => {
+    setFotos((prev) => {
+      const eliminada = prev[index]
+      const restante = prev.filter((_, i) => i !== index)
+      if (eliminada?.item) {
+        if (ESTADO_FISICO_LADO_KEYS.includes(eliminada.item)) {
+          actualizarEstadoFisico(restante)
+        } else if (eliminada.item === 'presion_llantas') {
+          const quedaOtra = restante.some((f) => f.item === 'presion_llantas')
+          if (!quedaOtra) setForm((prevForm) => ({ ...prevForm, presion_llantas: '', llanta_cambiada: false }))
+        } else if (eliminada.item === 'carga_traila') {
+          const quedaOtra = restante.some((f) => f.item === 'carga_traila')
+          if (!quedaOtra) setForm((prevForm) => ({ ...prevForm, carga_traila: false, traila: null }))
+        } else if (CHECKLIST_ITEM_KEYS.includes(eliminada.item)) {
+          const quedaOtra = restante.some((f) => f.item === eliminada.item)
+          if (!quedaOtra) setForm((prevForm) => ({ ...prevForm, [eliminada.item]: false }))
+        }
+      }
+      return restante
+    })
+  }
 
   const handleGuardar = async () => {
     setGuardando(true)
@@ -66,6 +128,7 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
       for (const foto of fotos) {
         const fd = new FormData()
         fd.append('foto', foto.file)
+        if (foto.item) fd.append('item', foto.item)
         if (foto.descripcion) fd.append('descripcion', foto.descripcion)
         await subirFotoChecklist(checklist.id, fd)
       }
@@ -108,14 +171,42 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
 
       <div className="px-4 py-5">
         {paso === 1 && (
-          <Paso1Identificacion vehiculos={vehiculos} form={form} setForm={setForm} usuarioActual={user} />
+          <Paso1Identificacion
+            vehiculoPreseleccionado={vehiculoPreseleccionado}
+            form={form}
+            setForm={setForm}
+            usuarioActual={user}
+          />
         )}
-        {paso === 2 && <Paso2Inspeccion form={form} setForm={setForm} />}
+        {paso === 2 && (
+          <Paso2Inspeccion
+            form={form}
+            setForm={setForm}
+            tipoVehiculo={vehiculoPreseleccionado?.tipo}
+            kilometrajeActual={kilometrajeActual}
+            fotos={fotos}
+            onAgregarFoto={handleAgregarFoto}
+            onEliminarFoto={handleEliminarFoto}
+          />
+        )}
+        {paso === 2 && !itemsCompletos && (
+          <p className="mt-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm font-semibold text-warning">
+            ⚠️ Falta{itemsFaltantes === 1 ? '' : 'n'} {itemsFaltantes} ítem{itemsFaltantes === 1 ? '' : 's'} con foto
+            de evidencia. No se puede salir sin completar el checklist.
+          </p>
+        )}
+        {paso === 2 && itemsCompletos && !gasolinaValida && (
+          <p className="mt-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm font-semibold text-warning">
+            ⚠️ Falta revisar la gasolina. No se puede salir sin completar el checklist.
+          </p>
+        )}
         {paso === 3 && (
           <Paso3Evidencia
+            form={form}
+            setForm={setForm}
             fotos={fotos}
-            onAgregar={(f) => setFotos((prev) => [...prev, f])}
-            onEliminar={(i) => setFotos((prev) => prev.filter((_, idx) => idx !== i))}
+            onAgregarFoto={handleAgregarFoto}
+            onEliminarFoto={handleEliminarFoto}
             guardando={guardando}
             onGuardar={handleGuardar}
           />
@@ -136,7 +227,7 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
             <button
               type="button"
               onClick={() => setPaso((p) => p + 1)}
-              disabled={paso === 1 && !puedeAvanzar1}
+              disabled={(paso === 1 && !puedeAvanzar1) || (paso === 2 && !puedeAvanzar2)}
               style={{ minHeight: '56px' }}
               className="flex-1 rounded-xl bg-accent text-base font-bold text-highlight transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
             >

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 
 import {
+  crearAdvertenciaChecklist,
   getAlertasFlota,
   getHistorialVehiculo,
   getVehiculo,
@@ -10,7 +11,7 @@ import {
 } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { ALERTA_TIPO_LABELS, ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, TIPO_LABELS } from '../constants'
+import { ALERTA_TIPO_LABELS, ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, TIPO_LABELS, esOffRoad } from '../constants'
 import DetalleChecklist from './DetalleChecklist'
 import FormularioVehiculo from './FormularioVehiculo'
 import HistorialChecklists from './HistorialChecklists'
@@ -93,6 +94,24 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
     }
   }
 
+  const handleAgregarAdvertencia = async (motivo) => {
+    if (!checklistSeleccionado) return
+    setGuardando(true)
+    try {
+      const { data: advertencia } = await crearAdvertenciaChecklist(checklistSeleccionado.id, { motivo })
+      showToast('⚠️ Advertencia agregada', 'exito')
+      setChecklistSeleccionado((prev) => ({
+        ...prev,
+        advertencias: [advertencia, ...(prev.advertencias ?? [])],
+      }))
+      cargar()
+    } catch {
+      showToast('No se pudo agregar la advertencia.', 'error')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex min-h-svh items-center justify-center bg-bg">
@@ -104,6 +123,7 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
   if (!vehiculo) return null
 
   const estadoConfig = ESTADO_VEHICULO_CONFIG[vehiculo.estado] ?? ESTADO_VEHICULO_CONFIG.activo
+  const unidad = esOffRoad(vehiculo.tipo) ? 'hrs' : 'km'
 
   return (
     <div className="min-h-svh bg-bg pb-10">
@@ -135,69 +155,70 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
       </header>
 
       <div className="flex flex-col gap-5 px-4 py-5">
-        <div className="rounded-2xl border border-border bg-card p-4">
-          <div className="mb-3 flex items-center gap-4">
-            {vehiculo.foto ? (
-              <img src={vehiculo.foto} alt={vehiculo.nombre} className="h-20 w-20 rounded-xl border border-border object-cover" />
-            ) : (
-              <div className="flex h-20 w-20 items-center justify-center rounded-xl border border-border bg-bg text-4xl">
-                {TIPO_ICONOS[vehiculo.tipo] ?? '🚗'}
-              </div>
-            )}
-            <div>
+        <div className="overflow-hidden rounded-2xl border border-border bg-card">
+          {vehiculo.foto ? (
+            <img src={vehiculo.foto} alt={vehiculo.nombre} className="h-56 w-full object-cover" />
+          ) : (
+            <div className="flex h-48 w-full items-center justify-center bg-bg text-7xl">
+              {TIPO_ICONOS[vehiculo.tipo] ?? '🚗'}
+            </div>
+          )}
+
+          <div className="p-4">
+            <div className="mb-3">
               <p className="text-lg font-bold text-text">{vehiculo.marca} {vehiculo.modelo} · {vehiculo.anio}</p>
               <p className="text-sm text-text-secondary">{vehiculo.color}{vehiculo.placas ? ` · ${vehiculo.placas}` : ''}</p>
               <span className={`mt-1 inline-block rounded-full border px-3 py-0.5 text-xs font-bold ${estadoConfig.border} ${estadoConfig.text} ${estadoConfig.bg}`}>
                 {estadoConfig.label}
               </span>
             </div>
-          </div>
 
-          <div className="grid grid-cols-2 gap-3 text-sm">
-            <div>
-              <p className="text-text-secondary">Kilometraje</p>
-              <p className="font-mono font-semibold text-text">{Number(vehiculo.kilometraje_actual).toLocaleString('es-MX')} km</p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-text-secondary">{unidad === 'hrs' ? 'Horas (horómetro)' : 'Kilometraje'}</p>
+                <p className="font-mono font-semibold text-text">{Number(vehiculo.kilometraje_actual).toLocaleString('es-MX')} {unidad}</p>
+              </div>
+              {vehiculo.numero_serie && (
+                <div>
+                  <p className="text-text-secondary">Número de serie</p>
+                  <p className="font-mono text-text">{vehiculo.numero_serie}</p>
+                </div>
+              )}
+              {vehiculo.uso_asignacion && (
+                <div className="col-span-2">
+                  <p className="text-text-secondary">Uso / asignación</p>
+                  <p className="text-text">{vehiculo.uso_asignacion}</p>
+                </div>
+              )}
+              {vehiculo.fecha_vencimiento_tenencia && (
+                <div>
+                  <p className="text-text-secondary">Vence tenencia</p>
+                  <p className="text-text">{vehiculo.fecha_vencimiento_tenencia}</p>
+                </div>
+              )}
+              {vehiculo.fecha_vencimiento_placas && (
+                <div>
+                  <p className="text-text-secondary">Vencen placas</p>
+                  <p className="text-text">{vehiculo.fecha_vencimiento_placas}</p>
+                </div>
+              )}
             </div>
-            {vehiculo.numero_serie && (
-              <div>
-                <p className="text-text-secondary">Número de serie</p>
-                <p className="font-mono text-text">{vehiculo.numero_serie}</p>
-              </div>
+
+            {vehiculo.notas && (
+              <p className="mt-3 rounded-lg bg-bg/50 px-3 py-2 text-sm text-text-secondary">{vehiculo.notas}</p>
             )}
-            {vehiculo.uso_asignacion && (
-              <div className="col-span-2">
-                <p className="text-text-secondary">Uso / asignación</p>
-                <p className="text-text">{vehiculo.uso_asignacion}</p>
-              </div>
-            )}
-            {vehiculo.fecha_vencimiento_tenencia && (
-              <div>
-                <p className="text-text-secondary">Vence tenencia</p>
-                <p className="text-text">{vehiculo.fecha_vencimiento_tenencia}</p>
-              </div>
-            )}
-            {vehiculo.fecha_vencimiento_placas && (
-              <div>
-                <p className="text-text-secondary">Vencen placas</p>
-                <p className="text-text">{vehiculo.fecha_vencimiento_placas}</p>
-              </div>
+
+            {puedeCrearChecklist && (
+              <button
+                type="button"
+                onClick={() => onNuevoChecklist(vehiculo)}
+                style={{ minHeight: '52px' }}
+                className="mt-4 w-full rounded-xl bg-accent text-sm font-bold text-highlight transition hover:opacity-90"
+              >
+                + Nuevo checklist
+              </button>
             )}
           </div>
-
-          {vehiculo.notas && (
-            <p className="mt-3 rounded-lg bg-bg/50 px-3 py-2 text-sm text-text-secondary">{vehiculo.notas}</p>
-          )}
-
-          {puedeCrearChecklist && (
-            <button
-              type="button"
-              onClick={onNuevoChecklist}
-              style={{ minHeight: '52px' }}
-              className="mt-4 w-full rounded-xl bg-accent text-sm font-bold text-highlight transition hover:opacity-90"
-            >
-              + Nuevo checklist
-            </button>
-          )}
         </div>
 
         {puedeVerAlertas && alertas.length > 0 && (
@@ -241,6 +262,7 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
           checklist={checklistSeleccionado}
           puedeValidar={puedeValidar}
           onValidar={handleValidarChecklist}
+          onAgregarAdvertencia={handleAgregarAdvertencia}
           guardando={guardando}
           onCerrar={() => setChecklistSeleccionado(null)}
         />

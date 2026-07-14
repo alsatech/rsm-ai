@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AdvertenciaChecklist, AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
 
 
 @admin.register(Vehiculo)
@@ -15,13 +15,19 @@ class FotoChecklistInline(admin.TabularInline):
     extra = 0
 
 
+class AdvertenciaChecklistInline(admin.TabularInline):
+    model = AdvertenciaChecklist
+    extra = 0
+    raw_id_fields = ('creada_por',)
+
+
 @admin.register(ChecklistVehiculo)
 class ChecklistVehiculoAdmin(admin.ModelAdmin):
     list_display = ('vehiculo', 'tipo_reporte', 'responsable', 'fecha_hora', 'km_reporte', 'validado')
     list_filter = ('tipo_reporte', 'validado', 'vehiculo')
     search_fields = ('vehiculo__nombre', 'responsable__username')
-    raw_id_fields = ('vehiculo', 'responsable', 'validado_por')
-    inlines = [FotoChecklistInline]
+    raw_id_fields = ('vehiculo', 'responsable', 'validado_por', 'traila')
+    inlines = [FotoChecklistInline, AdvertenciaChecklistInline]
 
 
 @admin.register(AlertaFlota)

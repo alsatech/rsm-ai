@@ -53,7 +53,7 @@ export default function Flota() {
       <DetalleVehiculo
         id={vehiculoId}
         onVolver={handleVolver}
-        onNuevoChecklist={() => handleNuevoChecklist({ id: vehiculoId })}
+        onNuevoChecklist={handleNuevoChecklist}
       />
     )
   }

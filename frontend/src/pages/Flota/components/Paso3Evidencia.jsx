@@ -1,27 +1,28 @@
 import { useRef } from 'react'
 
-const MAX_FOTOS = 6
+const MAX_FOTOS_GENERALES = 6
 
-export default function Paso3Evidencia({ fotos, onAgregar, onEliminar, guardando, onGuardar }) {
+export default function Paso3Evidencia({ form, setForm, fotos, onAgregarFoto, onEliminarFoto, guardando, onGuardar }) {
   const inputRef = useRef(null)
+  const fotosGenerales = fotos
+    .map((foto, index) => ({ foto, index }))
+    .filter(({ foto }) => !foto.item)
 
   const handleFile = (e) => {
     const files = Array.from(e.target.files)
     if (!files.length) return
-    const disponibles = MAX_FOTOS - fotos.length
-    files.slice(0, disponibles).forEach((file) => {
-      onAgregar({ file, preview: URL.createObjectURL(file), descripcion: '' })
-    })
+    const disponibles = MAX_FOTOS_GENERALES - fotosGenerales.length
+    files.slice(0, disponibles).forEach((file) => onAgregarFoto('', file))
     e.target.value = ''
   }
 
   return (
     <div className="space-y-5">
       <p className="text-sm text-text-secondary">
-        Agrega hasta 6 fotos del vehículo (opcional).
+        Agrega hasta {MAX_FOTOS_GENERALES} fotos adicionales del vehículo (opcional).
       </p>
 
-      {fotos.length < MAX_FOTOS && (
+      {fotosGenerales.length < MAX_FOTOS_GENERALES && (
         <>
           <input
             ref={inputRef}
@@ -43,14 +44,14 @@ export default function Paso3Evidencia({ fotos, onAgregar, onEliminar, guardando
         </>
       )}
 
-      {fotos.length > 0 && (
+      {fotosGenerales.length > 0 && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          {fotos.map((f, i) => (
-            <div key={i} className="relative aspect-square overflow-hidden rounded-xl border border-border">
-              <img src={f.preview} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
+          {fotosGenerales.map(({ foto, index }, i) => (
+            <div key={index} className="relative aspect-square overflow-hidden rounded-xl border border-border">
+              <img src={foto.preview} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
               <button
                 type="button"
-                onClick={() => onEliminar(i)}
+                onClick={() => onEliminarFoto(index)}
                 className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-bg/80 text-error hover:bg-bg"
               >
                 ✕
@@ -64,8 +65,22 @@ export default function Paso3Evidencia({ fotos, onAgregar, onEliminar, guardando
       )}
 
       <p className="text-center text-xs text-text-secondary">
-        {fotos.length}/{MAX_FOTOS} fotos
+        {fotosGenerales.length}/{MAX_FOTOS_GENERALES} fotos
       </p>
+
+      <div>
+        <label className="mb-1 block text-sm font-medium text-text-secondary" htmlFor="observaciones">
+          Observaciones
+        </label>
+        <textarea
+          id="observaciones"
+          rows={3}
+          value={form.observaciones}
+          onChange={(e) => setForm((prev) => ({ ...prev, observaciones: e.target.value }))}
+          className="w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight"
+          placeholder="Ej. Falta cruceta, falta aceite, se adjunta foto del tanque vacío de agua y del radiador roto…"
+        />
+      </div>
 
       <button
         type="button"

@@ -25,6 +25,8 @@ export const subirFotoChecklist = (id, formData) =>
   })
 export const eliminarFotoChecklist = (id, fotoId) =>
   api.delete(`/api/v1/flota/checklists/${id}/fotos/${fotoId}/`)
+export const crearAdvertenciaChecklist = (id, data) =>
+  api.post(`/api/v1/flota/checklists/${id}/advertencias/`, data)
 
 export const getAlertasFlota = (params) => api.get('/api/v1/flota/alertas/', { params })
 export const resolverAlertaFlota = (id, data) =>
