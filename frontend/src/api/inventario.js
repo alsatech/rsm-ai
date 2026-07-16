@@ -1,0 +1,20 @@
+import api from './axios'
+
+export const getProductos = (params) => api.get('/api/v1/inventario/productos/', { params })
+export const getProducto = (id) => api.get(`/api/v1/inventario/productos/${id}/`)
+export const createProducto = (data) => api.post('/api/v1/inventario/productos/', data)
+export const updateProducto = (id, data) => api.patch(`/api/v1/inventario/productos/${id}/`, data)
+export const getMovimientosProducto = (id) => api.get(`/api/v1/inventario/productos/${id}/movimientos/`)
+
+export const getMovimientos = (params) => api.get('/api/v1/inventario/movimientos/', { params })
+export const getMovimiento = (id) => api.get(`/api/v1/inventario/movimientos/${id}/`)
+export const createMovimiento = (data) =>
+  api.post('/api/v1/inventario/movimientos/', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+export const validarMovimiento = (id, data) => api.patch(`/api/v1/inventario/movimientos/${id}/validar/`, data)
+
+export const getCategorias = () => api.get('/api/v1/inventario/categorias/')
+export const getUbicaciones = () => api.get('/api/v1/inventario/ubicaciones/')
+export const getAlertasStock = () => api.get('/api/v1/inventario/alertas-stock/')
+export const getResumenInventario = () => api.get('/api/v1/inventario/resumen/')

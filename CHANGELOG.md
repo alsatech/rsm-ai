@@ -127,7 +127,20 @@ _Se registran aquí al completar cada módulo._
 - Test `TOTAL_VEHICULOS_PRECARGADOS` actualizado de 6 a 20; 13/13 tests de flota OK
 
 ### v0.6.0 — Inventarios
-> Pendiente
+- App `apps/inventario`: modelos `CategoriaInventario` (8 categorías con color/ícono), `Ubicacion` (bodega/granero/hangar), `Producto` (código único, categoría, ubicación, unidad de medida, stock actual/mínimo) y `MovimientoInventario` (entrada/salida, stock antes/después, responsable, uso o proveedor/factura, código de vehículo para combustibles, referencia de proyecto, validación, rechazo con reversión de stock, foto de evidencia)
+- Data migrations: `0002_precarga_categorias_ubicaciones` (8 categorías + 3 ubicaciones) y `0003_precarga_productos` (121 productos reales del Excel con su stock actual y mínimo)
+- `MovimientoInventarioSerializer.create()` actualiza `producto.stock_actual` de forma atómica antes de crear el movimiento (evita stock negativo — valida cantidad de salida contra stock disponible)
+- Señal `alertar_stock_minimo` dispara la tarea Celery `alertar_stock_bajo_inmediato` en cuanto un movimiento deja el stock en o bajo el mínimo; tarea periódica `revisar_stock_minimo` (diaria, 5:00 pm — ventana en la que Yajaira actualiza el inventario) imprime en consola el listado completo de reabasto
+- Endpoint `PATCH /movimientos/{id}/validar/` con acciones `validar`/`rechazar` (rechazar exige nota y revierte el stock automáticamente)
+- Permisos por rol: `campo`/`inventario`/`administrador`/`superadmin` registran salidas; solo `inventario`/`administrador`/`superadmin` registran entradas; solo `inventario`/`superadmin` validan movimientos (Erik/Abigail no pueden); `operaciones` no registra movimientos pero sí ve alertas de stock; catálogo (productos/categorías) editable por `inventario`/`administrador`/`superadmin`; historial de movimientos filtrado — `campo` solo ve los suyos
+- Endpoints completos: `productos/`, `productos/{id}/movimientos/`, `movimientos/`, `movimientos/{id}/validar/`, `categorias/`, `ubicaciones/`, `alertas-stock/`, `resumen/`
+- 20 tests backend (145 totales en el proyecto): salida reduce stock, entrada aumenta stock, stock no puede quedar negativo, alerta de stock mínimo se genera, permisos de validación/registro por rol, rechazo revierte stock, visibilidad de movimientos por rol, alertas-stock, creación de producto
+- Frontend: `/inventario` con dashboard de tabs por categoría (8 cards con ícono/color, total de productos, badge de alerta), lista de productos con buscador y filtros (categoría/ubicación/estado de stock con badges 🔴🟡🟢), formulario de nuevo producto
+- Wizard de movimiento en 3 pasos (buscador de producto con autocomplete, tipo entrada/salida según rol; cantidad + responsable + sugerencias rápidas de uso + selector de vehículo para combustibles, o proveedor/factura/foto si es entrada; confirmación con stock resultante y advertencias de stock en cero/mínimo)
+- Vista de validación (Yajaira/superadmin): cola de movimientos sin validar con botones Validar/Rechazar (nota obligatoria al rechazar)
+- Historial de movimientos con filtros de fecha/tipo y exportación CSV (`inventario`/`administrador`/`superadmin`)
+- Widget `ResumenInventario` exportable (productos en alerta, movimientos del día, entradas sin validar) — visible solo para `inventario`/`administrador`/`superadmin`
+- Ruta `/inventario` registrada en `App.jsx`; `modules.js` actualizado con `ruta` y acceso a los 5 roles (todos ven stock básico)
 
 ### v0.7.0 — Registro de ganado por arete
 > Pendiente

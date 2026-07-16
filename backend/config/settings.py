@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'apps.pendientes',
     'apps.ganado',
     'apps.flota',
+    'apps.inventario',
 ]
 
 MIDDLEWARE = [
@@ -166,5 +167,9 @@ CELERY_BEAT_SCHEDULE = {
     'revisar-alertas-flota': {
         'task': 'apps.flota.tasks.revisar_alertas_flota',
         'schedule': crontab(hour=6, minute=0),
+    },
+    'revisar-stock-minimo': {
+        'task': 'apps.inventario.tasks.revisar_stock_minimo',
+        'schedule': crontab(hour=17, minute=0),
     },
 }

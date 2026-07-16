@@ -10,6 +10,7 @@ urlpatterns = [
     path('api/v1/pendientes/', include('apps.pendientes.urls')),
     path('api/v1/ganado/', include('apps.ganado.urls')),
     path('api/v1/flota/', include('apps.flota.urls')),
+    path('api/v1/inventario/', include('apps.inventario.urls')),
 ]
 
 if settings.DEBUG:

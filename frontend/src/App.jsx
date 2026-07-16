@@ -5,6 +5,7 @@ import Dashboard from './pages/Dashboard'
 import Flota from './pages/Flota'
 import Ganado from './pages/Ganado'
 import Hidraulica from './pages/Hidraulica'
+import Inventario from './pages/Inventario'
 import Login from './pages/Login'
 import Pendientes from './pages/Pendientes'
 
@@ -49,6 +50,14 @@ function App() {
         element={
           <ProtectedRoute roles={['campo', 'operaciones', 'administrador', 'superadmin']}>
             <Flota />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/inventario"
+        element={
+          <ProtectedRoute roles={['campo', 'inventario', 'operaciones', 'administrador', 'superadmin']}>
+            <Inventario />
           </ProtectedRoute>
         }
       />

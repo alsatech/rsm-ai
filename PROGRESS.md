@@ -7,7 +7,7 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 5 / 11  
+**Módulos completados:** 6 / 11  
 **Fase actual:** Mes 2
 
 ---
@@ -22,7 +22,7 @@
 ### Fase 2 — Mes 2 (Días 31–60)
 - [x] **Módulo 4** — Ganado — recorridos GPS
 - [x] **Módulo 5** — Flota vehicular
-- [ ] **Módulo 6** — Inventarios
+- [x] **Módulo 6** — Inventarios
 - [ ] **Módulo 7** — Registro de ganado por arete
 
 ### Fase 3 — Mes 3 (Días 61–90)
@@ -146,6 +146,16 @@
 **Commit:** `[FLOTA] feat: migración de 20 vehículos reales RSM`  
 **Descripción:** Se reciben los datos reales de la flota y se reemplazan los 6 vehículos placeholder de `0002_precarga_vehiculos`. Migración `0003_vehiculo_equipo_tipos_anio_opcional`: agrega el campo `equipo` (nombre oficial del equipo, separado del apodo interno en `nombre`) y amplía `Vehiculo.Tipo` con `polaris`, `can_am`, `remolque`, `traila`, `maquinaria`, `plataforma` y `van`; `anio` pasa a `null=True, blank=True` para los vehículos con año pendiente o N/A (Caterpillar, remolques, plataforma). Data migration `0004_reemplazo_vehiculos_reales`: elimina los 6 placeholders por nombre y carga (`get_or_create` por `equipo`, idempotente) los 20 vehículos reales — cuatrimotos, Polaris/CAN AM, 4 remolques + traila fabricada + remolque de hechizos, plataforma ganadera, maquinaria Caterpillar, y las unidades con placas (Sierra, Blazer, Tacoma, Savana, F250) con su kilometraje real; donde el Excel decía "N/A" o "PDTE" se usó `0.0` en kilometraje. Serializer y admin actualizados para exponer `equipo`. Frontend: `TIPO_ICONOS`/`TIPO_LABELS` (`constants.js`) ampliados con los 7 tipos nuevos y fallback agregado en `DetalleVehiculo.jsx` para que ningún vehículo real quede sin ícono o etiqueta.  
 **Notas:** Migración probada con `migrate`/reversa/reaplicar (`0003`→`0004`→`0003`→`0004`) sin errores. Constante `TOTAL_VEHICULOS_PRECARGADOS` del test `VehiculosPrecargadosTest` actualizada de 6 a 20. 13/13 tests de `apps.flota` OK. `npm run build` sin errores. No se tocó el formulario de edición de vehículo (`FormularioVehiculo.jsx`) — sigue sin exponer `equipo` ni permitir año vacío; fuera del alcance pedido, pendiente si se requiere editar esos campos desde la UI.
+
+---
+
+### 🟢 Push #7
+**Módulo:** Módulo 6 — Inventarios  
+**Fecha:** 2026-07-16  
+**Branch:** main  
+**Commit:** `[INVENTARIO] feat: módulo completo de inventarios con 3 ubicaciones, categorías y control de movimientos`  
+**Descripción:** App `apps/inventario` con modelos `CategoriaInventario` (8 categorías precargadas con color/ícono), `Ubicacion` (bodega/granero/hangar), `Producto` (código único, categoría, ubicación, unidad de medida, stock actual/mínimo) y `MovimientoInventario` (entrada/salida, stock antes/después, responsable, uso o proveedor/factura según tipo, código de vehículo para combustibles, referencia de proyecto opcional, validación, rechazo con reversión automática de stock, foto de evidencia). Data migrations precargan las 8 categorías, las 3 ubicaciones y los 121 productos reales del Excel con su stock actual y mínimo. El stock se actualiza de forma atómica en `MovimientoInventarioSerializer.create()` antes de crear el movimiento (evita condiciones de carrera con la señal de alerta) y nunca puede quedar negativo. Señal `alertar_stock_minimo` dispara la tarea Celery `alertar_stock_bajo_inmediato` en cuanto un movimiento deja el stock en o bajo el mínimo (notifica a Erik/administrador/superadmin); tarea periódica `revisar_stock_minimo` corre diario a las 5 pm. Permisos estrictos por rol: `campo`/`inventario`/`administrador`/`superadmin` registran salidas, solo `inventario`/`administrador`/`superadmin` registran entradas (Erik reporta a Yajaira, no captura directo — `operaciones` no puede registrar ningún movimiento), solo `inventario`/`superadmin` validan (Abigail/`administrador` no puede, a diferencia de Flota), historial filtrado por rol (`campo` solo ve los suyos). Endpoints completos de productos, movimientos, validación, categorías, ubicaciones, alertas de stock y resumen para dashboard. Frontend: `/inventario` con dashboard de tabs por categoría, lista de productos con buscador/filtros y badges de stock 🔴🟡🟢, wizard de movimiento mobile-first de 3 pasos (producto → cantidad/uso/vehículo o proveedor/factura → confirmación con advertencias de stock en cero/mínimo), vista de validación para Yajaira con validar/rechazar (nota obligatoria), historial con exportación CSV, y widget `ResumenInventario` exportable.  
+**Notas:** 20 tests nuevos en `apps.inventario` (145 totales en el backend, todos OK). Verificado con llamadas reales a la API contra el servidor de desarrollo (login real de chino/yajaira/erik/abigail): salida como campo, intento de movimiento bloqueado para operaciones (403), intento de entrada bloqueado para campo (400), entrada + validación como Yajaira, intento de validación bloqueado para administrador (403), rechazo revierte stock, resumen y alertas-stock, y visibilidad de movimientos filtrada por rol. `npm run build` y `npm run lint` sin errores nuevos (el único error de lint es preexistente en `VistaListaAdmin.jsx` del Módulo 3, no tocado). No fue posible tomar screenshots de navegador en este entorno (faltan librerías del sistema para Chromium headless y no hay sudo).
 
 ---
 

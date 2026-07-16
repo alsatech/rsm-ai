@@ -39,7 +39,8 @@ export const MODULOS = [
     nombre: 'Inventarios',
     descripcion: 'Control de materiales, alimento, herramienta y auditoría',
     icono: '📦',
-    roles: ['inventario', 'administrador', 'superadmin'],
+    roles: ['campo', 'operaciones', 'inventario', 'administrador', 'superadmin'],
+    ruta: '/inventario',
   },
   {
     id: 'arete',
