@@ -27,6 +27,13 @@ export const ESTADO_BADGE = {
   falla: 'border-error text-error',
 }
 
+// Norias que abastecen las cazuelas (backend: apps/hidraulica/models.py — Cazuela.Noria)
+export const NORIAS = {
+  rosita: { label: 'Rosita', color: '#0ea5e9', icono: '🔵' },
+  margaritas: { label: 'Margaritas', color: '#4ade80', icono: '🟢' },
+  chapote: { label: 'Chapote', color: '#f59e0b', icono: '🟠' },
+}
+
 // Checklist diario de generadores (backend: ChecklistGenerador)
 export const CHECKLIST_GENERADOR_ITEMS = [
   { key: 'nivel_aceite', label: 'Nivel de aceite del motor verificado' },

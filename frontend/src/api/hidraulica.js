@@ -15,3 +15,5 @@ export const getChecklistGenerador = (id) => api.get(`/api/v1/hidraulica/generad
 
 export const crearChecklistGenerador = (id, data) =>
   api.post(`/api/v1/hidraulica/generadores/${id}/checklist/`, data)
+
+export const getCazuelas = (params) => api.get('/api/v1/hidraulica/cazuelas/', { params })

@@ -1,6 +1,15 @@
 from rest_framework import serializers
 
-from .models import AlertaMantenimientoGenerador, ChecklistGenerador, Generador, RegistroHidraulico
+from .models import AlertaMantenimientoGenerador, Cazuela, ChecklistGenerador, Generador, RegistroHidraulico
+
+
+class CazuelaSerializer(serializers.ModelSerializer):
+    noria_display = serializers.CharField(source='get_noria_display', read_only=True)
+
+    class Meta:
+        model = Cazuela
+        fields = ('id', 'nombre', 'noria', 'noria_display', 'lat', 'lng', 'activa', 'notas')
+        read_only_fields = ('id',)
 
 
 class RegistroHidraulicoSerializer(serializers.ModelSerializer):

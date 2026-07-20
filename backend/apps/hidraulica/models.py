@@ -70,6 +70,30 @@ class RegistroHidraulico(models.Model):
             alerta_falla_hidraulica.delay(self.id)
 
 
+class Cazuela(models.Model):
+    """Punto de distribución de agua en el rancho, abastecido por una noria."""
+
+    class Noria(models.TextChoices):
+        ROSITA = 'rosita', 'Rosita'
+        MARGARITAS = 'margaritas', 'Margaritas'
+        CHAPOTE = 'chapote', 'Chapote'
+
+    nombre = models.CharField(max_length=50, unique=True)
+    noria = models.CharField(max_length=20, choices=Noria.choices)
+    lat = models.DecimalField(max_digits=18, decimal_places=12)
+    lng = models.DecimalField(max_digits=18, decimal_places=12)
+    activa = models.BooleanField(default=True)
+    notas = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['noria', 'nombre']
+        verbose_name = 'Cazuela'
+        verbose_name_plural = 'Cazuelas'
+
+    def __str__(self):
+        return f'{self.nombre} ({self.get_noria_display()})'
+
+
 class Generador(models.Model):
     """Generador eléctrico de la reserva — control de horas de operación."""
 

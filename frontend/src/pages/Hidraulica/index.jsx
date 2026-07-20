@@ -11,8 +11,14 @@ import {
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import GeneradoresSection from './components/GeneradoresSection'
+import MapaCazuelas from './MapaCazuelas'
 import RegistroForm from './components/RegistroForm'
 import RegistroTable from './components/RegistroTable'
+
+const TABS = [
+  { id: 'registros', label: 'Registros' },
+  { id: 'cazuelas', label: '🗺️ Cazuelas' },
+]
 
 export default function Hidraulica() {
   const { user } = useAuth()
@@ -26,6 +32,8 @@ export default function Hidraulica() {
   const [generadores, setGeneradores] = useState([])
   const [loadingGeneradores, setLoadingGeneradores] = useState(true)
   const [errorGeneradores, setErrorGeneradores] = useState('')
+
+  const [tab, setTab] = useState('registros')
 
   const puedeValidar = user?.rol === 'administrador' || user?.rol === 'superadmin'
   const puedeActualizarHorasGenerador = user?.rol === 'administrador' || user?.rol === 'superadmin'
@@ -110,31 +118,54 @@ export default function Hidraulica() {
         <p className="text-sm text-text-secondary">Captura de mediciones y validación diaria</p>
       </header>
 
-      <RegistroForm onGuardar={handleGuardar} guardando={guardando} />
+      <div className="mb-6 flex gap-2">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
+              tab === t.id
+                ? 'bg-accent text-highlight'
+                : 'border border-border text-text-secondary hover:border-accent hover:text-highlight'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
 
-      <section className="mt-8">
-        <h2 className="mb-3 text-lg font-bold text-text">Registros de hoy</h2>
+      {tab === 'registros' && (
+        <>
+          <RegistroForm onGuardar={handleGuardar} guardando={guardando} />
 
-        {loading && <p className="text-text-secondary">Cargando…</p>}
-        {!loading && error && <p className="text-error">{error}</p>}
-        {!loading && !error && registros.length === 0 && (
-          <p className="text-text-secondary">Todavía no hay registros hoy.</p>
-        )}
-        {!loading && !error && registros.length > 0 && (
-          <RegistroTable registros={registros} puedeValidar={puedeValidar} onValidar={handleValidar} />
-        )}
-      </section>
+          <section className="mt-8">
+            <h2 className="mb-3 text-lg font-bold text-text">Registros de hoy</h2>
 
-      {loadingGeneradores && <p className="mt-8 text-text-secondary">Cargando generadores…</p>}
-      {!loadingGeneradores && errorGeneradores && <p className="mt-8 text-error">{errorGeneradores}</p>}
-      {!loadingGeneradores && !errorGeneradores && generadores.length > 0 && (
-        <GeneradoresSection
-          generadores={generadores}
-          puedeActualizarHoras={puedeActualizarHorasGenerador}
-          puedeVerAlertas={puedeVerAlertasGenerador}
-          onActualizarHoras={handleActualizarHorasGenerador}
-        />
+            {loading && <p className="text-text-secondary">Cargando…</p>}
+            {!loading && error && <p className="text-error">{error}</p>}
+            {!loading && !error && registros.length === 0 && (
+              <p className="text-text-secondary">Todavía no hay registros hoy.</p>
+            )}
+            {!loading && !error && registros.length > 0 && (
+              <RegistroTable registros={registros} puedeValidar={puedeValidar} onValidar={handleValidar} />
+            )}
+          </section>
+
+          {loadingGeneradores && <p className="mt-8 text-text-secondary">Cargando generadores…</p>}
+          {!loadingGeneradores && errorGeneradores && <p className="mt-8 text-error">{errorGeneradores}</p>}
+          {!loadingGeneradores && !errorGeneradores && generadores.length > 0 && (
+            <GeneradoresSection
+              generadores={generadores}
+              puedeActualizarHoras={puedeActualizarHorasGenerador}
+              puedeVerAlertas={puedeVerAlertasGenerador}
+              onActualizarHoras={handleActualizarHorasGenerador}
+            />
+          )}
+        </>
       )}
+
+      {tab === 'cazuelas' && <MapaCazuelas />}
     </div>
   )
 }

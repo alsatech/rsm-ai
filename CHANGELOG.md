@@ -39,6 +39,16 @@ _Se registran aquí al completar cada módulo._
 - Tests de modelo y endpoints (checklist completo/incompleto, alerta por horas, permisos de actualización de horas)
 - Frontend: sección "Generadores" en `/hidraulica` con tarjetas por generador (horas actuales, botón "Hacer revisión diaria", checklist con 4 verificaciones + observaciones, historial del día), campo de actualización de horas para `administrador`/`superadmin` y alertas de mantenimiento destacadas en amarillo
 
+### v0.2.2 — Mapa de cazuelas por noria de origen (ajuste Módulo 2)
+- Modelo `Cazuela` (`nombre` único, `noria` — rosita/margaritas/chapote, `lat`/`lng`, `activa`, `notas`)
+- Data migration precarga las 36 cazuelas reales (12 Rosita, 14 Margaritas, 10 Chapote) con sus coordenadas GPS
+- Endpoint `GET /api/v1/hidraulica/cazuelas/` (cualquier usuario autenticado, filtro opcional `?noria=`)
+- Tests de modelo y endpoint (conteo por noria, filtro, acceso sin autenticación)
+- Frontend: nueva pestaña "🗺️ Cazuelas" en `/hidraulica` — `MapaCazuelas.jsx` con mapa Leaflet satelital (Esri World Imagery), 36 marcadores coloreados por noria (🔵 Rosita, 🟢 Margaritas, 🟠 Chapote), capa de cercas del rancho superpuesta (`CapaCercas`, toggle existente reutilizado)
+- Panel lateral con leyenda por noria (conteo de cazuelas) y toggle independiente para mostrar/ocultar cada noria
+- El campo `activa` de la cazuela es la señal de "fuera de servicio": una cazuela inactiva se dibuja atenuada con ícono ⚠️ superpuesto; banner de alerta por noria ("Falla detectada en Noria X — N cazuelas afectadas") aparece cuando alguna de sus cazuelas está marcada inactiva; `administrador`/`superadmin` ven además el detalle de qué cazuelas están afectadas por noria
+- Nota de diseño: no existe relación real entre `RegistroHidraulico.punto_medicion` (pilas/fluxómetros/manómetros/pluviómetros) y las cazuelas/norias, así que la detección de falla usa el campo `activa` de `Cazuela` en vez de intentar correlacionar con los registros hidráulicos existentes
+
 ### v0.3.0 — Pendientes rastreables
 - App `apps/pendientes`: modelos `Pendiente` (estados, prioridades, motivos de bloqueo, asignación M2M, módulo relacionado, fecha límite/cierre, cerrado_por), `HistorialPendiente` y `FotoPendiente` (máx. 4 fotos con momentos apertura/seguimiento/cierre)
 - Señales Django: historial automático al cambiar estado, fecha_cierre auto en cierre, validación de bloqueo sin motivo → HTTP 400

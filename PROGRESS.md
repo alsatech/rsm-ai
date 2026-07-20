@@ -159,4 +159,14 @@
 
 ---
 
+### 🟢 Push #12
+**Módulo:** Ajuste Módulo 2 — Hidráulica: mapa de cazuelas con 36 puntos agrupados por noria de origen  
+**Fecha:** 2026-07-20  
+**Branch:** main  
+**Commit:** `[HIDRÁULICA] feat: mapa de cazuelas con 36 puntos agrupados por noria de origen`  
+**Descripción:** Modelo `Cazuela` (`apps/hidraulica`): `nombre` único, `noria` (rosita/margaritas/chapote), `lat`/`lng` (`DecimalField` 18/12), `activa`, `notas`. Data migration `0005_cazuelas_iniciales` precarga las 36 cazuelas reales con sus coordenadas GPS (12 Rosita, 14 Margaritas, 10 Chapote). Endpoint `GET /api/v1/hidraulica/cazuelas/` (cualquier rol autenticado, filtro opcional `?noria=`). Frontend: nueva pestaña "🗺️ Cazuelas" dentro de `/hidraulica` (`MapaCazuelas.jsx`) — mapa Leaflet satelital (Esri World Imagery) con las 36 cazuelas como marcadores circulares coloreados por noria (🔵 Rosita, 🟢 Margaritas, 🟠 Chapote), capa `CapaCercas` superpuesta reutilizando el toggle global existente, popup por cazuela (nombre, noria, estado, notas), panel lateral con leyenda/conteo por noria y toggle independiente para mostrar/ocultar cada una.  
+**Notas:** Decisión de diseño — `RegistroHidraulico.punto_medicion` (pilas/fluxómetros/manómetros/pluviómetros) no tiene ninguna relación real con las cazuelas/norias, así que el "impacto de una falla por noria" se calcula con el campo `activa` de `Cazuela` (marcar una cazuela como inactiva dispara el ícono de advertencia y el banner de alerta de su noria), en vez de inventar una correlación falsa con los registros hidráulicos existentes; no se modificó `RegistroHidraulico` (módulo ya completado). El changelog usa `v0.2.2` en vez de `v0.2.1` (pedido originalmente) porque esa versión ya la ocupan los Generadores. 22/22 tests de `apps.hidraulica` OK (5 nuevos de `Cazuela`). Verificado con llamadas reales a la API (login real de un usuario `campo`): lista completa de 36 cazuelas, filtro `?noria=chapote` (10 resultados), 401 sin autenticación. `npm run build` y `npm run lint` sin errores nuevos (el único error de lint es preexistente en `VistaListaAdmin.jsx` del Módulo 3, no tocado). No fue posible tomar screenshots de navegador en este entorno (faltan librerías del sistema para Chromium headless — `libnspr4.so` — y no hay sudo para instalarlas).
+
+---
+
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._

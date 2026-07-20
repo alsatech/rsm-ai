@@ -7,7 +7,7 @@ from rest_framework.test import APITestCase
 
 from apps.users.models import User
 
-from .models import AlertaMantenimientoGenerador, ChecklistGenerador, Generador, RegistroHidraulico
+from .models import AlertaMantenimientoGenerador, Cazuela, ChecklistGenerador, Generador, RegistroHidraulico
 from .tasks import revisar_alertas_generadores
 
 
@@ -262,3 +262,41 @@ class GeneradorEndpointTest(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         chapote = next(g for g in response.data if g['nombre'] == 'chapote')
         self.assertEqual(len(chapote['alertas_pendientes']), 3)
+
+
+class CazuelaModelTest(TestCase):
+    def test_cazuelas_precargadas_36_por_noria(self):
+        self.assertEqual(Cazuela.objects.count(), 36)
+        self.assertEqual(Cazuela.objects.filter(noria=Cazuela.Noria.ROSITA).count(), 12)
+        self.assertEqual(Cazuela.objects.filter(noria=Cazuela.Noria.MARGARITAS).count(), 14)
+        self.assertEqual(Cazuela.objects.filter(noria=Cazuela.Noria.CHAPOTE).count(), 10)
+
+    def test_str_incluye_nombre_y_noria(self):
+        cazuela = Cazuela.objects.get(nombre='Rcazuela1')
+        self.assertIn('Rcazuela1', str(cazuela))
+        self.assertIn('Rosita', str(cazuela))
+
+
+class CazuelaEndpointTest(APITestCase):
+    def setUp(self):
+        self.campo = User.objects.create_user(username='chino', password='clave12345', rol=User.Rol.CAMPO)
+        self.list_url = reverse('cazuela-list')
+
+    def test_usuario_autenticado_ve_todas_las_cazuelas(self):
+        self.client.force_authenticate(user=self.campo)
+        response = self.client.get(self.list_url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 36)
+
+    def test_filtro_por_noria(self):
+        self.client.force_authenticate(user=self.campo)
+        response = self.client.get(self.list_url, {'noria': 'chapote'})
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(response.data), 10)
+        self.assertTrue(all(c['noria'] == 'chapote' for c in response.data))
+
+    def test_usuario_no_autenticado_no_puede_ver_cazuelas(self):
+        response = self.client.get(self.list_url)
+        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)

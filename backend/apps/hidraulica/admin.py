@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import AlertaMantenimientoGenerador, ChecklistGenerador, Generador, RegistroHidraulico
+from .models import AlertaMantenimientoGenerador, Cazuela, ChecklistGenerador, Generador, RegistroHidraulico
+
+
+@admin.register(Cazuela)
+class CazuelaAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'noria', 'activa', 'lat', 'lng')
+    list_filter = ('noria', 'activa')
+    search_fields = ('nombre',)
 
 
 @admin.register(RegistroHidraulico)

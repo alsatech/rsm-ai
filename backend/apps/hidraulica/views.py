@@ -4,17 +4,19 @@ from rest_framework.permissions import IsAuthenticated
 
 from apps.users.models import User
 
-from .models import ChecklistGenerador, Generador, RegistroHidraulico
+from .models import Cazuela, ChecklistGenerador, Generador, RegistroHidraulico
 from .permissions import (
     PuedeActualizarHorasGenerador,
     PuedeCrearChecklistGenerador,
     PuedeCrearRegistroHidraulico,
     PuedeValidarRegistroHidraulico,
+    PuedeVerCazuela,
     PuedeVerGenerador,
     PuedeVerHistorialChecklistGenerador,
     PuedeVerRegistroHidraulico,
 )
 from .serializers import (
+    CazuelaSerializer,
     ChecklistGeneradorSerializer,
     GeneradorSerializer,
     RegistroHidraulicoSerializer,
@@ -127,3 +129,17 @@ class ChecklistGeneradorListCreateView(generics.ListCreateAPIView):
     def perform_create(self, serializer):
         generador = get_object_or_404(Generador, pk=self.kwargs['pk'])
         serializer.save(generador=generador, created_by=self.request.user)
+
+
+class CazuelaListView(generics.ListAPIView):
+    """GET: lista de las cazuelas del rancho. Filtro opcional: ?noria=rosita|margaritas|chapote."""
+
+    serializer_class = CazuelaSerializer
+    permission_classes = [IsAuthenticated, PuedeVerCazuela]
+
+    def get_queryset(self):
+        queryset = Cazuela.objects.all()
+        noria = self.request.query_params.get('noria')
+        if noria:
+            queryset = queryset.filter(noria=noria)
+        return queryset

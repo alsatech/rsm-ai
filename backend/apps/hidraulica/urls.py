@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    CazuelaListView,
     ChecklistGeneradorListCreateView,
     GeneradorDetailView,
     GeneradorListView,
@@ -14,4 +15,5 @@ urlpatterns = [
     path('generadores/', GeneradorListView.as_view(), name='generador-list'),
     path('generadores/<int:pk>/', GeneradorDetailView.as_view(), name='generador-detail'),
     path('generadores/<int:pk>/checklist/', ChecklistGeneradorListCreateView.as_view(), name='generador-checklist'),
+    path('cazuelas/', CazuelaListView.as_view(), name='cazuela-list'),
 ]

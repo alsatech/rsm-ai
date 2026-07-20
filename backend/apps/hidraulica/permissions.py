@@ -86,3 +86,10 @@ class PuedeVerHistorialChecklistGenerador(BasePermission):
             and request.user.is_authenticated
             and request.user.rol in ROLES_CON_ACCESO
         )
+
+
+class PuedeVerCazuela(BasePermission):
+    """Permite ver el mapa de cazuelas a cualquier usuario autenticado."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated)
