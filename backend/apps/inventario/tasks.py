@@ -46,3 +46,24 @@ def revisar_stock_minimo():
             f'  - {producto.codigo} | {producto.descripcion} | '
             f'stock: {producto.stock_actual} | mínimo: {producto.stock_minimo}'
         )
+
+
+@shared_task
+def alertar_nuevo_reporte_faltante_danio(reporte_id):
+    """Se dispara al crear un reporte de faltante/daño — notifica a administrador/superadmin.
+
+    Por ahora solo imprime en consola — WhatsApp queda fuera del SLA actual.
+    """
+    from .models import ReporteFaltanteDanio
+
+    try:
+        reporte = ReporteFaltanteDanio.objects.select_related('reportado_por', 'producto').get(pk=reporte_id)
+    except ReporteFaltanteDanio.DoesNotExist:
+        return
+
+    referencia = reporte.producto.descripcion if reporte.producto else 'sin producto asociado'
+    print(
+        f'[ALERTA INVENTARIO] Nuevo reporte de {reporte.get_tipo_display()} — {referencia}: '
+        f'"{reporte.descripcion}". Reportado por {reporte.reportado_por}. '
+        f'Notificar a administrador/superadmin.'
+    )

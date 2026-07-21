@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
+import VistaAdquisiciones from './components/Adquisiciones/VistaAdquisiciones'
 import DashboardInventario from './components/DashboardInventario'
 import HistorialMovimientos from './components/HistorialMovimientos'
 import ListaProductos from './components/ListaProductos'
@@ -58,6 +59,31 @@ export default function Inventario() {
     return <HistorialMovimientos onVolver={handleVolver} />
   }
 
+  if (vista === 'adquisiciones') {
+    return (
+      <div className="min-h-svh bg-bg pb-10">
+        <header className="sticky top-0 z-10 border-b border-border bg-bg px-4 py-4">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleVolver}
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-text-secondary hover:border-accent hover:text-text"
+            >
+              ←
+            </button>
+            <div>
+              <h1 className="font-bold text-highlight">Adquisiciones</h1>
+              <p className="text-xs text-text-secondary">Solicitudes, envíos y recepción de material</p>
+            </div>
+          </div>
+        </header>
+        <div className="px-4 py-5">
+          <VistaAdquisiciones onVolver={handleVolver} />
+        </div>
+      </div>
+    )
+  }
+
   if (vista === 'lista') {
     return (
       <ListaProductos
@@ -88,6 +114,13 @@ export default function Inventario() {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setVista('adquisiciones')}
+              className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+            >
+              📦 Adquisiciones
+            </button>
             {puedeValidar && (
               <button
                 type="button"

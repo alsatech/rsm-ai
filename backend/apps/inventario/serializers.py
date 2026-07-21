@@ -2,7 +2,19 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import CategoriaInventario, MovimientoInventario, Producto, Ubicacion
+from .models import (
+    CategoriaInventario,
+    EnvioMaterial,
+    FotoEnvio,
+    ItemRecepcion,
+    ItemSolicitud,
+    MovimientoInventario,
+    Producto,
+    RecepcionMaterial,
+    ReporteFaltanteDanio,
+    SolicitudMaterial,
+    Ubicacion,
+)
 from .permissions import ROLES_REGISTRAN_ENTRADA
 
 User = get_user_model()
@@ -162,3 +174,192 @@ class ValidarMovimientoSerializer(serializers.Serializer):
 
         movimiento.save()
         return movimiento
+
+
+class ItemSolicitudSerializer(serializers.ModelSerializer):
+    producto_detalle = ProductoSerializer(source='producto', read_only=True)
+
+    class Meta:
+        model = ItemSolicitud
+        fields = (
+            'id', 'producto', 'producto_detalle', 'descripcion_libre', 'cantidad_solicitada',
+            'cantidad_enviada', 'cantidad_recibida', 'unidad', 'notas', 'es_producto_nuevo',
+        )
+        read_only_fields = ('id', 'cantidad_enviada', 'cantidad_recibida')
+
+    def validate(self, data):
+        producto = data.get('producto')
+        descripcion_libre = data.get('descripcion_libre', '')
+        if not producto and not descripcion_libre:
+            raise serializers.ValidationError(
+                'Cada ítem necesita un producto del catálogo o una descripción de producto nuevo.'
+            )
+        return data
+
+
+class SolicitudMaterialSerializer(serializers.ModelSerializer):
+    items = ItemSolicitudSerializer(many=True)
+    solicitante_detalle = UsuarioResumenSerializer(source='solicitante', read_only=True)
+    created_by_detalle = UsuarioResumenSerializer(source='created_by', read_only=True)
+    autorizado_por_detalle = UsuarioResumenSerializer(source='autorizado_por', read_only=True)
+    area_display = serializers.CharField(source='get_area_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+
+    class Meta:
+        model = SolicitudMaterial
+        fields = (
+            'id', 'folio', 'solicitante', 'solicitante_detalle', 'area', 'area_display',
+            'descripcion_necesidad', 'estado', 'estado_display', 'autorizado_por', 'autorizado_por_detalle',
+            'autorizado_en', 'notas_autorizacion', 'fecha_requerida', 'created_by', 'created_by_detalle',
+            'created_at', 'updated_at', 'items',
+        )
+        read_only_fields = (
+            'id', 'folio', 'solicitante', 'autorizado_por', 'autorizado_en', 'notas_autorizacion',
+            'created_by', 'created_at', 'updated_at',
+        )
+
+    def validate_estado(self, value):
+        if self.instance is None and value not in (
+            SolicitudMaterial.Estado.BORRADOR, SolicitudMaterial.Estado.ENVIADA,
+        ):
+            raise serializers.ValidationError('Al crear una solicitud solo puede quedar en borrador o enviada.')
+        return value
+
+    def validate_items(self, value):
+        if self.instance is None and not value:
+            raise serializers.ValidationError('Agrega al menos un material a la solicitud.')
+        return value
+
+    def create(self, validated_data):
+        items_data = validated_data.pop('items')
+        request = self.context['request']
+        solicitud = SolicitudMaterial.objects.create(
+            solicitante=request.user, created_by=request.user, **validated_data,
+        )
+        for item_data in items_data:
+            ItemSolicitud.objects.create(solicitud=solicitud, **item_data)
+        return solicitud
+
+    def update(self, instance, validated_data):
+        validated_data.pop('items', None)
+        return super().update(instance, validated_data)
+
+
+class AutorizarSolicitudSerializer(serializers.Serializer):
+    notas_autorizacion = serializers.CharField(required=False, allow_blank=True)
+
+    def save(self):
+        solicitud = self.instance
+        request = self.context['request']
+        solicitud.estado = SolicitudMaterial.Estado.AUTORIZADA
+        solicitud.autorizado_por = request.user
+        solicitud.autorizado_en = timezone.now()
+        solicitud.notas_autorizacion = self.validated_data.get('notas_autorizacion', '')
+        solicitud.save()
+        return solicitud
+
+
+class RechazarSolicitudSerializer(serializers.Serializer):
+    notas_autorizacion = serializers.CharField()
+
+    def validate_notas_autorizacion(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Debes indicar el motivo del rechazo.')
+        return value
+
+    def save(self):
+        solicitud = self.instance
+        request = self.context['request']
+        solicitud.estado = SolicitudMaterial.Estado.RECHAZADA
+        solicitud.autorizado_por = request.user
+        solicitud.autorizado_en = timezone.now()
+        solicitud.notas_autorizacion = self.validated_data['notas_autorizacion']
+        solicitud.save()
+        return solicitud
+
+
+class FotoEnvioSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FotoEnvio
+        fields = ('id', 'foto', 'descripcion', 'momento', 'uploaded_by', 'created_at')
+        read_only_fields = ('id', 'uploaded_by', 'created_at')
+
+
+class EnvioMaterialSerializer(serializers.ModelSerializer):
+    enviado_por_detalle = UsuarioResumenSerializer(source='enviado_por', read_only=True)
+    fotos = FotoEnvioSerializer(many=True, read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+
+    class Meta:
+        model = EnvioMaterial
+        fields = (
+            'id', 'solicitud', 'enviado_por', 'enviado_por_detalle', 'fecha_envio', 'hora_envio',
+            'vehiculo', 'notas_envio', 'estado', 'estado_display', 'created_at', 'fotos',
+        )
+        read_only_fields = ('id', 'solicitud', 'enviado_por', 'estado', 'created_at')
+
+
+class ItemRecepcionSerializer(serializers.ModelSerializer):
+    item_solicitud_detalle = ItemSolicitudSerializer(source='item_solicitud', read_only=True)
+    estado_item_display = serializers.CharField(source='get_estado_item_display', read_only=True)
+
+    class Meta:
+        model = ItemRecepcion
+        fields = (
+            'id', 'item_solicitud', 'item_solicitud_detalle', 'cantidad_recibida', 'estado_item',
+            'estado_item_display', 'notas', 'foto',
+        )
+        read_only_fields = ('id',)
+
+
+class RecepcionMaterialSerializer(serializers.ModelSerializer):
+    recibido_por_detalle = UsuarioResumenSerializer(source='recibido_por', read_only=True)
+    items = ItemRecepcionSerializer(many=True, read_only=True)
+    estado_general_display = serializers.CharField(source='get_estado_general_display', read_only=True)
+
+    class Meta:
+        model = RecepcionMaterial
+        fields = (
+            'id', 'envio', 'recibido_por', 'recibido_por_detalle', 'fecha_recepcion', 'hora_recepcion',
+            'estado_general', 'estado_general_display', 'notas', 'created_at', 'items',
+        )
+        read_only_fields = ('id', 'envio', 'recibido_por', 'created_at')
+
+
+class ReporteFaltanteDanioSerializer(serializers.ModelSerializer):
+    reportado_por_detalle = UsuarioResumenSerializer(source='reportado_por', read_only=True)
+    resuelto_por_detalle = UsuarioResumenSerializer(source='resuelto_por', read_only=True)
+    producto_detalle = ProductoSerializer(source='producto', read_only=True)
+    ubicacion_detalle = UbicacionSerializer(source='ubicacion', read_only=True)
+    tipo_display = serializers.CharField(source='get_tipo_display', read_only=True)
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+
+    class Meta:
+        model = ReporteFaltanteDanio
+        fields = (
+            'id', 'producto', 'producto_detalle', 'descripcion', 'tipo', 'tipo_display',
+            'reportado_por', 'reportado_por_detalle', 'ubicacion', 'ubicacion_detalle', 'foto',
+            'estado', 'estado_display', 'resuelto_por', 'resuelto_por_detalle', 'resuelto_en',
+            'notas_resolucion', 'created_at', 'updated_at',
+        )
+        read_only_fields = (
+            'id', 'reportado_por', 'estado', 'resuelto_por', 'resuelto_en', 'created_at', 'updated_at',
+        )
+
+    def create(self, validated_data):
+        validated_data['reportado_por'] = self.context['request'].user
+        return super().create(validated_data)
+
+
+class ResolverReporteSerializer(serializers.Serializer):
+    notas_resolucion = serializers.CharField(required=False, allow_blank=True)
+
+    def save(self):
+        reporte = self.instance
+        request = self.context['request']
+        reporte.estado = ReporteFaltanteDanio.Estado.RESUELTO
+        reporte.resuelto_por = request.user
+        reporte.resuelto_en = timezone.now()
+        reporte.notas_resolucion = self.validated_data.get('notas_resolucion', '')
+        reporte.save()
+        return reporte

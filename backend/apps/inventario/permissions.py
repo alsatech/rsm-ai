@@ -9,6 +9,14 @@ ROLES_VALIDAN = (User.Rol.INVENTARIO, User.Rol.SUPERADMIN)
 ROLES_REPORTES_COMPLETOS = (User.Rol.INVENTARIO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_VEN_ALERTAS = (User.Rol.OPERACIONES, User.Rol.INVENTARIO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 
+ROLES_TODOS = (
+    User.Rol.CAMPO, User.Rol.INVENTARIO, User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN,
+)
+ROLES_AUTORIZAN_SOLICITUD = (User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
+ROLES_REGISTRAN_ENVIO = (User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
+ROLES_REGISTRAN_RECEPCION = (User.Rol.CAMPO, User.Rol.INVENTARIO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
+ROLES_RESUELVEN_REPORTE = (User.Rol.INVENTARIO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
+
 
 def _rol_en(request, roles):
     return bool(request.user and request.user.is_authenticated and request.user.rol in roles)
@@ -39,3 +47,45 @@ class PuedeVerReportesCompletos(BasePermission):
 class PuedeVerAlertas(BasePermission):
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_VEN_ALERTAS)
+
+
+class PuedeCrearSolicitud(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_TODOS)
+
+
+class PuedeAutorizarSolicitud(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_AUTORIZAN_SOLICITUD)
+
+
+class PuedeRegistrarEnvio(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_REGISTRAN_ENVIO)
+
+
+class PuedeRegistrarRecepcion(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_REGISTRAN_RECEPCION)
+
+
+class PuedeReportarFaltante(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_TODOS)
+
+
+class PuedeResolverReporte(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_RESUELVEN_REPORTE)
+
+
+class PuedeEditarSolicitud(BasePermission):
+    """El creador solo edita mientras está en borrador; administrador/superadmin editan siempre."""
+
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_TODOS)
+
+    def has_object_permission(self, request, view, obj):
+        if request.user.rol in ROLES_AUTORIZAN_SOLICITUD:
+            return True
+        return obj.created_by_id == request.user.id and obj.estado == obj.Estado.BORRADOR
