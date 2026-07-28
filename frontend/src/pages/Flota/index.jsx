@@ -2,8 +2,10 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
+import ChecklistsSinValidar from './components/ChecklistsSinValidar'
 import DashboardFlota from './components/DashboardFlota'
 import DetalleVehiculo from './components/DetalleVehiculo'
+import HistorialIncidencias from './components/HistorialIncidencias'
 import VistaAlertas from './components/VistaAlertas'
 import WizardChecklist from './components/WizardChecklist'
 
@@ -62,6 +64,19 @@ export default function Flota() {
     return <VistaAlertas onVolver={handleVolver} />
   }
 
+  if (vista === 'sin-validar' && puedeVerAlertas) {
+    return (
+      <ChecklistsSinValidar
+        onVolver={handleVolver}
+        onVerVehiculo={handleVerVehiculo}
+      />
+    )
+  }
+
+  if (vista === 'incidencias' && puedeVerAlertas) {
+    return <HistorialIncidencias onVolver={handleVolver} />
+  }
+
   return (
     <div className="min-h-svh bg-bg">
       <header className="sticky top-0 z-10 border-b border-border bg-bg">
@@ -80,13 +95,22 @@ export default function Flota() {
           </div>
 
           {puedeVerAlertas && (
-            <button
-              type="button"
-              onClick={() => setVista('alertas')}
-              className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
-            >
-              🔔 Alertas
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setVista('incidencias')}
+                className="flex items-center gap-2 rounded-xl border border-border px-3 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              >
+                ⚠️ Incidencias
+              </button>
+              <button
+                type="button"
+                onClick={() => setVista('alertas')}
+                className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              >
+                🔔 Alertas
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -95,6 +119,8 @@ export default function Flota() {
         recargar={recargar}
         onVerVehiculo={handleVerVehiculo}
         onNuevoChecklist={handleNuevoChecklist}
+        onVerSinValidar={() => setVista('sin-validar')}
+        onVerIncidencias={() => setVista('incidencias')}
         onVehiculoCreado={() => setRecargar((r) => r + 1)}
       />
     </div>

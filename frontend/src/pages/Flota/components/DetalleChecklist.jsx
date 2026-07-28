@@ -6,9 +6,9 @@ import {
   ESTADO_FISICO_INTERIOR,
   ESTADO_FISICO_ITEM,
   ESTADO_FISICO_LADOS,
-  GASOLINA_OPCIONES,
+  INCIDENCIA_NUEVA_ITEM,
+  INCIDENCIA_PREVIA_ITEM,
   KILOMETRAJE_ITEM,
-  PRESION_LLANTAS_ITEM,
   TRAILA_ITEMS,
   esOffRoad,
   esTraila,
@@ -19,13 +19,6 @@ function formatFechaHora(fechaHora) {
   return new Date(fechaHora).toLocaleString('es-MX', {
     day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit',
   })
-}
-
-function gasolinaLabel(valor) {
-  const opcion = GASOLINA_OPCIONES.reduce((masCercana, op) =>
-    Math.abs(op.value - valor) < Math.abs(masCercana.value - valor) ? op : masCercana
-  )
-  return opcion.label
 }
 
 export default function DetalleChecklist({ checklist, puedeValidar, onValidar, onAgregarAdvertencia, guardando, onCerrar }) {
@@ -80,11 +73,10 @@ export default function DetalleChecklist({ checklist, puedeValidar, onValidar, o
 
         <div className="max-h-[65vh] space-y-4 overflow-y-auto pr-1">
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-border bg-bg px-3 py-2 text-sm">
-            {!ocultarKilometraje && (
-              <span className="font-mono text-text">{Number(checklist.km_reporte).toLocaleString('es-MX')} {unidad}</span>
-            )}
-            {!esTrailaChecklist && (
-              <span className="text-text-secondary">⛽ {gasolinaLabel(checklist.nivel_combustible)}</span>
+            {!ocultarKilometraje && checklist.km_reporte != null && (
+              <span className="font-mono text-text">
+                {Number(checklist.km_reporte).toLocaleString('es-MX')} {unidad}
+              </span>
             )}
             <span className="font-semibold text-highlight">
               {checklist.items_verificados}/{checklist.total_items} ítems
@@ -95,6 +87,32 @@ export default function DetalleChecklist({ checklist, puedeValidar, onValidar, o
               <span className="ml-auto text-warning">⏳ Sin validar</span>
             )}
           </div>
+
+          {!esTrailaChecklist && (() => {
+            const fotosGasolina = fotosPorItem('gasolina')
+            if (!fotosGasolina.length) return null
+            return (
+              <div className="flex items-center gap-2 rounded-lg border border-border bg-bg px-3 py-2">
+                <span className="text-xl">⛽</span>
+                <div className="flex-1">
+                  <p className="text-sm font-semibold text-text">Gasolina (foto del tablero)</p>
+                  <p className="text-xs text-text-secondary">Verificar nivel en la foto</p>
+                </div>
+                <div className="flex gap-1.5">
+                  {fotosGasolina.map((foto) => (
+                    <button
+                      key={foto.id}
+                      type="button"
+                      onClick={() => setFotoAmpliada(foto)}
+                      className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border"
+                    >
+                      <img src={foto.foto} alt="Gasolina" className="h-full w-full object-cover" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
 
           <div className="space-y-2">
             {checklist.items_aplicables?.map((key) => {
@@ -108,7 +126,9 @@ export default function DetalleChecklist({ checklist, puedeValidar, onValidar, o
                         {esOffRoad(checklist.vehiculo_detalle?.tipo) ? 'Horas (horómetro)' : 'Kilometraje'}
                       </p>
                       <p className="text-xs text-text-secondary">
-                        {Number(checklist.km_reporte).toLocaleString('es-MX')} {unidad}
+                        {checklist.km_reporte != null
+                          ? `${Number(checklist.km_reporte).toLocaleString('es-MX')} ${unidad} (referencia informativa)`
+                          : 'Valor no registrado — ver foto del tablero'}
                       </p>
                     </div>
                     {fotos.map((foto) => (
@@ -168,37 +188,6 @@ export default function DetalleChecklist({ checklist, puedeValidar, onValidar, o
                 )
               }
 
-              if (key === 'presion_llantas') {
-                const fotos = fotosPorItem('presion_llantas')
-                const tieneProblema = checklist.presion_llantas && checklist.presion_llantas !== 'bien'
-                return (
-                  <div key={key} className="flex items-center gap-2 rounded-lg border border-border bg-bg px-3 py-2">
-                    <span className="text-xl">{PRESION_LLANTAS_ITEM.icon}</span>
-                    <div className="flex-1">
-                      <p className="text-sm font-semibold text-text">{PRESION_LLANTAS_ITEM.label}</p>
-                      <p className={`text-xs ${tieneProblema ? 'font-semibold text-error' : checklist.presion_llantas ? 'text-highlight' : 'text-text-secondary'}`}>
-                        {checklist.presion_llantas
-                          ? `${tieneProblema ? '⚠️ ' : '✓ '}${checklist.presion_llantas_display}`
-                          : 'Sin revisar'}
-                      </p>
-                      {checklist.llanta_cambiada && (
-                        <p className="text-xs font-semibold text-highlight">🔄 Se cambió la llanta completa</p>
-                      )}
-                    </div>
-                    {fotos.map((foto) => (
-                      <button
-                        key={foto.id}
-                        type="button"
-                        onClick={() => setFotoAmpliada(foto)}
-                        className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border"
-                      >
-                        <img src={foto.foto} alt="" className="h-full w-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )
-              }
-
               if (key === 'carga_traila') {
                 const fotos = fotosPorItem('carga_traila')
                 return (
@@ -253,6 +242,39 @@ export default function DetalleChecklist({ checklist, puedeValidar, onValidar, o
               )
             })}
           </div>
+
+          {/* Incidencias reportadas (daños preexistentes a la salida / nuevos a la llegada) */}
+          {(() => {
+            const item = checklist.tipo_reporte === 'salida' ? 'incidencia_previa' : 'incidencia_nueva'
+            const config = checklist.tipo_reporte === 'salida' ? INCIDENCIA_PREVIA_ITEM : INCIDENCIA_NUEVA_ITEM
+            const texto = (checklist[item] ?? '').trim()
+            const fotos = fotosPorItem(item)
+            if (!texto && !fotos.length) return null
+            return (
+              <div className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xl">{config.icon}</span>
+                  <p className="text-sm font-semibold text-text">{config.label}</p>
+                </div>
+                {texto && <p className="mt-1 text-sm text-text">{texto}</p>}
+                {fotos.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {fotos.map((foto) => (
+                      <button
+                        key={foto.id}
+                        type="button"
+                        onClick={() => setFotoAmpliada(foto)}
+                        className="h-12 w-12 shrink-0 overflow-hidden rounded-lg border border-border"
+                        title="Ver foto"
+                      >
+                        <img src={foto.foto} alt={config.label} className="h-full w-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )
+          })()}
 
           {checklist.observaciones && !puedeValidar && (
             <div>

@@ -65,13 +65,6 @@ class ChecklistVehiculo(models.Model):
         SALIDA = 'salida', 'Salida'
         LLEGADA = 'llegada', 'Llegada'
 
-    class PresionLlantas(models.TextChoices):
-        BIEN = 'bien', 'Presión correcta'
-        DELANTERO_IZQUIERDO = 'delantero_izquierdo', 'Delantera izquierda baja/ponchada'
-        DELANTERO_DERECHO = 'delantero_derecho', 'Delantera derecha baja/ponchada'
-        TRASERO_IZQUIERDO = 'trasero_izquierdo', 'Trasera izquierda baja/ponchada'
-        TRASERO_DERECHO = 'trasero_derecho', 'Trasera derecha baja/ponchada'
-
     # CAN-AM, Polaris y cuatrimotos: se registran en horas (horómetro) en vez de km,
     # llevan traila al campo y no reportan aceite de transmisión.
     TIPOS_OFF_ROAD = (Vehiculo.Tipo.CAN_AM, Vehiculo.Tipo.POLARIS, Vehiculo.Tipo.CUATRIMOTO)
@@ -82,17 +75,15 @@ class ChecklistVehiculo(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='checklists_flota'
     )
     fecha_hora = models.DateTimeField(default=timezone.now)
-    km_reporte = models.DecimalField(max_digits=10, decimal_places=2)  # km u horas, según tipo de vehículo
-    nivel_combustible = models.IntegerField()  # mínimo 50% para poder salir a campo
+    km_reporte = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+    )  # km u horas, según tipo de vehículo — informativo, se registra por foto
+    nivel_combustible = models.IntegerField(null=True, blank=True)  # se registra por foto, ya no se elige
 
     # Ítems del checklist — cada uno requiere foto de evidencia (ver FotoChecklist.item)
     estado_fisico = models.BooleanField(default=False)  # salida y llegada — 4 costados + interior opcional
     lavado = models.BooleanField(default=False)  # solo llegada
     soplado_filtro_aire = models.BooleanField(default=False)  # solo salida, vehículos off-road
-    presion_llantas = models.CharField(
-        max_length=25, choices=PresionLlantas.choices, blank=True
-    )  # solo salida — vacío = sin revisar
-    llanta_cambiada = models.BooleanField(default=False)  # se reemplazó la llanta completa (no solo presión)
     anticongelante = models.BooleanField(default=False)  # solo salida
     nivel_aceite_motor = models.BooleanField(default=False)  # solo salida
     nivel_aceite_transmision = models.BooleanField(default=False)  # solo salida, vehículos no off-road
@@ -111,6 +102,12 @@ class ChecklistVehiculo(models.Model):
     limpieza = models.BooleanField(default=False)
     sin_herramientas = models.BooleanField(default=False)
     sin_carga = models.BooleanField(default=False)
+
+    # Incidencias — texto libre + foto (item='incidencia_previa' o 'incidencia_nueva').
+    # SALIDA: el usuario reporta daños preexistentes para deslindarse ("ya lo entregué así").
+    # LLEGADA: el usuario reporta daños nuevos/choques ocurridos durante el uso.
+    incidencia_previa = models.TextField(blank=True)  # solo en salida
+    incidencia_nueva = models.TextField(blank=True)  # solo en llegada
 
     observaciones = models.TextField(blank=True)
     validado = models.BooleanField(default=False)
@@ -148,7 +145,7 @@ class ChecklistVehiculo(models.Model):
 
     def items_aplicables(self):
         if self._es_traila():
-            return ['presion_llantas', 'limpieza', 'sin_herramientas', 'sin_carga']
+            return ['limpieza', 'sin_herramientas', 'sin_carga']
 
         off_road = self._es_off_road()
         sin_kilometraje = self._sin_kilometraje()
@@ -161,7 +158,7 @@ class ChecklistVehiculo(models.Model):
                 items.append('carga_traila')
             return items
 
-        items = ['estado_fisico', 'nivel_aceite_motor', 'anticongelante', 'presion_llantas']
+        items = ['estado_fisico', 'nivel_aceite_motor', 'anticongelante']
         if not sin_kilometraje:
             items.append('kilometraje')
         if off_road:
@@ -173,9 +170,7 @@ class ChecklistVehiculo(models.Model):
     def items_verificados(self):
         verificados = 0
         for campo in self.items_aplicables():
-            if campo == 'presion_llantas':
-                verificados += 1 if self.presion_llantas else 0
-            elif campo == 'kilometraje':
+            if campo == 'kilometraje':
                 verificados += 1 if self.pk and self.fotos.filter(item='kilometraje').exists() else 0
             else:
                 verificados += 1 if getattr(self, campo) else 0
@@ -211,6 +206,7 @@ class AdvertenciaChecklist(models.Model):
 class FotoChecklist(models.Model):
     class Item(models.TextChoices):
         KILOMETRAJE = 'kilometraje', 'Kilometraje / horómetro'
+        GASOLINA = 'gasolina', 'Gasolina (foto del tablero)'
         ESTADO_FISICO_DERECHO = 'estado_fisico_derecho', 'Estado físico — costado derecho'
         ESTADO_FISICO_IZQUIERDO = 'estado_fisico_izquierdo', 'Estado físico — costado izquierdo'
         ESTADO_FISICO_FRENTE = 'estado_fisico_frente', 'Estado físico — frente'
@@ -226,6 +222,8 @@ class FotoChecklist(models.Model):
         LIMPIEZA = 'limpieza', 'Limpieza'
         SIN_HERRAMIENTAS = 'sin_herramientas', 'Sin herramientas'
         SIN_CARGA = 'sin_carga', 'Sin carga'
+        INCIDENCIA_PREVIA = 'incidencia_previa', 'Incidencia previa (daño reportado al sacar el vehículo)'
+        INCIDENCIA_NUEVA = 'incidencia_nueva', 'Incidencia nueva (daño reportado al regresar el vehículo)'
         GENERAL = '', 'General'
 
     checklist = models.ForeignKey(ChecklistVehiculo, on_delete=models.CASCADE, related_name='fotos')

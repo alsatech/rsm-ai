@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
@@ -12,6 +13,7 @@ from .permissions import (
     PuedeGestionarVehiculo,
     PuedeValidarChecklist,
     PuedeVerAlertas,
+    PuedeVerIncidencias,
 )
 from .serializers import (
     AdvertenciaChecklistSerializer,
@@ -214,10 +216,56 @@ class ResumenFlotaView(APIView):
 
         checklists_sin_validar = ChecklistVehiculo.objects.filter(validado=False).count()
 
+        incidencias_total = ChecklistVehiculo.objects.filter(
+            Q(incidencia_previa__gt='') | Q(incidencia_nueva__gt='')
+        ).count()
+
         return Response({
             'vehiculos_activos': vehiculos_activos,
             'alertas_activas': alertas_activas,
             'alertas_criticas': alertas_criticas,
             'vehiculos_sin_checklist_48h': vehiculos_sin_checklist,
             'checklists_sin_validar': checklists_sin_validar,
+            'incidencias_total': incidencias_total,
         })
+
+
+class IncidenciaListView(APIView):
+    """GET /incidencias/ — historial de incidencias reportadas en checklists.
+
+    Devuelve los checklists que tengan texto en `incidencia_previa` o `incidencia_nueva`,
+    con su vehículo, responsable, fotos de evidencia y advertencias.
+
+    Query params:
+      - vehiculo: id del vehículo
+      - tipo: 'previa' (daños preexistentes al sacar) | 'nueva' (daños durante el uso)
+      - fecha_desde, fecha_hasta: YYYY-MM-DD (filtra por `fecha_hora__date`)
+    """
+    permission_classes = [IsAuthenticated, PuedeVerIncidencias]
+
+    def get(self, request):
+        qs = ChecklistVehiculo.objects.select_related(
+            'vehiculo', 'responsable', 'validado_por', 'traila'
+        ).prefetch_related('fotos', 'advertencias__creada_por').filter(
+            Q(incidencia_previa__gt='') | Q(incidencia_nueva__gt='')
+        )
+
+        p = request.query_params
+        vehiculo = p.get('vehiculo')
+        tipo = p.get('tipo')
+        fecha_desde = p.get('fecha_desde')
+        fecha_hasta = p.get('fecha_hasta')
+
+        if vehiculo:
+            qs = qs.filter(vehiculo_id=vehiculo)
+        if tipo == 'previa':
+            qs = qs.filter(incidencia_previa__gt='')
+        elif tipo == 'nueva':
+            qs = qs.filter(incidencia_nueva__gt='')
+        if fecha_desde:
+            qs = qs.filter(fecha_hora__date__gte=fecha_desde)
+        if fecha_hasta:
+            qs = qs.filter(fecha_hora__date__lte=fecha_hasta)
+
+        serializer = ChecklistVehiculoSerializer(qs, many=True, context={'request': request})
+        return Response(serializer.data)

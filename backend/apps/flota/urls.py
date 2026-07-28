@@ -7,6 +7,7 @@ from .views import (
     ChecklistListCreateView,
     FotoChecklistDeleteView,
     FotoChecklistListView,
+    IncidenciaListView,
     ResolverAlertaView,
     ResumenFlotaView,
     VehiculoDetailView,
@@ -34,4 +35,5 @@ urlpatterns = [
     path('alertas/', AlertaFlotaListView.as_view(), name='alerta-list'),
     path('alertas/<int:pk>/resolver/', ResolverAlertaView.as_view(), name='alerta-resolver'),
     path('resumen/', ResumenFlotaView.as_view(), name='flota-resumen'),
+    path('incidencias/', IncidenciaListView.as_view(), name='incidencia-list'),
 ]

@@ -58,14 +58,13 @@ class FlotaAPITest(APITestCase):
     def _auth(self, user):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
 
-    def _checklist_data(self, tipo_reporte='salida', km_reporte='1000.00', vehiculo=None, nivel_combustible=80):
+    def _checklist_data(self, tipo_reporte='salida', km_reporte='1000.00', vehiculo=None, nivel_combustible=None):
         return {
             'vehiculo': (vehiculo or self.vehiculo).id,
             'tipo_reporte': tipo_reporte,
             'km_reporte': km_reporte,
             'nivel_combustible': nivel_combustible,
             'estado_fisico': True,
-            'presion_llantas': 'bien',
             'anticongelante': True,
             'nivel_aceite_motor': True,
             'nivel_aceite_transmision': True,
@@ -77,6 +76,29 @@ class FlotaAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
         self.assertEqual(resp.data['responsable'], self.campo.id)
         self.assertEqual(ChecklistVehiculo.objects.count(), 1)
+
+    def test_crear_checklist_sin_gasolina_ni_km(self):
+        # Ya no se elige gasolina en el formulario — se sube como foto.
+        # El kilometraje también es informativo y opcional.
+        self._auth(self.campo)
+        data = self._checklist_data(km_reporte='', nivel_combustible=None)
+        resp = self.client.post('/api/v1/flota/checklists/', data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertIsNone(resp.data['km_reporte'])
+        self.assertIsNone(resp.data['nivel_combustible'])
+
+    def test_foto_gasolina_se_puede_subir(self):
+        self._auth(self.campo)
+        resp = self.client.post('/api/v1/flota/checklists/', self._checklist_data(), format='json')
+        checklist_id = resp.data['id']
+
+        r = self.client.post(
+            f'/api/v1/flota/checklists/{checklist_id}/fotos/',
+            {'foto': imagen_test(), 'item': 'gasolina'},
+            format='multipart',
+        )
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.data['item'], 'gasolina')
 
     def test_km_llegada_actualiza_vehiculo(self):
         self._auth(self.campo)
@@ -154,7 +176,7 @@ class FlotaAPITest(APITestCase):
         checklist = ChecklistVehiculo.objects.create(
             vehiculo=self.vehiculo, tipo_reporte='salida', responsable=self.campo,
             km_reporte=1000, nivel_combustible=80,
-            estado_fisico=True, presion_llantas='bien', anticongelante=True,
+            estado_fisico=True, anticongelante=True,
             nivel_aceite_motor=True, nivel_aceite_transmision=True,
         )
         FotoChecklist.objects.create(checklist=checklist, item='kilometraje', foto='x.jpg', uploaded_by=self.campo)
@@ -163,8 +185,8 @@ class FlotaAPITest(APITestCase):
         self.assertNotIn('carga_traila', items)
         self.assertIn('nivel_aceite_transmision', items)
         self.assertIn('kilometraje', items)
-        self.assertEqual(checklist.total_items(), 6)
-        self.assertEqual(checklist.items_verificados(), 6)
+        self.assertEqual(checklist.total_items(), 5)
+        self.assertEqual(checklist.items_verificados(), 5)
 
     def test_items_aplicables_salida_off_road_filtro_aire_y_traila(self):
         polaris = crear_vehiculo(nombre='Polaris Test', kilometraje_actual=0, tipo=Vehiculo.Tipo.POLARIS)
@@ -177,7 +199,7 @@ class FlotaAPITest(APITestCase):
         self.assertIn('carga_traila', items)
         self.assertIn('kilometraje', items)
         self.assertNotIn('nivel_aceite_transmision', items)
-        self.assertEqual(checklist.total_items(), 7)
+        self.assertEqual(checklist.total_items(), 6)
         self.assertEqual(checklist.items_verificados(), 0)
 
     def test_items_aplicables_llegada_general(self):
@@ -208,20 +230,13 @@ class FlotaAPITest(APITestCase):
         FotoChecklist.objects.create(checklist=checklist, item='kilometraje', foto='x.jpg', uploaded_by=self.campo)
         self.assertEqual(checklist.items_verificados(), 3)
 
-    def test_gasolina_minima_50_por_ciento_para_salir(self):
+    def test_gasolina_no_bloquea_salida(self):
+        # Antes: gasolina < 50% bloqueaba la salida.
+        # Ahora: la gasolina se sube como foto y no hay validación de mínimo — se confía en lo que el conductor reporte.
         self._auth(self.campo)
         resp = self.client.post(
             '/api/v1/flota/checklists/',
-            self._checklist_data(nivel_combustible=30),
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_gasolina_baja_permitida_en_llegada(self):
-        self._auth(self.campo)
-        resp = self.client.post(
-            '/api/v1/flota/checklists/',
-            self._checklist_data(tipo_reporte='llegada', nivel_combustible=10),
+            self._checklist_data(nivel_combustible=10),
             format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
@@ -290,14 +305,14 @@ class FlotaAPITest(APITestCase):
         resp = self.client.delete(f'/api/v1/flota/vehiculos/{self.vehiculo.id}/')
         self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
 
-    def test_llanta_cambiada_se_guarda(self):
+    def test_llanta_cambiada_removida_del_modelo(self):
+        # Antes había un campo booleano para "se cambió la llanta completa".
+        # Ahora todo (incluida la llanta) se sube como foto de evidencia, sin campo dedicado.
         self._auth(self.campo)
-        data = self._checklist_data()
-        data['presion_llantas'] = 'delantero_izquierdo'
-        data['llanta_cambiada'] = True
-        resp = self.client.post('/api/v1/flota/checklists/', data, format='json')
+        resp = self.client.post('/api/v1/flota/checklists/', self._checklist_data(), format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        self.assertTrue(resp.data['llanta_cambiada'])
+        self.assertNotIn('llanta_cambiada', resp.data)
+        self.assertNotIn('presion_llantas', resp.data)
 
     def test_moto_sin_kilometraje(self):
         moto = crear_vehiculo(nombre='Moto Test', kilometraje_actual=0, tipo=Vehiculo.Tipo.MOTO)
@@ -388,13 +403,13 @@ class FlotaAPITest(APITestCase):
         checklist = ChecklistVehiculo.objects.create(
             vehiculo=traila, tipo_reporte='salida', responsable=self.campo,
             km_reporte=0, nivel_combustible=0,
-            presion_llantas='bien', limpieza=True, sin_herramientas=True, sin_carga=True,
+            limpieza=True, sin_herramientas=True, sin_carga=True,
         )
         self.assertEqual(
-            checklist.items_aplicables(), ['presion_llantas', 'limpieza', 'sin_herramientas', 'sin_carga']
+            checklist.items_aplicables(), ['limpieza', 'sin_herramientas', 'sin_carga']
         )
-        self.assertEqual(checklist.total_items(), 4)
-        self.assertEqual(checklist.items_verificados(), 4)
+        self.assertEqual(checklist.total_items(), 3)
+        self.assertEqual(checklist.items_verificados(), 3)
 
     def test_traila_no_requiere_medio_tanque(self):
         traila = Vehiculo.objects.create(
@@ -501,3 +516,140 @@ class FlotaAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertIn('vehiculos_activos', resp.data)
         self.assertIn('alertas_activas', resp.data)
+
+    def test_incidencia_previa_en_salida(self):
+        # En SALIDA el usuario puede reportar daños preexistentes para deslindarse.
+        self._auth(self.campo)
+        data = self._checklist_data(tipo_reporte='salida')
+        data['incidencia_previa'] = 'La defensa delantera ya estaba rayada cuando lo saqué.'
+        resp = self.client.post('/api/v1/flota/checklists/', data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['incidencia_previa'], data['incidencia_previa'])
+
+        # La foto de la incidencia se sube como evidencia.
+        cid = resp.data['id']
+        r = self.client.post(
+            f'/api/v1/flota/checklists/{cid}/fotos/',
+            {'foto': imagen_test(), 'item': 'incidencia_previa', 'descripcion': 'Foto del rayón'},
+            format='multipart',
+        )
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.data['item'], 'incidencia_previa')
+
+    def test_incidencia_nueva_en_llegada(self):
+        # En LLEGADA el usuario reporta daños nuevos / choques ocurridos durante el uso.
+        self._auth(self.campo)
+        data = self._checklist_data(tipo_reporte='llegada')
+        data['incidencia_nueva'] = 'Choque contra el portón del corral, espejo derecho roto.'
+        resp = self.client.post('/api/v1/flota/checklists/', data, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['incidencia_nueva'], data['incidencia_nueva'])
+
+        cid = resp.data['id']
+        r = self.client.post(
+            f'/api/v1/flota/checklists/{cid}/fotos/',
+            {'foto': imagen_test(), 'item': 'incidencia_nueva'},
+            format='multipart',
+        )
+        self.assertEqual(r.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(r.data['item'], 'incidencia_nueva')
+
+
+class IncidenciasAPITest(APITestCase):
+    """Tests del endpoint GET /api/v1/flota/incidencias/ — historial administrativo."""
+
+    def setUp(self):
+        self.campo = crear_usuario('chino_test', 'campo')
+        self.admin = crear_usuario('abigail_test', 'administrador')
+        self.operaciones = crear_usuario('erik_test', 'operaciones')
+        self.vehiculo = crear_vehiculo(kilometraje_actual=1000)
+        self.otro_vehiculo = crear_vehiculo(nombre='Otra Savana', kilometraje_actual=500)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _crear_checklist(self, **overrides):
+        data = {
+            'vehiculo': self.vehiculo.id,
+            'tipo_reporte': 'salida',
+            'km_reporte': '1000.00',
+            'nivel_combustible': None,
+            'estado_fisico': True,
+            'anticongelante': True,
+            'nivel_aceite_motor': True,
+            'nivel_aceite_transmision': True,
+        }
+        data.update(overrides)
+        return self.client.post('/api/v1/flota/checklists/', data, format='json')
+
+    def test_incidencias_endpoint_retorna_solo_checklists_con_incidencia(self):
+        self._auth(self.campo)
+        # 1 con incidencia previa (salida)
+        r1 = self._crear_checklist(incidencia_previa='Espejo derecho ya traía roto.')
+        self.assertEqual(r1.status_code, status.HTTP_201_CREATED)
+        # 1 con incidencia nueva (llegada)
+        r2 = self._crear_checklist(tipo_reporte='llegada', incidencia_nueva='Choqué contra el portón.')
+        self.assertEqual(r2.status_code, status.HTTP_201_CREATED)
+        # 1 sin incidencia — NO debe aparecer
+        r3 = self._crear_checklist(tipo_reporte='llegada')
+        self.assertEqual(r3.status_code, status.HTTP_201_CREATED)
+
+        # Solo el admin/superadmin puede ver el endpoint
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/flota/incidencias/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 2)
+
+    def test_incidencias_endpoint_filtra_por_tipo_y_vehiculo(self):
+        self._auth(self.campo)
+        # Previa en vehiculo A
+        self._crear_checklist(incidencia_previa='Previa en A')
+        # Nueva en vehiculo A
+        self._crear_checklist(tipo_reporte='llegada', incidencia_nueva='Nueva en A')
+        # Nueva en vehiculo B
+        r_b = self._crear_checklist(
+            vehiculo=self.otro_vehiculo.id,
+            tipo_reporte='llegada',
+            incidencia_nueva='Nueva en B',
+        )
+        self.assertEqual(r_b.status_code, status.HTTP_201_CREATED)
+
+        self._auth(self.admin)
+
+        # Filtro tipo=previa → solo 1
+        resp = self.client.get('/api/v1/flota/incidencias/', {'tipo': 'previa'})
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['incidencia_previa'], 'Previa en A')
+
+        # Filtro tipo=nueva → 2
+        resp = self.client.get('/api/v1/flota/incidencias/', {'tipo': 'nueva'})
+        self.assertEqual(len(resp.data), 2)
+
+        # Filtro vehiculo B → solo 1
+        resp = self.client.get(
+            '/api/v1/flota/incidencias/',
+            {'tipo': 'nueva', 'vehiculo': self.otro_vehiculo.id},
+        )
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['incidencia_nueva'], 'Nueva en B')
+
+    def test_incidencias_endpoint_bloquea_para_no_admin(self):
+        self._auth(self.campo)
+        self._crear_checklist(incidencia_previa='Alta')
+
+        # Campo y operaciones NO pueden ver el historial
+        for user in (self.campo, self.operaciones):
+            self._auth(user)
+            resp = self.client.get('/api/v1/flota/incidencias/')
+            self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_resumen_incluye_incidencias_total(self):
+        self._auth(self.campo)
+        self._crear_checklist(incidencia_previa='Una')
+        self._crear_checklist(tipo_reporte='llegada', incidencia_nueva='Dos')
+        self._crear_checklist(tipo_reporte='llegada')  # sin incidencia
+
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/flota/resumen/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['incidencias_total'], 2)

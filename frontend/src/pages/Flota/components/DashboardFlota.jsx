@@ -7,7 +7,7 @@ import FormularioVehiculo from './FormularioVehiculo'
 import PanelAlertas from './PanelAlertas'
 import TarjetaVehiculo from './TarjetaVehiculo'
 
-export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoChecklist, onVehiculoCreado }) {
+export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoChecklist, onVerSinValidar, onVerIncidencias, onVehiculoCreado }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [vehiculos, setVehiculos] = useState([])
@@ -121,12 +121,33 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
 
       {puedeVerAlertas && (
         <div className="flex flex-col gap-4">
+          {resumen?.incidencias_total > 0 && (
+            <button
+              type="button"
+              onClick={onVerIncidencias}
+              className="rounded-2xl border-2 border-error/40 bg-error/10 px-4 py-3 text-left transition hover:border-error hover:bg-error/15"
+            >
+              <p className="text-sm font-semibold text-error">
+                ⚠️ {resumen.incidencias_total} incidencia{resumen.incidencias_total !== 1 ? 's' : ''} reportada{resumen.incidencias_total !== 1 ? 's' : ''}
+              </p>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                Toca para ver el historial completo →
+              </p>
+            </button>
+          )}
           {resumen?.checklists_sin_validar > 0 && (
-            <div className="rounded-2xl border border-warning/40 bg-warning/10 px-4 py-3">
+            <button
+              type="button"
+              onClick={onVerSinValidar}
+              className="rounded-2xl border-2 border-warning/40 bg-warning/10 px-4 py-3 text-left transition hover:border-warning hover:bg-warning/15"
+            >
               <p className="text-sm font-semibold text-warning">
                 ⚠️ {resumen.checklists_sin_validar} checklist{resumen.checklists_sin_validar !== 1 ? 's' : ''} sin validar
               </p>
-            </div>
+              <p className="mt-0.5 text-xs text-text-secondary">
+                Toca para ver el detalle por vehículo →
+              </p>
+            </button>
           )}
           <PanelAlertas alertas={alertas} loading={loadingAlertas} />
         </div>

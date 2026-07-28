@@ -154,7 +154,10 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
                     {c.tipo_reporte === 'salida' ? '🚗 Salida' : '🏁 Llegada'} — {c.responsable_detalle?.nombre}
                   </p>
                   <p className="text-xs text-text-secondary">
-                    {formatFechaHora(c.fecha_hora)} · {Number(c.km_reporte).toLocaleString('es-MX')} km ·{' '}
+                    {formatFechaHora(c.fecha_hora)}
+                    {c.km_reporte != null && (
+                      <> · {Number(c.km_reporte).toLocaleString('es-MX')} km</>
+                    )} ·{' '}
                     <span className={incompleto ? 'font-semibold text-error' : ''}>
                       {incompleto && '⚠️ '}{c.items_verificados}/{c.total_items} ítems
                     </span>

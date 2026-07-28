@@ -94,7 +94,6 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
     responsable_detalle = UsuarioResumenSerializer(source='responsable', read_only=True)
     validado_por_detalle = UsuarioResumenSerializer(source='validado_por', read_only=True)
     tipo_reporte_display = serializers.CharField(source='get_tipo_reporte_display', read_only=True)
-    presion_llantas_display = serializers.CharField(source='get_presion_llantas_display', read_only=True)
     traila = serializers.PrimaryKeyRelatedField(
         queryset=Vehiculo.objects.filter(tipo=Vehiculo.Tipo.TRAILA), required=False, allow_null=True,
     )
@@ -110,9 +109,10 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'vehiculo', 'vehiculo_detalle', 'tipo_reporte', 'tipo_reporte_display',
             'responsable', 'responsable_detalle', 'fecha_hora', 'km_reporte', 'nivel_combustible',
-            'estado_fisico', 'lavado', 'soplado_filtro_aire', 'presion_llantas', 'presion_llantas_display',
-            'llanta_cambiada', 'anticongelante', 'nivel_aceite_motor', 'nivel_aceite_transmision',
+            'estado_fisico', 'lavado', 'soplado_filtro_aire',
+            'anticongelante', 'nivel_aceite_motor', 'nivel_aceite_transmision',
             'carga_traila', 'traila', 'traila_detalle', 'limpieza', 'sin_herramientas', 'sin_carga',
+            'incidencia_previa', 'incidencia_nueva',
             'observaciones', 'validado', 'validado_por', 'validado_por_detalle', 'validado_en',
             'fotos', 'advertencias', 'items_verificados', 'total_items', 'items_aplicables', 'created_at',
         )
@@ -131,7 +131,6 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         vehiculo = data.get('vehiculo') or getattr(self.instance, 'vehiculo', None)
-        es_traila = bool(vehiculo and vehiculo.tipo == Vehiculo.Tipo.TRAILA)
 
         tipo_reporte = data.get('tipo_reporte', getattr(self.instance, 'tipo_reporte', None))
 
@@ -142,17 +141,6 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
         ):
             raise serializers.ValidationError({
                 'vehiculo': f'{vehiculo.nombre} está {vehiculo.get_estado_display().lower()} — no puede salir hasta que se repare.'
-            })
-
-        nivel_combustible = data.get('nivel_combustible', getattr(self.instance, 'nivel_combustible', None))
-        if (
-            not es_traila
-            and tipo_reporte == ChecklistVehiculo.TipoReporte.SALIDA
-            and nivel_combustible is not None
-            and nivel_combustible < 50
-        ):
-            raise serializers.ValidationError({
-                'nivel_combustible': 'Ningún vehículo debe salir a campo con menos de medio tanque de gasolina.'
             })
 
         traila = data.get('traila')

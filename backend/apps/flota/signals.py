@@ -14,6 +14,8 @@ def actualizar_km_al_llegar(sender, instance, created, **kwargs):
     """Al registrar un checklist de llegada, sube el kilometraje del vehículo si avanzó."""
     if not created or instance.tipo_reporte != ChecklistVehiculo.TipoReporte.LLEGADA:
         return
+    if instance.km_reporte is None:
+        return
 
     vehiculo = instance.vehiculo
     if instance.km_reporte > vehiculo.kilometraje_actual:

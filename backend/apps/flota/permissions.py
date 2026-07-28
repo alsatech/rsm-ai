@@ -34,3 +34,10 @@ class PuedeValidarChecklist(BasePermission):
 class PuedeVerAlertas(BasePermission):
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_ADMIN)
+
+
+class PuedeVerIncidencias(BasePermission):
+    """Acceso al historial de incidencias de vehículos — administrador y superadmin."""
+
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_ADMIN)

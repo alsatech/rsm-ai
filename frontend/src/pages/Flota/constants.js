@@ -79,8 +79,6 @@ export function sinKilometraje(tipoVehiculo) {
   return TIPOS_SIN_KILOMETRAJE.includes(tipoVehiculo)
 }
 
-export const NIVEL_COMBUSTIBLE_MINIMO_SALIDA = 50
-
 // Ítems booleanos del checklist — cada uno se marca automáticamente al adjuntar su foto de evidencia.
 export const CHECKLIST_ITEMS = [
   {
@@ -115,20 +113,11 @@ export const CHECKLIST_ITEMS = [
   },
 ]
 
-// Kilometraje/horas — no es un simple check, requiere el valor + foto del odómetro/horómetro.
+// Kilometraje/horas — se sube como foto del tablero, el número es informativo.
 export const KILOMETRAJE_ITEM = { key: 'kilometraje', icon: '🔢', label: 'Kilometraje' }
 
-// Gasolina — se elige como marca el tablero real del vehículo, no un porcentaje.
+// Gasolina — la aguja del tablero se captura en una foto, no se elige con un botón.
 export const GASOLINA_ITEM = { key: 'gasolina', icon: '⛽', label: 'Gasolina' }
-
-// Color por nivel — de vacío (rojo) a lleno (verde), para diferenciar de un vistazo sin leer.
-export const GASOLINA_OPCIONES = [
-  { value: 0, label: 'E', color: '#f87171' },
-  { value: 25, label: '¼', color: '#fb923c' },
-  { value: 50, label: '½', color: '#fbbf24' },
-  { value: 75, label: '¾', color: '#a3e635' },
-  { value: 100, label: 'F', color: '#4ade80' },
-]
 
 // Estado físico — no es un simple check, requiere foto de los 4 costados (+ interior opcional).
 export const ESTADO_FISICO_ITEM = { key: 'estado_fisico', icon: '📷', label: 'Estado físico del vehículo' }
@@ -142,16 +131,14 @@ export const ESTADO_FISICO_LADOS = [
 
 export const ESTADO_FISICO_INTERIOR = { key: 'estado_fisico_interior', label: 'Interior (opcional)' }
 
-// Presión de llantas — no es un simple check, requiere indicar si alguna está baja/ponchada.
-export const PRESION_LLANTAS_ITEM = { key: 'presion_llantas', icon: '🛞', label: 'Presión de llantas' }
+// Llantas / neumáticos — se sube una foto de cada llanta en mal estado, sin selección.
+export const PRESION_LLANTAS_ITEM = { key: 'presion_llantas', icon: '🛞', label: 'Llantas / neumáticos' }
 
-export const PRESION_LLANTAS_OPCIONES = [
-  { value: 'bien', label: 'Presión correcta', icon: '✅' },
-  { value: 'delantero_izquierdo', label: 'Delantera izquierda baja', icon: '🛞' },
-  { value: 'delantero_derecho', label: 'Delantera derecha baja', icon: '🛞' },
-  { value: 'trasero_izquierdo', label: 'Trasera izquierda baja', icon: '🛞' },
-  { value: 'trasero_derecho', label: 'Trasera derecha baja', icon: '🛞' },
-]
+// Incidencia previa (salida) — el usuario reporta daños que el vehículo ya traía para deslindarse.
+export const INCIDENCIA_PREVIA_ITEM = { key: 'incidencia_previa', icon: '⚠️', label: 'Daño preexistente' }
+
+// Incidencia nueva (llegada) — el usuario reporta daños/choques ocurridos durante el uso.
+export const INCIDENCIA_NUEVA_ITEM = { key: 'incidencia_nueva', icon: '🚨', label: 'Daño nuevo / choque' }
 
 // Carga de la traila — no es un simple check, requiere elegir cuál traila (solo 4x5).
 export const CARGA_TRAILA_ITEM = { key: 'carga_traila', icon: '🚚', label: 'Carga de la traila' }
@@ -174,57 +161,67 @@ export function itemsAplicables({ tipoReporte, tipoVehiculo }) {
   return CHECKLIST_ITEMS.filter((item) => item.aplica(ctx))
 }
 
-// Resume el avance del checklist — estado_fisico, presion_llantas, kilometraje y carga_traila
-// se cuentan aparte porque no son simples booleanos (requieren varias fotos, o valor/selección + foto).
-// Gasolina queda fuera de este conteo: no lleva foto, se valida aparte (ver Paso2Inspeccion).
+// Resume el avance del checklist — estado_fisico, kilometraje, carga_traila y la incidencia
+// (cuando aplica) se cuentan aparte porque no son simples booleanos (requieren foto).
+// Kilometraje es informativo: solo se requiere la foto del tablero.
+// Incidencia es opcional pero bloquea si hay texto sin foto: si escribió, debe subir foto.
 export function resumenChecklist({ form, fotos, tipoVehiculo, kilometrajeActual }) {
   const tipoReporte = form.tipo_reporte
 
   if (esTraila(tipoVehiculo)) {
-    const presionCompleto = Boolean(form.presion_llantas) && fotos.some((f) => f.item === 'presion_llantas')
-    const verificados =
-      (presionCompleto ? 1 : 0) +
-      TRAILA_ITEMS.filter((item) => form[item.key]).length
-    const total = 1 + TRAILA_ITEMS.length
+    const verificados = TRAILA_ITEMS.filter((item) => form[item.key]).length
+    const total = TRAILA_ITEMS.length
     return { verificados, total, completo: verificados === total }
   }
 
   const items = itemsAplicables({ tipoReporte, tipoVehiculo })
 
   const estadoFisicoCompleto = ESTADO_FISICO_LADOS.every((lado) => fotos.some((f) => f.item === lado.key))
-  const presionAplica = tipoReporte === 'salida'
-  const presionCompleto = Boolean(form.presion_llantas) && fotos.some((f) => f.item === 'presion_llantas')
+  const interiorCompleto = fotos.some((f) => f.item === ESTADO_FISICO_INTERIOR.key)  // interior — opcional
   const kilometrajeAplica = !sinKilometraje(tipoVehiculo)
-  const kmValido = form.km_reporte !== '' && (kilometrajeActual == null || Number(form.km_reporte) >= kilometrajeActual)
-  const kilometrajeCompleto = kmValido && fotos.some((f) => f.item === 'kilometraje')
+  const kilometrajeCompleto = kilometrajeAplica && fotos.some((f) => f.item === 'kilometraje')
+  const gasolinaCompleto = fotos.some((f) => f.item === 'gasolina')
   const cargaTrailaAplica = esOffRoad(tipoVehiculo)
   const cargaTrailaCompleto = Boolean(form.traila) && fotos.some((f) => f.item === 'carga_traila')
+  // Llantas: si subió al menos una foto, se considera revisado.
+  const llantasCompleto = fotos.some((f) => f.item === 'presion_llantas')
+
+  // Incidencias: si escribió texto sin foto, queda bloqueado. Si no escribió nada, no bloquea.
+  const itemIncidencia = tipoReporte === 'salida' ? 'incidencia_previa' : 'incidencia_nueva'
+  const incidenciaTexto = (form[itemIncidencia] ?? '').trim()
+  const incidenciaFoto = fotos.some((f) => f.item === itemIncidencia)
+  const incidenciaBloqueada = Boolean(incidenciaTexto) && !incidenciaFoto
+  const incidenciaCompleta = !incidenciaBloqueada && (incidenciaFoto || !incidenciaTexto)
 
   const verificados =
     items.filter((item) => form[item.key]).length +
     (estadoFisicoCompleto ? 1 : 0) +
-    (presionAplica && presionCompleto ? 1 : 0) +
+    (interiorCompleto ? 1 : 0) +
     (kilometrajeAplica && kilometrajeCompleto ? 1 : 0) +
-    (cargaTrailaAplica && cargaTrailaCompleto ? 1 : 0)
+    (gasolinaCompleto ? 1 : 0) +
+    (llantasCompleto ? 1 : 0) +
+    (cargaTrailaAplica && cargaTrailaCompleto ? 1 : 0) +
+    (incidenciaCompleta ? 1 : 0)
 
-  const total = items.length + 1 + (presionAplica ? 1 : 0) + (kilometrajeAplica ? 1 : 0) + (cargaTrailaAplica ? 1 : 0)
+  // Total de obligatorios: items + estado_fisico + gasolina + (km) + (traila) + incidencia.
+  // Llantas se cuenta aparte: solo aparece si subió foto, pero el slot siempre está en la lista.
+  const total = items.length + 3 + (kilometrajeAplica ? 1 : 0) + (cargaTrailaAplica ? 1 : 0)
 
-  return { verificados, total, completo: verificados === total }
+  // verificados puede incluir +1 del interior (opcional). El total no incluye al interior,
+  // así que "completo" se cumple cuando llegamos al total obligatorio, y el bonus del interior
+  // puede hacer que verificados > total sin que sea un problema.
+  const completo = !incidenciaBloqueada && verificados >= total
+  return { verificados, total, completo, incidenciaBloqueada }
 }
 
 // Lista ordenada de "casillas" de foto pendientes — para el subidor masivo del paso 2.
 // Cada foto que se sube se asigna automáticamente a la siguiente casilla vacía, en este orden.
-// Presión de llantas y carga de traila solo aparecen una vez que el usuario ya eligió el estado/traila.
+// La casilla de incidencia aparece cuando el usuario escribió texto en el textarea correspondiente.
 export function fotoSlotsAplicables({ form, tipoVehiculo }) {
   const tipoReporte = form.tipo_reporte
 
   if (esTraila(tipoVehiculo)) {
-    const slots = []
-    if (form.presion_llantas) {
-      slots.push({ item: 'presion_llantas', icon: PRESION_LLANTAS_ITEM.icon, label: PRESION_LLANTAS_ITEM.label })
-    }
-    TRAILA_ITEMS.forEach((item) => slots.push({ item: item.key, icon: item.icon, label: item.label }))
-    return slots
+    return TRAILA_ITEMS.map((item) => ({ item: item.key, icon: item.icon, label: item.label }))
   }
 
   const slots = []
@@ -233,20 +230,39 @@ export function fotoSlotsAplicables({ form, tipoVehiculo }) {
     slots.push({
       item: 'kilometraje',
       icon: KILOMETRAJE_ITEM.icon,
-      label: esOffRoad(tipoVehiculo) ? 'Horas actuales' : 'Kilometraje actual',
+      label: esOffRoad(tipoVehiculo) ? 'Horas actuales (foto del tablero)' : 'Kilometraje actual (foto del tablero)',
     })
   }
+
+  // Gasolina — se sube como foto del tablero.
+  slots.push({ item: 'gasolina', icon: GASOLINA_ITEM.icon, label: 'Gasolina (foto del tablero)' })
 
   ESTADO_FISICO_LADOS.forEach((lado) => {
     slots.push({ item: lado.key, icon: '📷', label: `Costado ${lado.label.toLowerCase()}` })
   })
+  slots.push({ item: ESTADO_FISICO_INTERIOR.key, icon: '📷', label: 'Interior (opcional)' })
+
+  // Llantas / neumáticos — la foto se sube si alguna está baja o ponchada. El slot siempre se muestra.
+  slots.push({ item: PRESION_LLANTAS_ITEM.item, icon: PRESION_LLANTAS_ITEM.icon, label: 'Llantas / neumáticos (foto si alguna está baja)' })
 
   itemsAplicables({ tipoReporte, tipoVehiculo }).forEach((item) => {
     slots.push({ item: item.key, icon: item.icon, label: item.label })
   })
 
-  if (tipoReporte === 'salida' && form.presion_llantas) {
-    slots.push({ item: 'presion_llantas', icon: PRESION_LLANTAS_ITEM.icon, label: PRESION_LLANTAS_ITEM.label })
+  // Incidencia — solo aparece cuando el usuario escribió algo en el textarea.
+  if (tipoReporte === 'salida' && (form.incidencia_previa ?? '').trim()) {
+    slots.push({
+      item: INCIDENCIA_PREVIA_ITEM.key,
+      icon: INCIDENCIA_PREVIA_ITEM.icon,
+      label: 'Foto del daño preexistente',
+    })
+  }
+  if (tipoReporte === 'llegada' && (form.incidencia_nueva ?? '').trim()) {
+    slots.push({
+      item: INCIDENCIA_NUEVA_ITEM.key,
+      icon: INCIDENCIA_NUEVA_ITEM.icon,
+      label: 'Foto del daño / choque',
+    })
   }
 
   if (esOffRoad(tipoVehiculo) && form.traila) {

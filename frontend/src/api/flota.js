@@ -32,4 +32,6 @@ export const getAlertasFlota = (params) => api.get('/api/v1/flota/alertas/', { p
 export const resolverAlertaFlota = (id, data) =>
   api.patch(`/api/v1/flota/alertas/${id}/resolver/`, data)
 
+export const getIncidencias = (params) => api.get('/api/v1/flota/incidencias/', { params })
+
 export const getResumenFlota = () => api.get('/api/v1/flota/resumen/')
