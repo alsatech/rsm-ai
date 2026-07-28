@@ -61,7 +61,6 @@ function SubidorMasivo({ slots, fotos, onAgregarFoto, onEliminarFoto, inputRefEx
         ref={inputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         multiple
         className="hidden"
         onChange={handleFiles}
@@ -458,7 +457,6 @@ export default function Paso2Inspeccion({
             ref={inputRefIncidencia}
             type="file"
             accept="image/*"
-            capture="environment"
             multiple
             className="hidden"
             onChange={handleArchivosIncidencia}
