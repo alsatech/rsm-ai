@@ -515,15 +515,12 @@ export default function Paso2Inspeccion({
           placeholder="Notas generales del checklist…"
         />
 
-        {/* Botón push-to-talk + texto claro grande */}
-        <div className="glass-card flex flex-col items-center gap-2 rounded-2xl px-4 py-4">
+        {/* Botón grabador con su propia etiqueta dinámica — no agregamos texto extra */}
+        <div className="glass-card flex flex-col items-center rounded-2xl px-4 py-5">
           <GrabadorAudio
             onAudioListo={(file, duracion) => onAgregarAudio?.(file, duracion)}
             disabled={guardando}
           />
-          <p className="text-center text-base font-bold text-flotafg">
-            Mantén presionado para grabar
-          </p>
         </div>
 
         <AudiosChecklist audios={audios} onEliminar={onEliminarAudio} />

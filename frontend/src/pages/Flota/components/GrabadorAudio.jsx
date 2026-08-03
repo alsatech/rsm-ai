@@ -2,13 +2,12 @@ import { useEffect, useRef, useState } from 'react'
 
 // Adjuntar audio a un checklist.
 //
-// Estrategia:
-//   1. Si MediaRecorder + getUserMedia están disponibles y funcionando, ofrece
-//      el botón rojo push-to-talk estilo WhatsApp.
-//   2. Si NO están disponibles (navegador sin soporte o contexto HTTP que
-//      bloquea el micrófono), muestra un input de archivo normal para subir
-//      audios ya grabados desde el dispositivo (Voice Memos en iOS,
-//      grabadora en Android, audios de WhatsApp, etc.).
+// UX ultra-simple (apta para un niño de 6 años):
+//   - Tap en el botón rojo → empieza a grabar. El botón se ilumina, aparece un
+//     timer grande, vibra (si el dispositivo lo soporta).
+//   - Tap otra vez en el botón → para y envía.
+//   - Si el navegador no soporta micrófono, aparece un clip para subir un
+//     audio ya grabado del dispositivo.
 //
 // Ambos caminos llaman a onAudioListo(file, duracionSegundos) con la misma firma.
 
@@ -39,11 +38,7 @@ function clasificarError(e) {
   ) {
     return 'sin-microfono'
   }
-  if (
-    msg.includes('secure')
-    || msg.includes('https')
-    || e?.name === 'SecurityError'
-  ) {
+  if (msg.includes('secure') || msg.includes('https') || e?.name === 'SecurityError') {
     return 'http'
   }
   return 'otro'
@@ -52,31 +47,28 @@ function clasificarError(e) {
 function mensajePara(tipo) {
   switch (tipo) {
     case 'permiso':
-      return 'Bloqueaste el micrófono. Toca el candado junto a la URL y permite el micrófono para grabar desde aquí.'
+      return 'Bloqueaste el micrófono. Toca el candado junto a la URL y permite el micrófono.'
     case 'sin-microfono':
-      return 'No se detecta micrófono en este dispositivo. Sube un audio ya grabado desde tu galería.'
+      return 'No hay micrófono en este dispositivo. Sube un audio ya grabado.'
     case 'http':
-      return 'Tu navegador bloquea el micrófono en conexiones HTTP. Sube un audio ya grabado desde tu galería.'
+      return 'Tu navegador bloquea el micrófono aquí. Sube un audio ya grabado.'
     default:
-      return 'No se pudo acceder al micrófono. Sube un audio ya grabado desde tu galería.'
+      return 'No se pudo grabar. Sube un audio ya grabado.'
   }
 }
 
-// ── Sub-grabador push-to-talk (interno) ────────────────────────────────────────
-function GrabadorPushToTalk({ onAudioListo, onError }) {
+// ── Sub-grabador tap-to-start/stop ─────────────────────────────────────────────
+function GrabadorTap({ onAudioListo, onError }) {
   const [grabando, setGrabando] = useState(false)
   const [segundos, setSegundos] = useState(0)
-  const [cancelado, setCancelado] = useState(false)
   const [errorLocal, setErrorLocal] = useState(null)
+  const [preparando, setPreparando] = useState(false)
 
   const mediaRecorderRef = useRef(null)
   const chunksRef = useRef([])
   const streamRef = useRef(null)
   const startTimeRef = useRef(null)
   const intervalRef = useRef(null)
-  const canceladoRef = useRef(false)
-  const startYRef = useRef(null)
-  const CANCEL_THRESHOLD = 60
 
   const cleanup = () => {
     if (intervalRef.current) clearInterval(intervalRef.current)
@@ -88,24 +80,22 @@ function GrabadorPushToTalk({ onAudioListo, onError }) {
     chunksRef.current = []
     startTimeRef.current = null
     setSegundos(0)
-    setCancelado(false)
-    canceladoRef.current = false
   }
 
   useEffect(() => () => cleanup(), [])
 
   const empezar = async () => {
-    if (grabando) return
     setErrorLocal(null)
+    setPreparando(true)
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       streamRef.current = stream
+
       const candidates = ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4']
       const mimeType = candidates.find((t) => MediaRecorder.isTypeSupported(t))
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
       mediaRecorderRef.current = recorder
       chunksRef.current = []
-      canceladoRef.current = false
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size > 0) chunksRef.current.push(e.data)
@@ -121,12 +111,16 @@ function GrabadorPushToTalk({ onAudioListo, onError }) {
 
         cleanup()
         setGrabando(false)
-        if (!canceladoRef.current && blob.size > 0) onAudioListo?.(archivo, duracion)
+        if (blob.size > 0) onAudioListo?.(archivo, duracion)
       }
 
       recorder.start()
       startTimeRef.current = Date.now()
       setGrabando(true)
+      // Vibración corta como confirmación háptica (móviles que lo soportan).
+      if (navigator.vibrate) {
+        try { navigator.vibrate(50) } catch { /* ignore */ }
+      }
       intervalRef.current = setInterval(() => {
         setSegundos(Math.floor((Date.now() - startTimeRef.current) / 1000))
       }, 200)
@@ -136,76 +130,71 @@ function GrabadorPushToTalk({ onAudioListo, onError }) {
       onError?.(tipo, mensajePara(tipo))
       cleanup()
       setGrabando(false)
+    } finally {
+      setPreparando(false)
     }
   }
 
-  const terminar = () => {
-    if (!grabando) return
+  const parar = () => {
+    if (navigator.vibrate) {
+      try { navigator.vibrate([30, 30, 30]) } catch { /* ignore */ }
+    }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     }
   }
 
-  const cancelar = () => {
-    canceladoRef.current = true
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop()
-    }
-  }
-
-  const onTouchStart = (e) => {
-    startYRef.current = e.touches[0].clientY
-    empezar()
-  }
-  const onTouchMove = (e) => {
-    if (startYRef.current == null) return
-    const delta = startYRef.current - e.touches[0].clientY
-    setCancelado(delta > CANCEL_THRESHOLD)
-  }
-  const onTouchEnd = () => {
-    startYRef.current = null
-    if (canceladoRef.current) cancelar()
-    else terminar()
+  const onClickBoton = () => {
+    if (preparando) return
+    if (grabando) parar()
+    else empezar()
   }
 
   const fmt = (s) => `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-3">
+      {/* Timer gigante — solo aparece cuando está grabando */}
+      {grabando && (
+        <div className="flex items-center gap-2 rounded-full bg-error/10 px-4 py-1.5 flota-fade-in">
+          <span className="flota-pulse inline-block h-3 w-3 rounded-full bg-error" />
+          <span className="font-mono text-2xl font-bold tabular-nums text-error">
+            {fmt(segundos)}
+          </span>
+        </div>
+      )}
+
+      {/* Botón redondo grande — el único elemento con el que el usuario interactúa */}
       <button
         type="button"
-        onMouseDown={empezar}
-        onMouseUp={terminar}
-        onMouseLeave={() => grabando && !cancelado && terminar()}
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        aria-label={grabando ? 'Grabando, suelta para enviar' : 'Mantén presionado para grabar audio'}
-        style={{ minWidth: '64px', minHeight: '64px' }}
-        className={`relative flex items-center justify-center rounded-full text-2xl text-white shadow-lg transition active:scale-95 ${
-          cancelado
-            ? 'bg-flotafg-muted'
-            : grabando
-              ? 'flota-pulse bg-error'
-              : 'bg-error hover:brightness-110'
+        onClick={onClickBoton}
+        disabled={preparando}
+        aria-label={grabando ? 'Toca para parar y enviar' : 'Toca para grabar audio'}
+        style={{ width: '88px', height: '88px' }}
+        className={`relative flex items-center justify-center rounded-full text-4xl text-white shadow-xl transition active:scale-95 disabled:cursor-wait disabled:opacity-70 ${
+          grabando
+            ? 'flota-pulse bg-error ring-4 ring-error/30'
+            : 'bg-error hover:brightness-110'
         }`}
       >
-        {cancelado ? '✕' : grabando ? '⏹' : '🎙️'}
+        {preparando ? '⏳' : grabando ? '⏹' : '🎙️'}
       </button>
-      <p className="max-w-[180px] text-center text-[11px] font-semibold text-flotafg-muted">
+
+      {/* Etiqueta dinámica — cambia sola */}
+      <p className="text-center text-base font-bold text-flotafg">
         {errorLocal
           ? mensajePara(errorLocal)
           : grabando
-            ? cancelado
-              ? 'Suelta para cancelar'
-              : `Grabando ${fmt(segundos)} — suelta para enviar`
-            : ''}
+            ? 'Toca para parar'
+            : preparando
+              ? 'Preparando micrófono…'
+              : 'Toca para grabar'}
       </p>
     </div>
   )
 }
 
-// ── Subidor de archivo (interno) ────────────────────────────────────────────────
+// ── Subidor de archivo (fallback) ──────────────────────────────────────────────
 function SubidorArchivo({ onAudioListo, onError }) {
   const inputRef = useRef(null)
 
@@ -214,20 +203,15 @@ function SubidorArchivo({ onAudioListo, onError }) {
     if (!file) return
     const ext = getExt(file.name)
     if (!OK_EXTS.includes(ext)) {
-      onError?.('formato', `Formato "${ext || '?'}" no soportado. Usa m4a, mp3, ogg, wav, webm u opus.`)
+      onError?.('formato', `Formato "${ext || '?'}" no soportado.`)
       e.target.value = ''
       return
     }
     if (file.size > MAX_BYTES) {
-      onError?.(
-        'peso',
-        `El audio pesa ${(file.size / 1024 / 1024).toFixed(1)} MB. Máximo 5 MB.`
-      )
+      onError?.('peso', `El audio pesa ${(file.size / 1024 / 1024).toFixed(1)} MB. Máximo 5 MB.`)
       e.target.value = ''
       return
     }
-    // Tratamos de leer la duración si el navegador lo permite.
-    let duracion = 0
     try {
       const url = URL.createObjectURL(file)
       const audio = document.createElement('audio')
@@ -235,32 +219,26 @@ function SubidorArchivo({ onAudioListo, onError }) {
       audio.src = url
       audio.onloadedmetadata = () => {
         URL.revokeObjectURL(url)
-        if (Number.isFinite(audio.duration)) {
-          onAudioListo?.(file, Math.round(audio.duration))
-        } else {
-          onAudioListo?.(file, 0)
-        }
+        onAudioListo?.(file, Number.isFinite(audio.duration) ? Math.round(audio.duration) : 0)
       }
       audio.onerror = () => {
         URL.revokeObjectURL(url)
         onAudioListo?.(file, 0)
       }
-      return // Esperamos al evento antes de llamar onAudioListo
     } catch {
-      duracion = 0
+      onAudioListo?.(file, 0)
     }
-    onAudioListo?.(file, duracion)
     e.target.value = ''
   }
 
   return (
-    <div className="flex flex-col items-center gap-1">
+    <div className="flex flex-col items-center gap-3">
       <button
         type="button"
         onClick={() => inputRef.current?.click()}
         aria-label="Subir audio desde tu dispositivo"
-        style={{ minWidth: '64px', minHeight: '64px' }}
-        className="flex items-center justify-center rounded-full bg-accent text-2xl text-white shadow-lg transition hover:brightness-110 active:scale-95"
+        style={{ width: '88px', height: '88px' }}
+        className="flex items-center justify-center rounded-full bg-accent text-4xl text-white shadow-xl transition hover:brightness-110 active:scale-95"
       >
         📎
       </button>
@@ -271,16 +249,15 @@ function SubidorArchivo({ onAudioListo, onError }) {
         className="hidden"
         onChange={handleFiles}
       />
-      <p className="max-w-[180px] text-center text-[11px] font-semibold text-flotafg-muted">
-        {''}
+      <p className="text-center text-base font-bold text-flotafg">
+        Toca para subir un audio
       </p>
     </div>
   )
 }
 
-// ── Componente público ─────────────────────────────────────────────────────────
+// ── Componente público ────────────────────────────────────────────────────────
 export default function GrabadorAudio({ onAudioListo, disabled }) {
-  // ¿El navegador soporta MediaRecorder + getUserMedia?
   const [soportaGrabar, setSoportaGrabar] = useState(() =>
     Boolean(
       typeof navigator !== 'undefined'
@@ -294,7 +271,6 @@ export default function GrabadorAudio({ onAudioListo, disabled }) {
   const [fallbackForzado, setFallbackForzado] = useState(false)
 
   const handleErrorGrabador = (tipo, mensaje) => {
-    // Si el error es de permiso / http / sin micrófono, mostramos fallback.
     if (['permiso', 'http', 'sin-microfono', 'otro'].includes(tipo)) {
       setFallbackForzado(true)
       setMensajeError(mensaje)
@@ -306,48 +282,28 @@ export default function GrabadorAudio({ onAudioListo, disabled }) {
   const mostrarFallback = !soportaGrabar || fallbackForzado
 
   return (
-    <div className="flex w-full flex-col gap-2">
-      <div className="flex items-center gap-3">
-        {mostrarFallback ? (
-          <SubidorArchivo onAudioListo={onAudioListo} onError={(t, m) => setMensajeError(m)} />
-        ) : (
-          <GrabadorPushToTalk onAudioListo={onAudioListo} onError={handleErrorGrabador} />
-        )}
+    <div className="flex w-full flex-col items-center gap-2">
+      {mostrarFallback ? (
+        <SubidorArchivo onAudioListo={onAudioListo} onError={(t, m) => setMensajeError(m)} />
+      ) : (
+        <GrabadorTap onAudioListo={onAudioListo} onError={handleErrorGrabador} />
+      )}
 
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-semibold text-flotafg">Mandar audio</p>
-          <p className="text-xs text-flotafg-muted">
-            {mostrarFallback
-              ? 'Sube un audio ya grabado (Voice Memos, grabadora, etc.).'
-              : 'Mantén presionado el botón rojo para grabar'}
-          </p>
-        </div>
-
-        {soportaGrabar && !fallbackForzado && (
-          <button
-            type="button"
-            onClick={() => setFallbackForzado(true)}
-            className="text-[11px] font-semibold text-accent underline"
-          >
-            ¿No funciona? Subir archivo
-          </button>
-        )}
-        {fallbackForzado && (
-          <button
-            type="button"
-            onClick={() => {
-              setFallbackForzado(false)
-              setMensajeError(null)
-            }}
-            className="text-[11px] font-semibold text-accent underline"
-          >
-            Intentar grabar
-          </button>
-        )}
-      </div>
+      {soportaGrabar && (
+        <button
+          type="button"
+          onClick={() => {
+            setFallbackForzado((v) => !v)
+            setMensajeError(null)
+          }}
+          className="text-[11px] font-semibold text-accent underline"
+        >
+          {fallbackForzado ? 'Intentar grabar' : 'No funciona mi micrófono'}
+        </button>
+      )}
 
       {mensajeError && (
-        <p className="rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-[11px] text-warning">
+        <p className="w-full rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
           {mensajeError}
         </p>
       )}
