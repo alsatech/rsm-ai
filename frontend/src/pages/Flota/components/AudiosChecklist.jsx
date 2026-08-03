@@ -84,13 +84,15 @@ function ReproductorAudio({ src, duracionSegundos }) {
   )
 }
 
-export default function AudiosChecklist({ audios, onEliminar }) {
+export default function AudiosChecklist({ audios, onEliminar, mostrarHeader = true }) {
   if (!audios?.length) return null
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-xs font-semibold uppercase tracking-wide text-flotafg-muted">
-        🎙️ Notas de voz ({audios.length})
-      </p>
+      {mostrarHeader && (
+        <p className="text-xs font-semibold uppercase tracking-wide text-flotafg-muted">
+          🎙️ Notas de voz ({audios.length})
+        </p>
+      )}
       {audios.map((a, i) => {
         const idx = audios.findIndex((x) => x === a)
         return (

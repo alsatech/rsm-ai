@@ -192,14 +192,14 @@ function GrabadorPushToTalk({ onAudioListo, onError }) {
       >
         {cancelado ? '✕' : grabando ? '⏹' : '🎙️'}
       </button>
-      <p className="max-w-[160px] text-center text-[11px] font-semibold text-flotafg-muted">
+      <p className="max-w-[180px] text-center text-[11px] font-semibold text-flotafg-muted">
         {errorLocal
           ? mensajePara(errorLocal)
           : grabando
             ? cancelado
               ? 'Suelta para cancelar'
               : `Grabando ${fmt(segundos)} — suelta para enviar`
-            : 'Mantén presionado para grabar'}
+            : ''}
       </p>
     </div>
   )
@@ -271,8 +271,8 @@ function SubidorArchivo({ onAudioListo, onError }) {
         className="hidden"
         onChange={handleFiles}
       />
-      <p className="max-w-[160px] text-center text-[11px] font-semibold text-flotafg-muted">
-        Subir audio (m4a, mp3, ogg…)
+      <p className="max-w-[180px] text-center text-[11px] font-semibold text-flotafg-muted">
+        {''}
       </p>
     </div>
   )

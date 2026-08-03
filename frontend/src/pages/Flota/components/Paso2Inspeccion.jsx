@@ -505,16 +505,7 @@ export default function Paso2Inspeccion({
           </div>
         </div>
 
-        {/* Instrucción clara: cómo mandar el audio */}
-        <div className="flex items-start gap-2 rounded-xl border-2 border-dashed border-error/40 bg-error/5 px-3 py-2 text-xs text-flotafg">
-          <span className="text-base leading-none">🎙️</span>
-          <p className="leading-snug">
-            <span className="font-bold">¿Quieres mandar un audio?</span>{' '}
-            Mantén presionado el botón rojo del micrófono
-            <span className="mx-1 font-bold text-error">🎙️</span>
-            abajo, habla y suelta para enviar. Si quieres cancelar, desliza el dedo hacia abajo antes de soltar.
-          </p>
-        </div>
+        {/* Botón push-to-talk + texto claro grande */}
 
         <textarea
           rows={2}
@@ -524,18 +515,15 @@ export default function Paso2Inspeccion({
           placeholder="Notas generales del checklist…"
         />
 
-        {/* Botón push-to-talk + lista de audios ya capturados */}
-        <div className="glass-card flex items-center gap-4 rounded-2xl px-4 py-3">
+        {/* Botón push-to-talk + texto claro grande */}
+        <div className="glass-card flex flex-col items-center gap-2 rounded-2xl px-4 py-4">
           <GrabadorAudio
             onAudioListo={(file, duracion) => onAgregarAudio?.(file, duracion)}
             disabled={guardando}
           />
-          <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold text-flotafg">Mandar audio</p>
-            <p className="text-xs text-flotafg-muted">
-              Estilo WhatsApp —{'>'} mantén presionado para grabar, suelta para enviar
-            </p>
-          </div>
+          <p className="text-center text-base font-bold text-flotafg">
+            Mantén presionado para grabar
+          </p>
         </div>
 
         <AudiosChecklist audios={audios} onEliminar={onEliminarAudio} />

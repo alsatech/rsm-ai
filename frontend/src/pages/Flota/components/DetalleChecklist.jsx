@@ -14,6 +14,7 @@ import {
   esTraila,
   sinKilometraje,
 } from '../constants'
+import AudiosChecklist from './AudiosChecklist'
 
 function formatFechaHora(fechaHora) {
   return new Date(fechaHora).toLocaleString('es-MX', {
@@ -330,6 +331,25 @@ export default function DetalleChecklist({ checklist, puedeValidar, onValidar, o
             <div>
               <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-flotafg-muted">Observaciones</p>
               <p className="text-sm text-flotafg">{checklist.observaciones}</p>
+            </div>
+          )}
+
+          {/* Audios (notas de voz). Solo visibles para los usuarios que validan
+              — Abigail (administrador) y superadmin — porque son quienes revisan
+              el reporte antes de marcar el checklist como validado. */}
+          {puedeValidar && checklist.audios?.length > 0 && (
+            <div>
+              <p className="mb-1.5 text-xs font-semibold uppercase tracking-wide text-flotafg-muted">
+                🎙️ Notas de voz ({checklist.audios.length})
+              </p>
+              <AudiosChecklist
+                audios={checklist.audios.map((a) => ({
+                  id: a.id,
+                  url: a.audio,
+                  duracion_segundos: a.duracion_segundos,
+                }))}
+                mostrarHeader={false}
+              />
             </div>
           )}
 
