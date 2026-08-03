@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import AdvertenciaChecklist, AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AdvertenciaChecklist, AlertaFlota, AudioChecklist, ChecklistVehiculo, FotoChecklist, Vehiculo
 
 User = get_user_model()
 
@@ -88,6 +88,67 @@ class AdvertenciaChecklistSerializer(serializers.ModelSerializer):
         read_only_fields = ('id', 'checklist', 'creada_por', 'created_at')
 
 
+class AudioChecklistSerializer(serializers.ModelSerializer):
+    """Audio (nota de voz) adjunto a un checklist. Se sube vía multipart/form-data."""
+
+    uploaded_by_nombre = serializers.SerializerMethodField()
+
+    class Meta:
+        model = AudioChecklist
+        fields = (
+            'id', 'checklist', 'audio', 'duracion_segundos', 'descripcion',
+            'uploaded_by', 'uploaded_by_nombre', 'created_at',
+        )
+        read_only_fields = ('id', 'checklist', 'uploaded_by', 'created_at')
+
+    def get_uploaded_by_nombre(self, obj):
+        return obj.uploaded_by.get_full_name() or obj.uploaded_by.username
+
+    def validate_audio(self, value):
+        # 5 MB de tope — los audios de voz cortos (webm/ogg/m4a) rara vez pasan de 1 MB.
+        max_bytes = 5 * 1024 * 1024
+        if value.size > max_bytes:
+            raise serializers.ValidationError(
+                f'El audio pesa {value.size / 1024 / 1024:.1f} MB; el máximo permitido es 5 MB.'
+            )
+        # Content-type puede venir vacío en algunos navegadores; validamos por extensión como fallback.
+        ok_exts = ('.webm', '.ogg', '.mp3', '.m4a', '.wav', '.mp4')
+        name = (value.name or '').lower()
+        if not name.endswith(ok_exts):
+            raise serializers.ValidationError(
+                f'Formato de audio no soportado ({name}). Usa webm, ogg, mp3, m4a, wav o mp4.'
+            )
+        return value
+
+
+class SalidaRelacionadaSerializer(serializers.ModelSerializer):
+    """Resumen ligero de la salida que está cerrando una llegada.
+
+    Se usa como nested read-only en `ChecklistVehiculoSerializer.salida_relacionada_detalle`
+    y como payload principal del endpoint `salidas-pendientes`.
+    """
+
+    responsable_detalle = UsuarioResumenSerializer(source='responsable', read_only=True)
+    vehiculo_detalle = VehiculoSerializer(source='vehiculo', read_only=True)
+    items_verificados = serializers.SerializerMethodField()
+    total_items = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ChecklistVehiculo
+        fields = (
+            'id', 'vehiculo', 'vehiculo_detalle', 'tipo_reporte',
+            'responsable', 'responsable_detalle', 'fecha_hora',
+            'items_verificados', 'total_items',
+        )
+        read_only_fields = fields
+
+    def get_items_verificados(self, obj):
+        return obj.items_verificados()
+
+    def get_total_items(self, obj):
+        return obj.total_items()
+
+
 class ChecklistVehiculoSerializer(serializers.ModelSerializer):
     vehiculo_detalle = VehiculoSerializer(source='vehiculo', read_only=True)
     responsable = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
@@ -99,10 +160,20 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
     )
     traila_detalle = VehiculoSerializer(source='traila', read_only=True)
     fotos = FotoChecklistSerializer(many=True, read_only=True)
+    audios = AudioChecklistSerializer(many=True, read_only=True)
     advertencias = AdvertenciaChecklistSerializer(many=True, read_only=True)
     items_verificados = serializers.SerializerMethodField()
     total_items = serializers.SerializerMethodField()
     items_aplicables = serializers.SerializerMethodField()
+    salida_relacionada = serializers.PrimaryKeyRelatedField(
+        queryset=ChecklistVehiculo.objects.filter(tipo_reporte=ChecklistVehiculo.TipoReporte.SALIDA),
+        required=False,
+        allow_null=True,
+    )
+    salida_relacionada_detalle = SalidaRelacionadaSerializer(
+        source='salida_relacionada', read_only=True,
+    )
+    proyecto = serializers.CharField(max_length=200, required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = ChecklistVehiculo
@@ -113,8 +184,10 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
             'anticongelante', 'nivel_aceite_motor', 'nivel_aceite_transmision',
             'carga_traila', 'traila', 'traila_detalle', 'limpieza', 'sin_herramientas', 'sin_carga',
             'incidencia_previa', 'incidencia_nueva',
+            'proyecto',
+            'salida_relacionada', 'salida_relacionada_detalle',
             'observaciones', 'validado', 'validado_por', 'validado_por_detalle', 'validado_en',
-            'fotos', 'advertencias', 'items_verificados', 'total_items', 'items_aplicables', 'created_at',
+            'fotos', 'audios', 'advertencias', 'items_verificados', 'total_items', 'items_aplicables', 'created_at',
         )
         read_only_fields = (
             'id', 'validado', 'validado_por', 'validado_en', 'created_at',
@@ -143,11 +216,68 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
                 'vehiculo': f'{vehiculo.nombre} está {vehiculo.get_estado_display().lower()} — no puede salir hasta que se repare.'
             })
 
+        # Proyecto es OPCIONAL en salidas — solo se registra si el vehículo se está
+        # usando para un proyecto específico. Si se tomó para otra cosa (traslado personal,
+        # mantenimiento, comisión administrativa, etc.) se puede dejar vacío y aclararlo
+        # en observaciones. En llegadas no se exige: la llegada hereda el proyecto de la
+        # salida a la que se vincula.
+        if tipo_reporte == ChecklistVehiculo.TipoReporte.SALIDA:
+            proyecto_valor = data.get('proyecto', None)
+            if proyecto_valor is None:
+                proyecto_valor = getattr(self.instance, 'proyecto', '')
+            # Normalizamos: string vacío o solo espacios → None para no guardar ''.
+            proyecto_valor = (proyecto_valor or '').strip() or None
+            data['proyecto'] = proyecto_valor
+
         traila = data.get('traila')
         if traila and traila.modelo != '4x5':
             raise serializers.ValidationError({
                 'traila': 'Solo se pueden jalar trailas de 4x5.'
             })
+
+        # Vincular llegadas con su salida del mismo vehículo y mismo día.
+        salida_rel = data.get('salida_relacionada')
+        if tipo_reporte == ChecklistVehiculo.TipoReporte.LLEGADA:
+            # Permitir PATCH sin re-especificar salida si ya viene vinculada.
+            if salida_rel is None and not getattr(self.instance, 'salida_relacionada_id', None):
+                raise serializers.ValidationError({
+                    'salida_relacionada': 'Debes seleccionar la salida que estás cerrando.'
+                })
+
+            if salida_rel is not None:
+                if salida_rel.tipo_reporte != ChecklistVehiculo.TipoReporte.SALIDA:
+                    raise serializers.ValidationError({
+                        'salida_relacionada': 'Solo se pueden cerrar salidas.'
+                    })
+                if salida_rel.vehiculo_id != (vehiculo.id if vehiculo else getattr(self.instance, 'vehiculo_id', None)):
+                    raise serializers.ValidationError({
+                        'salida_relacionada': 'La salida no corresponde a este vehículo.'
+                    })
+                # Regla: la salida debe ser del mismo día de la llegada o de 1 día antes.
+                # 2+ días de diferencia no se permite.
+                fecha_llegada = data.get('fecha_hora') or getattr(self.instance, 'fecha_hora', None)
+                if fecha_llegada:
+                    diferencia = (fecha_llegada.date() - salida_rel.fecha_hora.date()).days
+                    if diferencia < 0 or diferencia > 1:
+                        raise serializers.ValidationError({
+                            'salida_relacionada': 'La salida debe ser del mismo día o de 1 día antes de la llegada.'
+                        })
+                # Una salida no puede ser cerrada dos veces (además del UniqueConstraint en BD).
+                ya_cerrada_por_otro = ChecklistVehiculo.objects.filter(
+                    salida_relacionada=salida_rel,
+                ).exclude(
+                    pk=getattr(self.instance, 'pk', None),
+                ).exists()
+                if ya_cerrada_por_otro:
+                    raise serializers.ValidationError({
+                        'salida_relacionada': 'Esta salida ya fue cerrada por otra llegada.'
+                    })
+
+        if tipo_reporte == ChecklistVehiculo.TipoReporte.SALIDA and salida_rel is not None:
+            raise serializers.ValidationError({
+                'salida_relacionada': 'Las salidas no se vinculan entre sí.'
+            })
+
         return data
 
 

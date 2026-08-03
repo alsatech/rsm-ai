@@ -18,6 +18,10 @@ export const getHistorialVehiculo = (id) => api.get(`/api/v1/flota/vehiculos/${i
 export const getChecklists = (params) => api.get('/api/v1/flota/checklists/', { params })
 export const getChecklist = (id) => api.get(`/api/v1/flota/checklists/${id}/`)
 export const createChecklist = (data) => api.post('/api/v1/flota/checklists/', data)
+// Salidas del vehículo del día indicado que aún no tienen llegada vinculada — opciones
+// para cerrar en una llegada.
+export const getSalidasPendientes = (params) =>
+  api.get('/api/v1/flota/checklists/salidas-pendientes/', { params })
 export const validarChecklist = (id, data) => api.patch(`/api/v1/flota/checklists/${id}/`, data)
 export const subirFotoChecklist = (id, formData) =>
   api.post(`/api/v1/flota/checklists/${id}/fotos/`, formData, {
@@ -25,6 +29,14 @@ export const subirFotoChecklist = (id, formData) =>
   })
 export const eliminarFotoChecklist = (id, fotoId) =>
   api.delete(`/api/v1/flota/checklists/${id}/fotos/${fotoId}/`)
+// Sube una nota de voz (estilo WhatsApp) al checklist. formData debe traer `audio` (Blob/File)
+// y, opcionalmente, `duracion_segundos` y `descripcion`.
+export const subirAudioChecklist = (id, formData) =>
+  api.post(`/api/v1/flota/checklists/${id}/audios/`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+export const eliminarAudioChecklist = (id, audioId) =>
+  api.delete(`/api/v1/flota/checklists/${id}/audios/${audioId}/`)
 export const crearAdvertenciaChecklist = (id, data) =>
   api.post(`/api/v1/flota/checklists/${id}/advertencias/`, data)
 

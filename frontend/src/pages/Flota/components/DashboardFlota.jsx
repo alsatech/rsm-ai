@@ -80,32 +80,32 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
   }
 
   return (
-    <div className="grid grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[1fr_320px]">
-      <div>
+    <div className="grid grid-cols-1 gap-5 2xl:grid-cols-[1fr_320px] 2xl:gap-6">
+      <div className="min-w-0">
         {puedeGestionarVehiculo && (
           <button
             type="button"
             onClick={() => setMostrarFormulario(true)}
             style={{ minHeight: '52px' }}
-            className="mb-4 w-full rounded-xl border-2 border-dashed border-accent text-sm font-semibold text-highlight transition hover:bg-card sm:w-auto sm:px-6"
+            className="glass-card mb-4 flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-highlight/60 px-4 text-sm font-semibold text-flotafg transition hover:-translate-y-0.5 hover:border-highlight hover:bg-highlight/5 hover:shadow-md active:scale-[0.99] sm:w-auto sm:px-6"
           >
-            + Nuevo vehículo
+            <span className="text-highlight">+</span> Nuevo vehículo
           </button>
         )}
 
-        {loading && <p className="text-center text-sm text-text-secondary">Cargando flota…</p>}
+        {loading && <p className="text-center text-sm text-flotafg-muted">Cargando flota…</p>}
 
         {!loading && error && <p className="text-center text-sm text-error">{error}</p>}
 
         {!loading && !error && vehiculos.length === 0 && (
           <div className="mt-12 flex flex-col items-center gap-3 text-center">
             <span className="text-5xl">🚚</span>
-            <p className="text-text-secondary">No hay vehículos registrados todavía.</p>
+            <p className="text-flotafg-muted">No hay vehículos registrados todavía.</p>
           </div>
         )}
 
         {!loading && !error && vehiculos.length > 0 && (
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col gap-2.5">
             {vehiculos.map((vehiculo) => (
               <TarjetaVehiculo
                 key={vehiculo.id}
@@ -125,12 +125,13 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
             <button
               type="button"
               onClick={onVerIncidencias}
-              className="rounded-2xl border-2 border-error/40 bg-error/10 px-4 py-3 text-left transition hover:border-error hover:bg-error/15"
+              style={{ animationDelay: '60ms' }}
+              className="flota-fade-in glass-card rounded-2xl border-error/40 bg-error/10 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
             >
               <p className="text-sm font-semibold text-error">
                 ⚠️ {resumen.incidencias_total} incidencia{resumen.incidencias_total !== 1 ? 's' : ''} reportada{resumen.incidencias_total !== 1 ? 's' : ''}
               </p>
-              <p className="mt-0.5 text-xs text-text-secondary">
+              <p className="mt-0.5 text-xs text-flotafg-muted">
                 Toca para ver el historial completo →
               </p>
             </button>
@@ -139,12 +140,13 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
             <button
               type="button"
               onClick={onVerSinValidar}
-              className="rounded-2xl border-2 border-warning/40 bg-warning/10 px-4 py-3 text-left transition hover:border-warning hover:bg-warning/15"
+              style={{ animationDelay: '120ms' }}
+              className="flota-fade-in glass-card rounded-2xl border-warning/40 bg-warning/10 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99]"
             >
               <p className="text-sm font-semibold text-warning">
                 ⚠️ {resumen.checklists_sin_validar} checklist{resumen.checklists_sin_validar !== 1 ? 's' : ''} sin validar
               </p>
-              <p className="mt-0.5 text-xs text-text-secondary">
+              <p className="mt-0.5 text-xs text-flotafg-muted">
                 Toca para ver el detalle por vehículo →
               </p>
             </button>

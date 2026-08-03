@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -109,6 +110,23 @@ class ChecklistVehiculo(models.Model):
     incidencia_previa = models.TextField(blank=True)  # solo en salida
     incidencia_nueva = models.TextField(blank=True)  # solo en llegada
 
+    # Proyecto al que se vincula el checklist — OBLIGATORIO en salidas, opcional en
+    # llegadas (la llegada queda vinculada a su salida y, por transitividad, al
+    # mismo proyecto que la salida). Es texto libre por ahora; cuando exista el
+    # Módulo 12 (Proyectos / Erik) se reemplaza por FK.
+    proyecto = models.CharField(max_length=200, blank=True, null=True)
+
+    # Llega → cierra una salida del mismo vehículo y mismo día. Solo aplica en llegadas
+    # (validado en el serializer). Una salida solo puede tener una llegada vinculada.
+    salida_relacionada = models.ForeignKey(
+        'self',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='llegadas',
+        limit_choices_to={'tipo_reporte': 'salida'},
+    )
+
     observaciones = models.TextField(blank=True)
     validado = models.BooleanField(default=False)
     validado_por = models.ForeignKey(
@@ -125,6 +143,13 @@ class ChecklistVehiculo(models.Model):
         ordering = ['-fecha_hora']
         verbose_name = 'Checklist de vehículo'
         verbose_name_plural = 'Checklists de vehículos'
+        constraints = [
+            models.UniqueConstraint(
+                fields=['salida_relacionada'],
+                condition=Q(salida_relacionada__isnull=False),
+                name='uniq_llegada_por_salida',
+            ),
+        ]
 
     def __str__(self):
         nombre = self.responsable.get_full_name() or self.responsable.username
@@ -207,6 +232,11 @@ class FotoChecklist(models.Model):
     class Item(models.TextChoices):
         KILOMETRAJE = 'kilometraje', 'Kilometraje / horómetro'
         GASOLINA = 'gasolina', 'Gasolina (foto del tablero)'
+        # Foto única del tablero: incluye kilometraje/horas + nivel de gasolina.
+        # En llegadas es la única obligatoria del tablero; en salidas se mantiene
+        # también el slot individual de kilometraje (cuando aplica) para conservar
+        # las fotos históricas con item=`kilometraje`.
+        TABLERO = 'tablero', 'Tablero (kilometraje + gasolina)'
         ESTADO_FISICO_DERECHO = 'estado_fisico_derecho', 'Estado físico — costado derecho'
         ESTADO_FISICO_IZQUIERDO = 'estado_fisico_izquierdo', 'Estado físico — costado izquierdo'
         ESTADO_FISICO_FRENTE = 'estado_fisico_frente', 'Estado físico — frente'
@@ -240,6 +270,30 @@ class FotoChecklist(models.Model):
 
     def __str__(self):
         return f'Foto — {self.checklist}'
+
+
+class AudioChecklist(models.Model):
+    """Nota de voz estilo WhatsApp adjunta a un checklist.
+
+    Los usuarios en campo muchas veces reportan mejor hablando que escribiendo;
+    este modelo guarda audios cortos (≤ ~2 min) que quedan anexos al checklist
+    para que Abigail o Erik los puedan reproducir al revisar.
+    """
+
+    checklist = models.ForeignKey(ChecklistVehiculo, on_delete=models.CASCADE, related_name='audios')
+    audio = models.FileField(upload_to='flota/audios/%Y/%m/')
+    duracion_segundos = models.PositiveSmallIntegerField(default=0)
+    descripcion = models.CharField(max_length=200, blank=True)
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Audio de checklist'
+        verbose_name_plural = 'Audios de checklist'
+
+    def __str__(self):
+        return f'Audio ({self.duracion_segundos}s) — {self.checklist}'
 
 
 class AlertaFlota(models.Model):

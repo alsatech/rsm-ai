@@ -3,8 +3,8 @@ import { useRef, useState } from 'react'
 import { TIPO_LABELS } from '../constants'
 
 const inputClass =
-  'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
-const labelClass = 'mb-1 block text-sm font-medium text-text-secondary'
+  'w-full rounded-lg border border-flotafg-muted/30 bg-flotabg/60 px-4 py-3 text-base text-flotafg outline-none transition focus:border-highlight focus:ring-2 focus:ring-highlight/30'
+const labelClass = 'mb-1 block text-sm font-medium text-flotafg-muted'
 
 const ESTADO_OPCIONES = [
   { value: 'activo', label: 'Activo' },
@@ -51,14 +51,14 @@ export default function FormularioVehiculo({ vehiculo, onGuardar, onCancelar, gu
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/70 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-bg/30 p-4 backdrop-blur-md"
       onClick={onCancelar}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg animate-[scaleIn_0.15s_ease-out] rounded-2xl border border-border bg-card p-5"
+        className="glass-card-strong w-full max-w-lg animate-[scaleIn_0.15s_ease-out] rounded-2xl p-5"
       >
-        <h2 className="mb-4 text-xl font-bold text-text">
+        <h2 className="mb-4 text-xl font-bold text-flotafg">
           {esEdicion ? 'Editar vehículo' : 'Nuevo vehículo'}
         </h2>
 
@@ -149,7 +149,7 @@ export default function FormularioVehiculo({ vehiculo, onGuardar, onCancelar, gu
               type="file"
               accept="image/*"
               onChange={(e) => setFoto(e.target.files?.[0] ?? null)}
-              className="block w-full text-sm text-text-secondary file:mr-3 file:rounded-lg file:border-0 file:bg-accent file:px-3 file:py-2 file:text-sm file:font-semibold file:text-highlight"
+              className="block w-full text-sm text-flotafg-muted file:mr-3 file:rounded-lg file:border-0 file:flota-cta-primary file:px-3 file:py-2 file:text-sm file:cursor-pointer"
             />
           </div>
 
@@ -163,7 +163,7 @@ export default function FormularioVehiculo({ vehiculo, onGuardar, onCancelar, gu
               type="button"
               onClick={onCancelar}
               style={{ minHeight: '52px' }}
-              className="flex-1 rounded-xl border border-border text-text-secondary transition hover:border-text-secondary hover:text-text"
+              className="flex-1 rounded-xl border border-flotafg-muted/30 text-flotafg-muted transition hover:border-flotafg hover:text-flotafg active:scale-[0.98]"
             >
               Cancelar
             </button>
@@ -171,7 +171,7 @@ export default function FormularioVehiculo({ vehiculo, onGuardar, onCancelar, gu
               type="submit"
               disabled={guardando}
               style={{ minHeight: '52px' }}
-              className="flex-1 rounded-xl bg-accent font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
+              className="flota-cta-primary flex-1 rounded-xl"
             >
               {guardando ? 'Guardando…' : esEdicion ? 'Guardar cambios' : 'Crear vehículo'}
             </button>

@@ -1,8 +1,9 @@
 import { useState } from 'react'
 
-import { createChecklist, subirFotoChecklist } from '../../../api/flota'
+import { createChecklist, subirAudioChecklist, subirFotoChecklist } from '../../../api/flota'
 import { useToast } from '../../../hooks/useToast'
 import { esOffRoad, sinKilometraje } from '../constants'
+import FlotaLayout from './FlotaLayout'
 import Paso1Identificacion from './Paso1Identificacion'
 import Paso2Inspeccion from './Paso2Inspeccion'
 
@@ -17,7 +18,11 @@ function estadoInicial(vehiculoPreseleccionado) {
     vehiculo: vehiculoPreseleccionado?.id ?? null,
     tipo_reporte: noPuedeSalir ? 'llegada' : 'salida',
     // El responsable lo asigna el backend con el usuario logueado — no se pide en el formulario.
+    // Proyecto — obligatorio en SALIDAS, no se pide en llegadas (la llegada hereda el
+    // proyecto de la salida a la que se vincula).
     proyecto: null,
+    // Vincula la llegada con la salida del mismo vehículo/día (obligatorio en llegadas).
+    salida_relacionada: null,
     // Kilometraje — informativo, se puede dejar vacío (la fuente de la verdad es la foto del tablero).
     km_reporte: vehiculoPreseleccionado?.kilometraje_actual != null
       ? String(vehiculoPreseleccionado.kilometraje_actual)
@@ -47,6 +52,7 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
   const [paso, setPaso] = useState(1)
   const [form, setForm] = useState(() => estadoInicial(vehiculoPreseleccionado))
   const [fotos, setFotos] = useState([])
+  const [audios, setAudios] = useState([])
   const [guardando, setGuardando] = useState(false)
 
   const kilometrajeActual = vehiculoPreseleccionado?.kilometraje_actual != null
@@ -55,11 +61,16 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
 
   const noPuedeSalir = ['en_taller', 'de_baja'].includes(vehiculoPreseleccionado?.estado)
   // El responsable ya no se pide — lo pone el backend con el usuario logueado.
-  // El proyecto es obligatorio para poder dar seguimiento al checklist.
+  // Reglas para avanzar del paso 1:
+  //  - SALIDA: proyecto OPCIONAL (puede ser null si el vehículo se usa para otra cosa).
+  //  - LLEGADA: requiere salida_relacionada (la salida del mismo vehículo/día que cerramos).
   const puedeAvanzar1 = Boolean(
     form.vehiculo
-    && form.proyecto
     && !(noPuedeSalir && form.tipo_reporte === 'salida')
+    && (
+      form.tipo_reporte === 'salida'
+      || (form.tipo_reporte === 'llegada' && form.salida_relacionada)
+    )
   )
 
   const fotosPorItem = (item) => fotos.filter((f) => f.item === item)
@@ -72,11 +83,14 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
 
   const estadoFisicoCompleto = ['estado_fisico_derecho', 'estado_fisico_izquierdo',
     'estado_fisico_frente', 'estado_fisico_trasero'].every((k) => fotosPorItem(k).length > 0)
-  const gasolinaCompleta = fotosPorItem('gasolina').length > 0
-  const kilometrajeCompleto = kilometrajeAplica && fotosPorItem('kilometraje').length > 0
+  // Salidas: el usuario sube 2 fotos del tablero (km + gasolina). Llegadas: 1 sola foto `tablero`.
+  const gasolinaCompleta = esSalida && fotosPorItem('gasolina').length > 0
+  const kilometrajeCompleto = esSalida && kilometrajeAplica && fotosPorItem('kilometraje').length > 0
+  const tableroCompleto = !esSalida && kilometrajeAplica && fotosPorItem('tablero').length > 0
   const cargaTrailaAplica = offRoad
   const cargaTrailaCompleta = cargaTrailaAplica && Boolean(form.traila) && fotosPorItem('carga_traila').length > 0
-  const presionLlantasCompleta = fotosPorItem('presion_llantas').length > 0
+  // Llantas / neumáticos — solo se exigen en salidas. En llegadas ya no bloquean.
+  const presionLlantasCompleta = esSalida && fotosPorItem('presion_llantas').length > 0
 
   const itemsAplicables = (() => {
     const items = []
@@ -91,9 +105,15 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
   })()
   const itemsVerificados = itemsAplicables.filter((k) => form[k]).length
   const totalItems = itemsAplicables.length
+  // Motos / cuatrimotos no llevan tablero (no reportan km ni gasolina).
+  // En llegadas se exige la foto del tablero; en salidas se exige km + gasolina (cuando aplican).
+  const tableroObligatorio = !kilometrajeAplica
+    || (esSalida ? (kilometrajeCompleto && gasolinaCompleta) : tableroCompleto)
   const obligatoriosCumplidos =
-    estadoFisicoCompleto && gasolinaCompleta && (!kilometrajeAplica || kilometrajeCompleto)
-    && (!cargaTrailaAplica || cargaTrailaCompleta) && presionLlantasCompleta
+    estadoFisicoCompleto
+    && tableroObligatorio
+    && (!cargaTrailaAplica || cargaTrailaCompleta)
+    && presionLlantasCompleta
     && itemsVerificados === totalItems
 
   // Incidencia: si respondió Sí, bloquea hasta que escriba texto y suba foto.
@@ -144,6 +164,20 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
     })
   }
 
+  const handleAgregarAudio = (file, duracionSegundos) => {
+    if (!file) return
+    const preview = URL.createObjectURL(file)
+    setAudios((prev) => [...prev, { file, preview, duracion_segundos: duracionSegundos, descripcion: '' }])
+  }
+
+  const handleEliminarAudio = (index) => {
+    setAudios((prev) => {
+      const eliminado = prev[index]
+      if (eliminado?.preview) URL.revokeObjectURL(eliminado.preview)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
   const handleGuardar = async () => {
     setGuardando(true)
     try {
@@ -170,6 +204,14 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
         await subirFotoChecklist(checklist.id, fd)
       }
 
+      for (const audio of audios) {
+        const fd = new FormData()
+        fd.append('audio', audio.file)
+        fd.append('duracion_segundos', String(audio.duracion_segundos || 0))
+        if (audio.descripcion) fd.append('descripcion', audio.descripcion)
+        await subirAudioChecklist(checklist.id, fd)
+      }
+
       showToast('✅ Checklist guardado', 'exito')
       onGuardado?.()
     } catch {
@@ -179,34 +221,38 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
     }
   }
 
+  const headerContent = (
+    <>
+      <button
+        type="button"
+        onClick={onVolver}
+        className="flex h-10 w-10 items-center justify-center rounded-full border border-flotafg-muted/30 text-flotafg-muted transition hover:scale-105 hover:text-flotafg"
+      >
+        ←
+      </button>
+      <div className="flex-1">
+        <h1 className="font-bold text-flotafg">Nuevo checklist</h1>
+        <p className="text-xs text-flotafg-muted">Paso {paso} de {PASOS.length} — {PASOS[paso - 1].titulo}</p>
+      </div>
+      <span className="glass-card rounded-full px-3 py-1 text-xs font-mono font-bold text-flotafg">
+        {paso}/{PASOS.length}
+      </span>
+    </>
+  )
+
   return (
-    <div className="min-h-svh bg-bg pb-10">
-      <header className="sticky top-0 z-10 border-b border-border bg-bg px-4 py-4">
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            onClick={onVolver}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-text-secondary hover:border-accent hover:text-text"
-          >
-            ←
-          </button>
-          <div>
-            <h1 className="font-bold text-highlight">Nuevo checklist</h1>
-            <p className="text-xs text-text-secondary">Paso {paso} de {PASOS.length} — {PASOS[paso - 1].titulo}</p>
-          </div>
-        </div>
+    <FlotaLayout headerContent={headerContent}>
+      {/* Indicador de paso glass */}
+      <div className="glass-card mb-5 flex gap-1.5 rounded-full p-1.5">
+        {PASOS.map((p) => (
+          <div
+            key={p.num}
+            className={`h-2 flex-1 rounded-full transition ${paso >= p.num ? 'bg-highlight' : 'bg-flotafg-muted/20'}`}
+          />
+        ))}
+      </div>
 
-        <div className="mt-3 flex gap-1.5">
-          {PASOS.map((p) => (
-            <div
-              key={p.num}
-              className={`h-1.5 flex-1 rounded-full ${paso >= p.num ? 'bg-highlight' : 'bg-border'}`}
-            />
-          ))}
-        </div>
-      </header>
-
-      <div className="px-4 py-5">
+      <div className="flota-fade-in">
         {paso === 1 && (
           <Paso1Identificacion
             vehiculoPreseleccionado={vehiculoPreseleccionado}
@@ -228,43 +274,48 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
             itemIncidencia={itemIncidencia}
             textoIncidencia={textoIncidencia}
             hayFotoIncidencia={hayFotoIncidencia}
+            audios={audios}
+            onAgregarAudio={handleAgregarAudio}
+            onEliminarAudio={handleEliminarAudio}
             obligatorio={puedeGuardar}
             guardando={guardando}
             onGuardar={handleGuardar}
           />
         )}
+      </div>
 
-        {paso < PASOS.length ? (
-          <div className={`mt-6 flex gap-3 ${paso === 1 ? 'justify-end' : ''}`}>
-            {paso > 1 && (
-              <button
-                type="button"
-                onClick={() => setPaso((p) => p - 1)}
-                style={{ minHeight: '56px' }}
-                className="flex-1 rounded-xl border border-border text-base text-text-secondary transition hover:border-text-secondary hover:text-text"
-              >
-                ← Anterior
-              </button>
-            )}
+      {paso < PASOS.length ? (
+        <div className={`mt-6 flex gap-3 ${paso === 1 ? 'justify-end' : ''}`}>
+          {paso > 1 && (
             <button
               type="button"
-              onClick={() => setPaso((p) => p + 1)}
-              disabled={paso === 1 && !puedeAvanzar1}
+              onClick={() => setPaso((p) => p - 1)}
               style={{ minHeight: '56px' }}
-              className={`rounded-xl bg-accent text-base font-bold text-highlight transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${
-                paso === 1 ? 'w-full' : 'flex-1'
-              }`}
+              className="flex-1 rounded-xl border border-flotafg-muted/30 text-base text-flotafg-muted transition hover:border-flotafg hover:text-flotafg active:scale-[0.98]"
             >
-              Siguiente →
+              ← Anterior
             </button>
-          </div>
-        ) : null}
-        {paso === 1 && !puedeAvanzar1 && (
-          <p className="mt-4 rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm font-semibold text-warning">
-            ⚠️ Selecciona un proyecto para continuar.
-          </p>
-        )}
-      </div>
-    </div>
+          )}
+          <button
+            type="button"
+            onClick={() => setPaso((p) => p + 1)}
+            disabled={paso === 1 && !puedeAvanzar1}
+            style={{ minHeight: '56px' }}
+            className={`flota-cta-primary rounded-xl text-base ${
+              paso === 1 ? 'w-full' : 'flex-1'
+            }`}
+          >
+            Siguiente →
+          </button>
+        </div>
+      ) : null}
+      {paso === 1 && !puedeAvanzar1 && (
+        <p className="mt-4 rounded-xl border border-warning/40 bg-warning/15 px-4 py-3 text-center text-sm font-semibold text-warning">
+          {form.tipo_reporte === 'llegada'
+            ? '⚠️ Selecciona la salida que estás cerrando para continuar.'
+            : '⚠️ Selecciona un vehículo válido para continuar.'}
+        </p>
+      )}
+    </FlotaLayout>
   )
 }

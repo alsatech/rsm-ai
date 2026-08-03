@@ -50,24 +50,24 @@ function ModalNota({ checklist, onCerrar, onGuardar, guardando }) {
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-bg/30 p-4 backdrop-blur-md"
       onClick={onCerrar}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-md rounded-2xl border border-border bg-card p-5"
+        className="glass-card-strong w-full max-w-md animate-[scaleIn_0.15s_ease-out] rounded-2xl p-5"
       >
         <div className="mb-3 flex items-start justify-between gap-3">
-          <h3 className="text-base font-bold text-text">📝 Nota de seguimiento</h3>
+          <h3 className="text-base font-bold text-flotafg">📝 Nota de seguimiento</h3>
           <button
             type="button"
             onClick={onCerrar}
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border text-text-secondary hover:text-text"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-flotafg-muted/30 text-flotafg-muted hover:text-flotafg"
           >
             ✕
           </button>
         </div>
-        <p className="mb-3 text-xs text-text-secondary">
+        <p className="mb-3 text-xs text-flotafg-muted">
           Incidencia del {checklist.vehiculo_detalle?.nombre} · {formatFechaHora(checklist.fecha_hora)}
         </p>
         <textarea
@@ -75,14 +75,14 @@ function ModalNota({ checklist, onCerrar, onGuardar, guardando }) {
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
           placeholder="Ej. Se turnó al taller mecánico Juan Pérez para presupuesto…"
-          className="w-full rounded-xl border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-warning"
+          className="w-full rounded-xl border border-flotafg-muted/30 bg-flotacard/60 px-3 py-2 text-sm text-flotafg outline-none transition focus:border-warning focus:ring-2 focus:ring-warning/30"
         />
         <div className="mt-3 flex gap-2">
           <button
             type="button"
             onClick={onCerrar}
             style={{ minHeight: '44px' }}
-            className="flex-1 rounded-lg border border-border text-sm text-text-secondary hover:text-text"
+            className="flex-1 rounded-lg border border-flotafg-muted/30 text-sm text-flotafg-muted hover:text-flotafg active:scale-[0.98]"
           >
             Cancelar
           </button>
@@ -91,7 +91,7 @@ function ModalNota({ checklist, onCerrar, onGuardar, guardando }) {
             onClick={handleEnviar}
             disabled={guardando || !motivo.trim()}
             style={{ minHeight: '44px' }}
-            className="flex-1 rounded-lg bg-warning text-sm font-bold text-bg transition hover:opacity-90 disabled:opacity-50"
+            className="flex-1 rounded-lg bg-warning text-sm font-bold text-bg transition hover:opacity-90 active:scale-[0.98] disabled:opacity-50"
           >
             {guardando ? 'Enviando…' : 'Enviar nota'}
           </button>
@@ -105,7 +105,7 @@ function ModalNota({ checklist, onCerrar, onGuardar, guardando }) {
 function FotoAmpliada({ foto, onCerrar }) {
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-bg/90 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-bg/40 p-4 backdrop-blur-md"
       onClick={onCerrar}
     >
       <div className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
@@ -113,7 +113,7 @@ function FotoAmpliada({ foto, onCerrar }) {
         <button
           onClick={onCerrar}
           style={{ minHeight: '48px' }}
-          className="mt-3 w-full rounded-xl border border-border py-3 text-text-secondary hover:text-text"
+          className="glass-card mt-3 w-full rounded-xl py-3 text-flotafg-muted hover:text-flotafg active:scale-[0.99]"
         >
           Cerrar
         </button>
@@ -130,13 +130,13 @@ function TarjetaIncidencia({ checklist, onAgregarNota, onFotoAmpliada, onNotaGua
   const ultimaAdvertencia = advertencias[0]
 
   return (
-    <div className="rounded-2xl border-2 border-warning/40 bg-card p-4">
+    <div className="glass-card rounded-2xl border-2 border-warning/40 p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <p className="text-base font-bold text-text">
+          <p className="text-base font-bold text-flotafg">
             {checklist.vehiculo_detalle?.nombre ?? 'Vehículo'}
           </p>
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-flotafg-muted">
             {checklist.vehiculo_detalle?.tipo_display ?? ''} · {checklist.vehiculo_detalle?.placas ?? 'sin placas'}
           </p>
         </div>
@@ -148,16 +148,16 @@ function TarjetaIncidencia({ checklist, onAgregarNota, onFotoAmpliada, onNotaGua
           }`}>
             {checklist.tipo_reporte === 'salida' ? '🚗 Salida' : '🏁 Llegada'}
           </span>
-          <span className="text-xs text-text-secondary">{formatFechaHora(checklist.fecha_hora)}</span>
+          <span className="text-xs text-flotafg-muted">{formatFechaHora(checklist.fecha_hora)}</span>
         </div>
       </div>
 
-      <div className="mt-3 rounded-xl border border-warning/30 bg-warning/5 p-3">
+      <div className="mt-3 rounded-xl border border-warning/30 bg-warning/10 p-3">
         <div className="flex items-center gap-2">
           <span className="text-xl">{inc.icono}</span>
-          <p className="text-sm font-bold text-text">{inc.titulo}</p>
+          <p className="text-sm font-bold text-flotafg">{inc.titulo}</p>
         </div>
-        <p className="mt-2 text-sm text-text">{inc.texto}</p>
+        <p className="mt-2 text-sm text-flotafg">{inc.texto}</p>
 
         {inc.fotos.length > 0 && (
           <div className="mt-3 flex flex-wrap gap-2">
@@ -166,7 +166,7 @@ function TarjetaIncidencia({ checklist, onAgregarNota, onFotoAmpliada, onNotaGua
                 key={foto.id}
                 type="button"
                 onClick={() => onFotoAmpliada(foto)}
-                className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-warning/40"
+                className="h-14 w-14 shrink-0 overflow-hidden rounded-lg border border-warning/40 transition hover:scale-105"
                 title="Ver foto"
               >
                 <img src={foto.foto} alt="Foto de incidencia" className="h-full w-full object-cover" />
@@ -177,21 +177,21 @@ function TarjetaIncidencia({ checklist, onAgregarNota, onFotoAmpliada, onNotaGua
       </div>
 
       <div className="mt-3 flex items-center justify-between gap-2 text-xs">
-        <span className="text-text-secondary">
+        <span className="text-flotafg-muted">
           👤 Reportado por {checklist.responsable_detalle?.nombre ?? '—'}
         </span>
         {advertencias.length > 0 && (
-          <span className="rounded-full border border-warning/40 bg-warning/10 px-2 py-0.5 font-bold text-warning">
+          <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 font-bold text-warning">
             📝 {advertencias.length} nota{advertencias.length !== 1 ? 's' : ''}
           </span>
         )}
       </div>
 
       {ultimaAdvertencia && (
-        <div className="mt-2 rounded-lg border border-warning/30 bg-bg px-3 py-2">
-          <p className="text-xs font-semibold text-text-secondary">Última nota:</p>
-          <p className="mt-1 text-sm text-text">{ultimaAdvertencia.motivo}</p>
-          <p className="mt-1 text-[11px] text-text-secondary">
+        <div className="mt-2 rounded-lg border border-warning/30 bg-flotacard/60 px-3 py-2">
+          <p className="text-xs font-semibold text-flotafg-muted">Última nota:</p>
+          <p className="mt-1 text-sm text-flotafg">{ultimaAdvertencia.motivo}</p>
+          <p className="mt-1 text-[11px] text-flotafg-muted">
             {ultimaAdvertencia.creada_por_detalle?.nombre ?? '—'} · {formatFechaHora(ultimaAdvertencia.created_at)}
           </p>
         </div>
@@ -201,7 +201,7 @@ function TarjetaIncidencia({ checklist, onAgregarNota, onFotoAmpliada, onNotaGua
         type="button"
         onClick={onAgregarNota}
         style={{ minHeight: '44px' }}
-        className="mt-3 w-full rounded-xl border border-warning/50 text-sm font-semibold text-warning transition hover:bg-warning/10"
+        className="mt-3 w-full rounded-xl border border-warning/50 text-sm font-semibold text-warning transition hover:bg-warning/15 active:scale-[0.98]"
       >
         📝 Agregar nota de seguimiento
       </button>
@@ -283,19 +283,19 @@ export default function HistorialIncidencias({ onVolver, onNotaGuardadaExterno }
   )
 
   return (
-    <div className="min-h-svh bg-bg pb-10">
-      <header className="sticky top-0 z-10 border-b border-border bg-bg px-4 py-4">
-        <div className="flex items-center gap-3">
+    <div className="min-h-svh bg-flotabg pb-10">
+      <header className="sticky top-0 z-20">
+        <div className="glass-card-strong flex items-center gap-3 px-4 py-4">
           <button
             type="button"
             onClick={onVolver}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-border text-text-secondary hover:border-accent hover:text-text"
+            className="flex h-10 w-10 items-center justify-center rounded-full border border-flotafg-muted/30 text-flotafg-muted transition hover:scale-105 hover:text-flotafg"
           >
             ←
           </button>
           <div>
-            <h1 className="font-bold text-highlight">Historial de incidencias</h1>
-            <p className="text-xs text-text-secondary">
+            <h1 className="font-bold text-flotafg">Historial de incidencias</h1>
+            <p className="text-xs text-flotafg-muted">
               {incidencias.length} reporte{incidencias.length !== 1 ? 's' : ''}
               {totalNotas > 0 && ` · ${totalNotas} nota${totalNotas !== 1 ? 's' : ''} de seguimiento`}
             </p>
@@ -308,7 +308,7 @@ export default function HistorialIncidencias({ onVolver, onNotaGuardadaExterno }
           <select
             value={filtroVehiculo}
             onChange={(e) => setFiltroVehiculo(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="glass-card rounded-lg px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
           >
             <option value="">Todos los vehículos</option>
             {vehiculos.map((v) => (
@@ -318,7 +318,7 @@ export default function HistorialIncidencias({ onVolver, onNotaGuardadaExterno }
           <select
             value={filtroTipo}
             onChange={(e) => setFiltroTipo(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="glass-card rounded-lg px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
           >
             <option value="">Todos los tipos</option>
             <option value="previa">Preexistentes (salida)</option>
@@ -328,36 +328,41 @@ export default function HistorialIncidencias({ onVolver, onNotaGuardadaExterno }
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="glass-card rounded-lg px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
             title="Desde"
           />
           <input
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
-            className="rounded-lg border border-border bg-card px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="glass-card rounded-lg px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
             title="Hasta"
           />
         </div>
 
-        {loading && <p className="text-center text-sm text-text-secondary">Cargando…</p>}
+        {loading && <p className="text-center text-sm text-flotafg-muted">Cargando…</p>}
 
         {!loading && incidencias.length === 0 && (
           <div className="mt-8 flex flex-col items-center gap-3 text-center">
             <span className="text-5xl">🎉</span>
-            <p className="text-text-secondary">No hay incidencias registradas.</p>
+            <p className="text-flotafg-muted">No hay incidencias registradas.</p>
           </div>
         )}
 
         {!loading && (
           <div className="flex flex-col gap-3">
-            {incidencias.map((checklist) => (
-              <TarjetaIncidencia
+            {incidencias.map((checklist, idx) => (
+              <div
                 key={checklist.id}
-                checklist={checklist}
-                onAgregarNota={() => setModalNota(checklist)}
-                onFotoAmpliada={setFotoAmpliada}
-              />
+                style={{ animationDelay: `${idx * 40}ms` }}
+                className="flota-fade-in"
+              >
+                <TarjetaIncidencia
+                  checklist={checklist}
+                  onAgregarNota={() => setModalNota(checklist)}
+                  onFotoAmpliada={setFotoAmpliada}
+                />
+              </div>
             ))}
           </div>
         )}

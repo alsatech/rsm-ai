@@ -1,6 +1,13 @@
 from django.contrib import admin
 
-from .models import AdvertenciaChecklist, AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import (
+    AdvertenciaChecklist,
+    AlertaFlota,
+    AudioChecklist,
+    ChecklistVehiculo,
+    FotoChecklist,
+    Vehiculo,
+)
 
 
 @admin.register(Vehiculo)
@@ -15,6 +22,12 @@ class FotoChecklistInline(admin.TabularInline):
     extra = 0
 
 
+class AudioChecklistInline(admin.TabularInline):
+    model = AudioChecklist
+    extra = 0
+    raw_id_fields = ('uploaded_by',)
+
+
 class AdvertenciaChecklistInline(admin.TabularInline):
     model = AdvertenciaChecklist
     extra = 0
@@ -27,7 +40,7 @@ class ChecklistVehiculoAdmin(admin.ModelAdmin):
     list_filter = ('tipo_reporte', 'validado', 'vehiculo')
     search_fields = ('vehiculo__nombre', 'responsable__username')
     raw_id_fields = ('vehiculo', 'responsable', 'validado_por', 'traila')
-    inlines = [FotoChecklistInline, AdvertenciaChecklistInline]
+    inlines = [FotoChecklistInline, AudioChecklistInline, AdvertenciaChecklistInline]
 
 
 @admin.register(AlertaFlota)

@@ -4,20 +4,21 @@ import { getVehiculos } from '../../../api/flota'
 import {
   CARGA_TRAILA_ITEM,
   ESTADO_FISICO_LADOS,
-  GASOLINA_ITEM,
   INCIDENCIA_NUEVA_ITEM,
   INCIDENCIA_PREVIA_ITEM,
-  KILOMETRAJE_ITEM,
   MODELO_TRAILA_PERMITIDO,
+  TABLERO_ITEM,
   TRAILA_ITEMS,
   esOffRoad,
   esTraila,
   sinKilometraje,
 } from '../constants'
+import AudiosChecklist from './AudiosChecklist'
+import GrabadorAudio from './GrabadorAudio'
 
 function IconoSeccion({ icono }) {
   return (
-    <span className="widget-glow flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-accent/40 bg-card text-xl">
+    <span className="glass-card flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xl">
       {icono}
     </span>
   )
@@ -51,10 +52,10 @@ function SubidorMasivo({ slots, fotos, onAgregarFoto, onEliminarFoto, inputRefEx
       <div className="flex items-center gap-2">
         <IconoSeccion icono="📷" />
         <div className="flex-1">
-          <h2 className="text-lg font-bold text-text">Evidencia fotográfica</h2>
-          <p className="text-xs text-text-secondary">Toma varias fotos o elige varias de tu galería</p>
+          <h2 className="text-lg font-bold text-flotafg">Evidencia fotográfica</h2>
+          <p className="text-xs text-flotafg-muted">Toma varias fotos o elige varias de tu galería</p>
         </div>
-        <span className="font-mono text-sm font-bold text-text-secondary">{completados}/{slots.length}</span>
+        <span className="font-mono text-sm font-bold text-flotafg-muted">{completados}/{slots.length}</span>
       </div>
 
       <input
@@ -69,15 +70,15 @@ function SubidorMasivo({ slots, fotos, onAgregarFoto, onEliminarFoto, inputRefEx
         type="button"
         onClick={() => inputRef.current?.click()}
         style={{ minHeight: '64px' }}
-        className="widget-glow-input flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-accent bg-card text-base font-bold text-text transition"
+        className="glass-card flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-highlight/70 bg-highlight/5 text-base font-bold text-flotafg transition hover:-translate-y-0.5 hover:border-highlight hover:bg-highlight/10 hover:shadow-md active:scale-[0.98]"
       >
         📷 Tomar o elegir fotos
       </button>
-      <p className="text-xs text-text-secondary">
+      <p className="text-xs text-flotafg-muted">
         Las fotos se asignan solas a las casillas pendientes, en orden.
       </p>
 
-      <div className="widget-glow flex flex-col divide-y divide-accent/15 overflow-hidden rounded-xl border border-accent/25 bg-card">
+      <div className="glass-card flex flex-col divide-y divide-flotafg-muted/15 overflow-hidden rounded-xl">
         {slots.map((slot) => {
           const indexFoto = fotos.findIndex((f) => f.item === slot.item)
           const listo = indexFoto >= 0
@@ -87,15 +88,15 @@ function SubidorMasivo({ slots, fotos, onAgregarFoto, onEliminarFoto, inputRefEx
               type="button"
               onClick={() => listo && onEliminarFoto(indexFoto)}
               style={{ minHeight: '52px' }}
-              className={`flex items-center gap-3 px-4 text-left transition ${listo ? 'bg-highlight/10' : ''}`}
+              className={`flex items-center gap-3 px-4 text-left transition ${listo ? 'bg-highlight/15' : 'hover:bg-flotacard/50'}`}
             >
               <span className="text-xl">{slot.icon}</span>
-              <span className={`flex-1 text-sm font-semibold ${listo ? 'text-text' : 'text-text-secondary'}`}>
+              <span className={`flex-1 text-sm font-semibold ${listo ? 'text-flotafg' : 'text-flotafg-muted'}`}>
                 {slot.label}
               </span>
               <span
                 className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition ${
-                  listo ? 'border-highlight bg-highlight text-bg' : 'border-accent/40'
+                  listo ? 'border-highlight bg-highlight text-white' : 'border-flotafg-muted/40'
                 }`}
               >
                 {listo ? '✓' : ''}
@@ -122,8 +123,8 @@ function SelectorIncidencia({ tipoReporte, value, onChange }) {
       <div className="flex items-center gap-2">
         <IconoSeccion icono={icono} />
         <div>
-          <h2 className="text-lg font-bold text-text">{titulo}</h2>
-          <p className="text-xs text-text-secondary">{ayuda}</p>
+          <h2 className="text-lg font-bold text-flotafg">{titulo}</h2>
+          <p className="text-xs text-flotafg-muted">{ayuda}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -131,10 +132,10 @@ function SelectorIncidencia({ tipoReporte, value, onChange }) {
           type="button"
           onClick={() => onChange(true)}
           style={{ minHeight: '56px' }}
-          className={`rounded-xl border-2 text-base font-bold transition ${
+          className={`rounded-xl border-2 text-base font-bold transition active:scale-[0.98] ${
             value === true
-              ? 'border-error bg-error/20 text-error'
-              : 'border-border bg-card text-text-secondary hover:border-error/60'
+              ? 'flota-cta-primary border-transparent'
+              : 'glass-card border-flotafg-muted/30 text-flotafg-muted hover:border-error hover:text-error'
           }`}
         >
           🚨 Sí
@@ -143,10 +144,10 @@ function SelectorIncidencia({ tipoReporte, value, onChange }) {
           type="button"
           onClick={() => onChange(false)}
           style={{ minHeight: '56px' }}
-          className={`rounded-xl border-2 text-base font-bold transition ${
+          className={`rounded-xl border-2 text-base font-bold transition active:scale-[0.98] ${
             value === false
-              ? 'border-highlight bg-highlight/20 text-highlight'
-              : 'border-border bg-card text-text-secondary hover:border-highlight/60'
+              ? 'border-highlight bg-highlight/20 text-accent'
+              : 'glass-card border-flotafg-muted/30 text-flotafg-muted hover:border-highlight hover:text-highlight'
           }`}
         >
           ✓ No
@@ -178,14 +179,14 @@ function DetalleIncidencia({
   const fotosPorItem = fotos.filter((f) => f.item === itemIncidencia)
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border-2 border-error/40 bg-error/5 p-4">
+    <div className="glass-card flex flex-col gap-4 rounded-2xl border-2 border-error/40 bg-error/10 p-4">
       <div className="flex items-center gap-2">
         <span className="text-xl">{config.icon}</span>
-        <h3 className="text-base font-bold text-text">{titulo}</h3>
+        <h3 className="text-base font-bold text-flotafg">{titulo}</h3>
       </div>
 
       <div className="flex flex-col gap-2">
-        <label className="text-xs font-semibold uppercase tracking-wide text-text-secondary" htmlFor="incidencia_texto">
+        <label className="text-xs font-semibold uppercase tracking-wide text-flotafg-muted" htmlFor="incidencia_texto">
           Describe el daño
         </label>
         <textarea
@@ -194,20 +195,20 @@ function DetalleIncidencia({
           value={texto}
           onChange={(e) => onTexto(e.target.value)}
           placeholder={placeholder}
-          className={`w-full rounded-xl border-2 bg-card px-4 py-3 text-base text-text outline-none ${
-            faltaFoto ? 'border-error/60 focus:border-error' : 'border-accent/40 focus:border-highlight'
+          className={`w-full rounded-xl border-2 bg-flotacard/60 px-4 py-3 text-base text-flotafg outline-none transition ${
+            faltaFoto ? 'border-error/60 focus:border-error' : 'border-flotafg-muted/30 focus:border-highlight'
           }`}
         />
       </div>
 
       <div className="flex flex-col gap-2">
-        <p className="text-xs font-semibold uppercase tracking-wide text-text-secondary">Foto de evidencia</p>
+        <p className="text-xs font-semibold uppercase tracking-wide text-flotafg-muted">Foto de evidencia</p>
         {fotosPorItem.length === 0 ? (
           <button
             type="button"
             onClick={() => inputRefIncidencia.current?.click()}
             style={{ minHeight: '64px' }}
-            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-error bg-card text-base font-bold text-text"
+            className="flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed border-error bg-flotacard/50 text-base font-bold text-flotafg transition hover:bg-error/5 active:scale-[0.98]"
           >
             📷 Subir foto del {esSalida ? 'daño preexistente' : 'daño'}
           </button>
@@ -221,7 +222,7 @@ function DetalleIncidencia({
                   <button
                     type="button"
                     onClick={() => onEliminarFoto(idx)}
-                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-bg/80 text-error hover:bg-bg"
+                    className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-full bg-flotacard/80 text-error hover:bg-flotacard"
                   >
                     ✕
                   </button>
@@ -231,7 +232,7 @@ function DetalleIncidencia({
             <button
               type="button"
               onClick={() => inputRefIncidencia.current?.click()}
-              className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-error/50 bg-card text-2xl text-text-secondary hover:border-error"
+              className="flex aspect-square items-center justify-center rounded-xl border-2 border-dashed border-error/50 bg-flotacard/50 text-2xl text-flotafg-muted hover:border-error"
             >
               +
             </button>
@@ -255,26 +256,26 @@ function GaleriaTodasLasFotos({ fotos, onEliminarFoto }) {
       <div className="flex items-center gap-2">
         <IconoSeccion icono="🖼️" />
         <div className="flex-1">
-          <h2 className="text-lg font-bold text-text">Fotos cargadas</h2>
-          <p className="text-xs text-text-secondary">Toca la ✕ para eliminar una foto</p>
+          <h2 className="text-lg font-bold text-flotafg">Fotos cargadas</h2>
+          <p className="text-xs text-flotafg-muted">Toca la ✕ para eliminar una foto</p>
         </div>
-        <span className="font-mono text-sm font-bold text-text-secondary">{fotos.length}</span>
+        <span className="font-mono text-sm font-bold text-flotafg-muted">{fotos.length}</span>
       </div>
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+      <div className="glass-card grid grid-cols-3 gap-2 rounded-2xl p-2 sm:grid-cols-4">
         {fotos.map((foto, i) => {
           const idx = fotos.findIndex((f) => f === foto)
           return (
-            <div key={i} className="relative aspect-square overflow-hidden rounded-xl border border-border">
+            <div key={i} className="relative aspect-square overflow-hidden rounded-xl border border-flotafg-muted/20">
               <img src={foto.preview} alt={`Foto ${i + 1}`} className="h-full w-full object-cover" />
               <button
                 type="button"
                 onClick={() => onEliminarFoto(idx)}
-                className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-bg/80 text-xs text-error hover:bg-bg"
+                className="absolute right-1.5 top-1.5 flex h-6 w-6 items-center justify-center rounded-full bg-flotacard/80 text-xs text-error hover:bg-flotacard"
               >
                 ✕
               </button>
               {foto.item && (
-                <span className="absolute bottom-1.5 left-1.5 rounded bg-bg/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-highlight">
+                <span className="absolute bottom-1.5 left-1.5 rounded bg-flotacard/80 px-1.5 py-0.5 font-mono text-[10px] font-bold text-highlight">
                   {foto.item}
                 </span>
               )}
@@ -299,6 +300,9 @@ export default function Paso2Inspeccion({
   itemIncidencia,
   textoIncidencia,
   hayFotoIncidencia,
+  audios,
+  onAgregarAudio,
+  onEliminarAudio,
   guardando,
   onGuardar,
 }) {
@@ -322,25 +326,42 @@ export default function Paso2Inspeccion({
 
   // Slots del checklist (en orden). Si el usuario responde Sí en la incidencia,
   // agregamos una casilla para su foto también.
+  // Llegadas: 1 sola foto del tablero (km+gasolina) y NO se exige evidencia de neumáticos.
+  // Salidas: mantiene kilometraje y gasolina como slots separados (compatibilidad con
+  // fotos históricas) y exige evidencia de neumáticos.
   const slots = (() => {
     const list = []
     if (esTrailaVehiculo) {
       TRAILA_ITEMS.forEach((item) => list.push({ item: item.key, icon: item.icon, label: item.label }))
       return list
     }
-    if (kilometrajeAplica) {
+    if (esSalida) {
+      if (kilometrajeAplica) {
+        list.push({
+          item: 'kilometraje',
+          icon: '🔢',
+          label: offRoad ? 'Horas actuales (foto del tablero)' : 'Kilometraje actual (foto del tablero)',
+        })
+      }
+      list.push({ item: 'gasolina', icon: '⛽', label: 'Gasolina (foto del tablero)' })
+    } else {
+      // Llegada — una sola foto del tablero cubre kilometraje + gasolina.
       list.push({
-        item: 'kilometraje',
-        icon: KILOMETRAJE_ITEM.icon,
-        label: offRoad ? 'Horas actuales (foto del tablero)' : 'Kilometraje actual (foto del tablero)',
+        item: TABLERO_ITEM.key,
+        icon: TABLERO_ITEM.icon,
+        label: offRoad
+          ? 'Horas + gasolina (foto del tablero)'
+          : 'Kilometraje + gasolina (foto del tablero)',
       })
     }
-    list.push({ item: GASOLINA_ITEM.key, icon: GASOLINA_ITEM.icon, label: 'Gasolina (foto del tablero)' })
     ESTADO_FISICO_LADOS.forEach((lado) => {
       list.push({ item: lado.key, icon: '📷', label: `Costado ${lado.label.toLowerCase()}` })
     })
     list.push({ item: 'estado_fisico_interior', icon: '📷', label: 'Interior (opcional)' })
-    list.push({ item: 'presion_llantas', icon: '🛞', label: 'Llantas / neumáticos (foto si alguna está baja)' })
+    // Llantas / neumáticos — solo se piden al sacar el vehículo. Al llegar ya no se exige.
+    if (esSalida) {
+      list.push({ item: 'presion_llantas', icon: '🛞', label: 'Llantas / neumáticos (foto si alguna está baja)' })
+    }
     if (esSalida) {
       list.push({ item: 'nivel_aceite_motor', icon: '🛢️', label: 'Nivel de aceite motor' })
       list.push({ item: 'anticongelante', icon: '🧊', label: 'Anticongelante' })
@@ -379,10 +400,10 @@ export default function Paso2Inspeccion({
           <div className="flex items-center gap-2">
             <IconoSeccion icono="🔢" />
             <div>
-              <h2 className="text-lg font-bold text-text">
+              <h2 className="text-lg font-bold text-flotafg">
                 {offRoad ? 'Horas actuales' : 'Kilometraje actual'}
               </h2>
-              <p className="text-xs text-text-secondary">Referencia informativa — la fuente de la verdad es la foto</p>
+              <p className="text-xs text-flotafg-muted">Referencia informativa — la fuente de la verdad es la foto</p>
             </div>
           </div>
           <div className="flex items-stretch gap-2">
@@ -395,18 +416,18 @@ export default function Paso2Inspeccion({
               value={form.km_reporte}
               onChange={(e) => setForm((prev) => ({ ...prev, km_reporte: e.target.value }))}
               style={{ minHeight: '64px' }}
-              className="widget-glow-input w-full rounded-xl border-2 border-accent/40 bg-card px-4 text-3xl font-bold text-text outline-none"
+              className="glass-card w-full rounded-xl border-2 border-flotafg-muted/30 px-4 text-3xl font-bold text-flotafg outline-none transition focus:border-highlight focus:ring-2 focus:ring-highlight/30"
               placeholder="Opcional"
             />
             <span
               style={{ minHeight: '64px' }}
-              className="widget-glow-input flex w-20 shrink-0 items-center justify-center rounded-xl border-2 border-accent/40 bg-card text-base font-bold text-text-secondary"
+              className="glass-card flex w-20 shrink-0 items-center justify-center rounded-xl text-base font-bold text-flotafg-muted"
             >
               {offRoad ? 'hrs' : 'km'}
             </span>
           </div>
           {kilometrajeActual != null && (
-            <p className="text-xs text-text-secondary">
+            <p className="text-xs text-flotafg-muted">
               Último registrado: {kilometrajeActual.toLocaleString('es-MX')} {offRoad ? 'hrs' : 'km'}
             </p>
           )}
@@ -419,22 +440,22 @@ export default function Paso2Inspeccion({
           <div className="flex items-center gap-2">
             <IconoSeccion icono="🚚" />
             <div>
-              <h2 className="text-lg font-bold text-text">Carga de la traila</h2>
-              <p className="text-xs text-text-secondary">Elige cuál traila vas a jalar</p>
+              <h2 className="text-lg font-bold text-flotafg">Carga de la traila</h2>
+              <p className="text-xs text-flotafg-muted">Elige cuál traila vas a jalar</p>
             </div>
           </div>
           <select
             value={form.traila ?? ''}
             onChange={(e) => setForm((prev) => ({ ...prev, traila: e.target.value ? Number(e.target.value) : null }))}
             style={{ minHeight: '56px' }}
-            className="widget-glow-input w-full rounded-xl border-2 border-accent/40 bg-card px-3 text-sm text-text outline-none"
+            className="glass-card w-full rounded-xl px-3 text-sm text-flotafg outline-none transition focus:border-highlight focus:ring-2 focus:ring-highlight/30"
           >
             <option value="" disabled>Selecciona la traila</option>
             {trailas.map((t) => (
               <option key={t.id} value={t.id}>{t.equipo || t.nombre}</option>
             ))}
           </select>
-          <p className="text-xs text-text-secondary">
+          <p className="text-xs text-flotafg-muted">
             Solo se pueden jalar trailas de {MODELO_TRAILA_PERMITIDO}.
           </p>
         </div>
@@ -474,22 +495,50 @@ export default function Paso2Inspeccion({
         </>
       )}
 
-      {/* Observaciones libres */}
+      {/* Observaciones + audio estilo WhatsApp */}
       <div className="flex flex-col gap-3">
         <div className="flex items-center gap-2">
           <IconoSeccion icono="📝" />
           <div>
-            <h2 className="text-lg font-bold text-text">Observaciones</h2>
-            <p className="text-xs text-text-secondary">Opcional — cualquier nota adicional</p>
+            <h2 className="text-lg font-bold text-flotafg">Observaciones</h2>
+            <p className="text-xs text-flotafg-muted">Opcional — escríbelas o mándalas como audio</p>
           </div>
         </div>
+
+        {/* Instrucción clara: cómo mandar el audio */}
+        <div className="flex items-start gap-2 rounded-xl border-2 border-dashed border-error/40 bg-error/5 px-3 py-2 text-xs text-flotafg">
+          <span className="text-base leading-none">🎙️</span>
+          <p className="leading-snug">
+            <span className="font-bold">¿Quieres mandar un audio?</span>{' '}
+            Mantén presionado el botón rojo del micrófono
+            <span className="mx-1 font-bold text-error">🎙️</span>
+            abajo, habla y suelta para enviar. Si quieres cancelar, desliza el dedo hacia abajo antes de soltar.
+          </p>
+        </div>
+
         <textarea
           rows={2}
           value={form.observaciones}
           onChange={(e) => setForm((prev) => ({ ...prev, observaciones: e.target.value }))}
-          className="w-full rounded-xl border-2 border-accent/40 bg-card px-4 py-3 text-base text-text outline-none focus:border-highlight"
+          className="glass-card w-full rounded-xl border-2 border-flotafg-muted/30 px-4 py-3 text-base text-flotafg outline-none transition focus:border-highlight focus:ring-2 focus:ring-highlight/30"
           placeholder="Notas generales del checklist…"
         />
+
+        {/* Botón push-to-talk + lista de audios ya capturados */}
+        <div className="glass-card flex items-center gap-4 rounded-2xl px-4 py-3">
+          <GrabadorAudio
+            onAudioListo={(file, duracion) => onAgregarAudio?.(file, duracion)}
+            disabled={guardando}
+          />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-flotafg">Mandar audio</p>
+            <p className="text-xs text-flotafg-muted">
+              Estilo WhatsApp —{'>'} mantén presionado para grabar, suelta para enviar
+            </p>
+          </div>
+        </div>
+
+        <AudiosChecklist audios={audios} onEliminar={onEliminarAudio} />
       </div>
 
       {/* Galería con todas las fotos cargadas */}
@@ -501,7 +550,7 @@ export default function Paso2Inspeccion({
         onClick={onGuardar}
         disabled={guardando}
         style={{ minHeight: '64px' }}
-        className="mt-2 flex w-full items-center justify-center gap-2 rounded-2xl bg-accent text-base font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
+        className="flota-cta-primary mt-2 flex w-full items-center justify-center gap-2 rounded-2xl text-base"
       >
         {guardando ? (
           <>
@@ -519,7 +568,7 @@ export default function Paso2Inspeccion({
         </p>
       )}
       {huboIncidencia === null && (
-        <p className="rounded-xl border border-warning/40 bg-warning/10 px-4 py-3 text-center text-sm font-semibold text-warning">
+        <p className="rounded-xl border border-warning/40 bg-warning/15 px-4 py-3 text-center text-sm font-semibold text-warning">
           ⚠️ Responde si hubo o no una incidencia para poder guardar.
         </p>
       )}

@@ -6,7 +6,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AlertaFlota, AudioChecklist, ChecklistVehiculo, FotoChecklist, Vehiculo
 from .permissions import (
     PuedeCrearChecklist,
     PuedeEliminarVehiculo,
@@ -18,9 +18,11 @@ from .permissions import (
 from .serializers import (
     AdvertenciaChecklistSerializer,
     AlertaFlotaSerializer,
+    AudioChecklistSerializer,
     ChecklistVehiculoSerializer,
     FotoChecklistSerializer,
     ResolverAlertaSerializer,
+    SalidaRelacionadaSerializer,
     ValidarChecklistSerializer,
     VehiculoSerializer,
 )
@@ -55,10 +57,58 @@ class VehiculoHistorialView(APIView):
     def get(self, request, pk):
         vehiculo = get_object_or_404(Vehiculo, pk=pk)
         checklists = vehiculo.checklists.select_related('responsable', 'validado_por', 'traila').prefetch_related(
-            'fotos', 'advertencias__creada_por',
+            'fotos', 'audios', 'advertencias__creada_por',
         )
         serializer = ChecklistVehiculoSerializer(checklists, many=True, context={'request': request})
         return Response(serializer.data)
+
+
+class SalidasPendientesListView(generics.ListAPIView):
+    """GET /checklists/salidas-pendientes/?vehiculo=<id>&fecha=<YYYY-MM-DD>&dias_atras=<0|1>
+
+    Devuelve las **salidas** del vehículo indicado, **sin llegada vinculada**, en la
+    ventana de tiempo permitida:
+
+      - `dias_atras=0` (default): solo del día indicado.
+      - `dias_atras=1`: del día indicado + el día anterior (holgura para cerrar
+        salidas que quedaron abiertas de un día para otro, p.ej. turno nocturno).
+
+    La regla dura "no se puede cerrar una salida de hace 2+ días" se valida también
+    en el serializer al guardar la llegada.
+    """
+    serializer_class = SalidaRelacionadaSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        vehiculo = self.request.query_params.get('vehiculo')
+        fecha_str = self.request.query_params.get('fecha')
+        try:
+            dias_atras = max(0, min(1, int(self.request.query_params.get('dias_atras', 0))))
+        except (TypeError, ValueError):
+            dias_atras = 0
+
+        if fecha_str:
+            try:
+                fecha = timezone.datetime.strptime(fecha_str, '%Y-%m-%d').date()
+            except ValueError:
+                fecha = timezone.now().date()
+        else:
+            fecha = timezone.now().date()
+
+        fecha_desde = fecha - timezone.timedelta(days=dias_atras)
+
+        qs = ChecklistVehiculo.objects.select_related(
+            'vehiculo', 'responsable'
+        ).filter(
+            tipo_reporte=ChecklistVehiculo.TipoReporte.SALIDA,
+            fecha_hora__date__gte=fecha_desde,
+            fecha_hora__date__lte=fecha,
+            llegadas=None,
+        ).order_by('fecha_hora')
+
+        if vehiculo:
+            qs = qs.filter(vehiculo_id=vehiculo)
+        return qs
 
 
 class ChecklistListCreateView(generics.ListCreateAPIView):
@@ -72,7 +122,7 @@ class ChecklistListCreateView(generics.ListCreateAPIView):
     def get_queryset(self):
         qs = ChecklistVehiculo.objects.select_related(
             'vehiculo', 'responsable', 'validado_por', 'traila'
-        ).prefetch_related('fotos', 'advertencias__creada_por')
+        ).prefetch_related('fotos', 'audios', 'advertencias__creada_por')
         p = self.request.query_params
 
         vehiculo = p.get('vehiculo')
@@ -104,7 +154,7 @@ class ChecklistListCreateView(generics.ListCreateAPIView):
 class ChecklistDetailView(generics.RetrieveUpdateAPIView):
     queryset = ChecklistVehiculo.objects.select_related(
         'vehiculo', 'responsable', 'validado_por', 'traila'
-    ).prefetch_related('fotos', 'advertencias__creada_por')
+    ).prefetch_related('fotos', 'audios', 'advertencias__creada_por')
     http_method_names = ['get', 'patch', 'head', 'options']
 
     def get_serializer_class(self):
@@ -157,6 +207,37 @@ class FotoChecklistDeleteView(APIView):
     def delete(self, request, pk, foto_id):
         foto = get_object_or_404(FotoChecklist, pk=foto_id, checklist_id=pk)
         foto.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AudioChecklistListView(APIView):
+    """POST /checklists/{id}/audios/ — sube una nota de voz estilo WhatsApp.
+
+    Multipart/form-data con campos:
+      - audio: archivo (webm/ogg/mp3/m4a/wav/mp4) ≤ 5 MB
+      - duracion_segundos: int (opcional)
+      - descripcion: str (opcional)
+    """
+    permission_classes = [IsAuthenticated, PuedeCrearChecklist]
+
+    def post(self, request, pk):
+        checklist = get_object_or_404(ChecklistVehiculo, pk=pk)
+        serializer = AudioChecklistSerializer(
+            data=request.data,
+            context={'checklist': checklist, 'request': request},
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save(checklist=checklist, uploaded_by=request.user)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class AudioChecklistDeleteView(APIView):
+    permission_classes = [IsAuthenticated, PuedeValidarChecklist]
+
+    def delete(self, request, pk, audio_id):
+        audio = get_object_or_404(AudioChecklist, pk=audio_id, checklist_id=pk)
+        audio.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
@@ -246,7 +327,7 @@ class IncidenciaListView(APIView):
     def get(self, request):
         qs = ChecklistVehiculo.objects.select_related(
             'vehiculo', 'responsable', 'validado_por', 'traila'
-        ).prefetch_related('fotos', 'advertencias__creada_por').filter(
+        ).prefetch_related('fotos', 'audios', 'advertencias__creada_por').filter(
             Q(incidencia_previa__gt='') | Q(incidencia_nueva__gt='')
         )
 

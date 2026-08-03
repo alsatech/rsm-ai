@@ -11,6 +11,11 @@
   --color-error: #f87171;
   --color-warning: #fbbf24;
 
+  --color-flotabg: #eef3f0;
+  --color-flotacard: rgba(255, 255, 255, 0.85);
+  --color-flotafg: #1a2e2a;
+  --color-flotafg-muted: #5b7b6e;
+
   --font-sans: 'DM Sans', sans-serif;
   --font-mono: 'Space Mono', monospace;
 }
@@ -72,3 +77,40 @@ body {
     transform: scale(1);
   }
 }
+
+/* ── Flota — glassmorphic claro (scoped al módulo Flota) ────────────────── */
+.glass-card {
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08), 0 1px 0 rgba(255, 255, 255, 0.6) inset;
+}
+.glass-card-strong {
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(24px) saturate(200%);
+  -webkit-backdrop-filter: blur(24px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1), 0 1px 0 rgba(255, 255, 255, 0.7) inset;
+}
+.flota-cta-primary {
+  background: linear-gradient(135deg, #2d8a5c 0%, #1f6b3e 100%);
+  color: #ffffff;
+  font-weight: 700;
+  box-shadow: 0 4px 14px rgba(31, 107, 62, 0.35), 0 1px 0 rgba(255, 255, 255, 0.2) inset;
+  transition: transform 0.12s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.flota-cta-primary:hover { filter: brightness(1.08); box-shadow: 0 6px 20px rgba(31, 107, 62, 0.5); }
+.flota-cta-primary:active { transform: scale(0.98); }
+.flota-cta-primary:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+@keyframes flotaFadeInUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes flotaPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.4); opacity: 0.6; }
+}
+.flota-fade-in { animation: flotaFadeInUp 0.25s ease-out both; }
+.flota-pulse { animation: flotaPulse 2s ease-in-out infinite; }

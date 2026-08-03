@@ -67,7 +67,7 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
   const hayFiltrosActivos = Boolean(busqueda || responsableId || fechaDesde || fechaHasta)
 
   if (checklists.length === 0) {
-    return <p className="py-6 text-center text-sm text-text-secondary">Sin checklists registrados.</p>
+    return <p className="py-6 text-center text-sm text-flotafg-muted">Sin checklists registrados.</p>
   }
 
   return (
@@ -78,14 +78,14 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           placeholder="🔍 Buscar por responsable…"
-          className="w-full rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+          className="w-full rounded-lg border border-flotafg-muted/30 bg-flotabg/60 px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
         />
 
         <div className="grid grid-cols-2 gap-2">
           <select
             value={responsableId}
             onChange={(e) => setResponsableId(e.target.value)}
-            className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="rounded-lg border border-flotafg-muted/30 bg-flotabg/60 px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
           >
             <option value="">Todos los responsables</option>
             {responsables.map((r) => (
@@ -96,14 +96,14 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
             <button
               type="button"
               onClick={() => aplicarSemana(0)}
-              className="flex-1 rounded-lg border border-border px-2 py-2 text-xs font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              className="flex-1 rounded-lg border border-flotafg-muted/30 px-2 py-2 text-xs font-semibold text-flotafg-muted transition hover:border-highlight hover:text-flotafg active:scale-[0.98]"
             >
               Esta semana
             </button>
             <button
               type="button"
               onClick={() => aplicarSemana(-1)}
-              className="flex-1 rounded-lg border border-border px-2 py-2 text-xs font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              className="flex-1 rounded-lg border border-flotafg-muted/30 px-2 py-2 text-xs font-semibold text-flotafg-muted transition hover:border-highlight hover:text-flotafg active:scale-[0.98]"
             >
               Semana pasada
             </button>
@@ -115,13 +115,13 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
             type="date"
             value={fechaDesde}
             onChange={(e) => setFechaDesde(e.target.value)}
-            className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="rounded-lg border border-flotafg-muted/30 bg-flotabg/60 px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
           />
           <input
             type="date"
             value={fechaHasta}
             onChange={(e) => setFechaHasta(e.target.value)}
-            className="rounded-lg border border-border bg-bg px-3 py-2 text-sm text-text outline-none focus:border-highlight"
+            className="rounded-lg border border-flotafg-muted/30 bg-flotabg/60 px-3 py-2 text-sm text-flotafg outline-none focus:border-highlight"
           />
         </div>
 
@@ -129,7 +129,7 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
           <button
             type="button"
             onClick={limpiarFiltros}
-            className="self-start text-xs text-text-secondary underline hover:text-text"
+            className="self-start text-xs text-flotafg-muted underline hover:text-flotafg"
           >
             Limpiar filtros
           </button>
@@ -137,23 +137,30 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
       </div>
 
       {filtrados.length === 0 ? (
-        <p className="py-6 text-center text-sm text-text-secondary">Sin resultados para estos filtros.</p>
+        <p className="py-6 text-center text-sm text-flotafg-muted">Sin resultados para estos filtros.</p>
       ) : (
         <div className="flex flex-col gap-2">
-          {filtrados.map((c) => {
+          {filtrados.map((c, idx) => {
             const incompleto = c.items_verificados < c.total_items
+            const esSalida = c.tipo_reporte === 'salida'
+            // Una salida sin llegada es la que NO aparece como `salida_relacionada`
+            // de ninguna otra checklist del listado.
+            const salidaSinCerrar = esSalida && !checklists.some(
+              (otro) => otro.salida_relacionada_detalle?.id === c.id,
+            )
             return (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => onVerDetalle(c)}
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-bg px-4 py-3 text-left transition hover:border-accent"
+                style={{ animationDelay: `${idx * 30}ms` }}
+                className="flota-fade-in flex w-full items-center justify-between gap-3 rounded-xl border border-flotafg-muted/20 bg-flotabg/50 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-highlight hover:shadow-md active:scale-[0.99]"
               >
-                <div>
-                  <p className="text-sm font-semibold text-text">
-                    {c.tipo_reporte === 'salida' ? '🚗 Salida' : '🏁 Llegada'} — {c.responsable_detalle?.nombre}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-flotafg">
+                    {esSalida ? '🚗 Salida' : '🏁 Llegada'} — {c.responsable_detalle?.nombre}
                   </p>
-                  <p className="text-xs text-text-secondary">
+                  <p className="text-xs text-flotafg-muted">
                     {formatFechaHora(c.fecha_hora)}
                     {c.km_reporte != null && (
                       <> · {Number(c.km_reporte).toLocaleString('es-MX')} km</>
@@ -165,6 +172,18 @@ export default function HistorialChecklists({ checklists, onVerDetalle }) {
                       <span className="ml-1 font-semibold text-warning">· ⚠️ {c.advertencias.length}</span>
                     )}
                   </p>
+                  <div className="mt-1 flex flex-wrap gap-1">
+                    {!esSalida && c.salida_relacionada_detalle?.id && (
+                      <span className="rounded-full border border-highlight/40 bg-highlight/15 px-2 py-0.5 text-[10px] font-bold text-highlight">
+                        ↩ Cierra salida #{c.salida_relacionada_detalle.id}
+                      </span>
+                    )}
+                    {salidaSinCerrar && (
+                      <span className="rounded-full border border-warning/40 bg-warning/15 px-2 py-0.5 text-[10px] font-bold text-warning">
+                        ⏳ Sin llegada
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <span className={`shrink-0 text-xs font-bold ${c.validado ? 'text-highlight' : 'text-warning'}`}>
                   {c.validado ? '✅ Validado' : '⏳ Pendiente'}

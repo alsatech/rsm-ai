@@ -31,15 +31,15 @@ export const TIPO_LABELS = {
 }
 
 export const ESTADO_VEHICULO_CONFIG = {
-  activo: { label: 'Activo', border: 'border-highlight', text: 'text-highlight', bg: 'bg-highlight/10' },
-  en_taller: { label: 'En taller', border: 'border-warning', text: 'text-warning', bg: 'bg-warning/10' },
-  de_baja: { label: 'De baja', border: 'border-error', text: 'text-error', bg: 'bg-error/10' },
+  activo: { label: 'Activo', border: 'border-highlight/40', text: 'text-highlight', bg: 'bg-highlight/15' },
+  en_taller: { label: 'En taller', border: 'border-warning/40', text: 'text-warning', bg: 'bg-warning/15' },
+  de_baja: { label: 'De baja', border: 'border-error/40', text: 'text-error', bg: 'bg-error/15' },
 }
 
 export const URGENCIA_CONFIG = {
-  critico: { icon: '🔴', label: 'Crítico', border: 'border-error', text: 'text-error', bg: 'bg-error/10' },
-  proximo: { icon: '🟡', label: 'Próximo', border: 'border-warning', text: 'text-warning', bg: 'bg-warning/10' },
-  preventivo: { icon: '🟢', label: 'Preventivo', border: 'border-highlight', text: 'text-highlight', bg: 'bg-highlight/10' },
+  critico: { icon: '🔴', label: 'Crítico', border: 'border-error/40', text: 'text-error', bg: 'bg-error/15' },
+  proximo: { icon: '🟡', label: 'Próximo', border: 'border-warning/40', text: 'text-warning', bg: 'bg-warning/15' },
+  preventivo: { icon: '🟢', label: 'Preventivo', border: 'border-highlight/40', text: 'text-highlight', bg: 'bg-highlight/15' },
 }
 
 export const ALERTA_TIPO_LABELS = {
@@ -49,19 +49,6 @@ export const ALERTA_TIPO_LABELS = {
   vencimiento_placas: 'Vencimiento de placas',
   mantenimiento_general: 'Mantenimiento general',
 }
-
-// Placeholder hasta que exista el Módulo 12 — Proyectos (Erik). No se liga a nada todavía.
-export const PROYECTOS_PLACEHOLDER = [
-  { id: 'cercas', nombre: 'Mantenimiento de cercas' },
-  { id: 'caminos', nombre: 'Rehabilitación de caminos' },
-  { id: 'hidraulico', nombre: 'Sistema hidráulico' },
-  { id: 'bebederos', nombre: 'Construcción de bebederos' },
-  { id: 'rcazuela_38', nombre: 'Rcazuela 38' },
-  { id: 'rcazuela_35', nombre: 'Rcazuela 35' },
-  { id: 'rcazuela_39', nombre: 'Rcazuela 39' },
-  { id: 'rcazuela_41', nombre: 'Rcazuela 41' },
-  { id: 'general', nombre: 'General / Sin proyecto asignado' },
-]
 
 // CAN-AM, Polaris y cuatrimotos: llevan traila al campo, no reportan aceite de
 // transmisión y sopletean el filtro de aire (CAN-AM/Polaris además registran horas).
@@ -114,10 +101,30 @@ export const CHECKLIST_ITEMS = [
 ]
 
 // Kilometraje/horas — se sube como foto del tablero, el número es informativo.
+// Solo se usa en SALIDAS (en llegadas se unifica con gasolina en TABLERO_ITEM).
 export const KILOMETRAJE_ITEM = { key: 'kilometraje', icon: '🔢', label: 'Kilometraje' }
 
 // Gasolina — la aguja del tablero se captura en una foto, no se elige con un botón.
+// Solo se usa en SALIDAS (en llegadas se unifica con kilometraje en TABLERO_ITEM).
 export const GASOLINA_ITEM = { key: 'gasolina', icon: '⛽', label: 'Gasolina' }
+
+// Foto única del tablero — obligatoria en LLEGADAS. Cubre kilometraje/horas + gasolina.
+export const TABLERO_ITEM = { key: 'tablero', icon: '⛽', label: 'Tablero (km + gasolina)' }
+
+// Placeholder hasta que exista el Módulo 12 — Proyectos (Erik). Texto libre que
+// se persiste en `ChecklistVehiculo.proyecto`. La llegada toma el proyecto por
+// transitividad de la salida vinculada, así que no se pide en el flujo de llegada.
+export const PROYECTOS_PLACEHOLDER = [
+  { id: 'cercas', nombre: 'Mantenimiento de cercas' },
+  { id: 'caminos', nombre: 'Rehabilitación de caminos' },
+  { id: 'hidraulico', nombre: 'Sistema hidráulico' },
+  { id: 'bebederos', nombre: 'Construcción de bebederos' },
+  { id: 'rcazuela_38', nombre: 'Rcazuela 38' },
+  { id: 'rcazuela_35', nombre: 'Rcazuela 35' },
+  { id: 'rcazuela_39', nombre: 'Rcazuela 39' },
+  { id: 'rcazuela_41', nombre: 'Rcazuela 41' },
+  { id: 'general', nombre: 'General / Sin proyecto asignado' },
+]
 
 // Estado físico — no es un simple check, requiere foto de los 4 costados (+ interior opcional).
 export const ESTADO_FISICO_ITEM = { key: 'estado_fisico', icon: '📷', label: 'Estado físico del vehículo' }
@@ -178,13 +185,19 @@ export function resumenChecklist({ form, fotos, tipoVehiculo, kilometrajeActual 
 
   const estadoFisicoCompleto = ESTADO_FISICO_LADOS.every((lado) => fotos.some((f) => f.item === lado.key))
   const interiorCompleto = fotos.some((f) => f.item === ESTADO_FISICO_INTERIOR.key)  // interior — opcional
+  const esSalidaReporte = tipoReporte === 'salida'
+
+  // Tablero / km / gasolina: en salida el usuario sube 2 fotos (km + gasolina);
+  // en llegada, una sola foto del tablero cubre ambos.
+  const tableroCompleto = fotos.some((f) => f.item === TABLERO_ITEM.key)
   const kilometrajeAplica = !sinKilometraje(tipoVehiculo)
-  const kilometrajeCompleto = kilometrajeAplica && fotos.some((f) => f.item === 'kilometraje')
-  const gasolinaCompleto = fotos.some((f) => f.item === 'gasolina')
+  const kilometrajeCompleto = esSalidaReporte && kilometrajeAplica && fotos.some((f) => f.item === 'kilometraje')
+  const gasolinaCompleto = esSalidaReporte && fotos.some((f) => f.item === 'gasolina')
+
   const cargaTrailaAplica = esOffRoad(tipoVehiculo)
   const cargaTrailaCompleto = Boolean(form.traila) && fotos.some((f) => f.item === 'carga_traila')
-  // Llantas: si subió al menos una foto, se considera revisado.
-  const llantasCompleto = fotos.some((f) => f.item === 'presion_llantas')
+  // Llantas: solo se exige en salidas. En llegadas no bloquea.
+  const llantasCompleto = esSalidaReporte && fotos.some((f) => f.item === 'presion_llantas')
 
   // Incidencias: si escribió texto sin foto, queda bloqueado. Si no escribió nada, no bloquea.
   const itemIncidencia = tipoReporte === 'salida' ? 'incidencia_previa' : 'incidencia_nueva'
@@ -193,23 +206,28 @@ export function resumenChecklist({ form, fotos, tipoVehiculo, kilometrajeActual 
   const incidenciaBloqueada = Boolean(incidenciaTexto) && !incidenciaFoto
   const incidenciaCompleta = !incidenciaBloqueada && (incidenciaFoto || !incidenciaTexto)
 
+  // Total de obligatorios depende del tipo de reporte:
+  //  - salida: items + estado_fisico + (km) + gasolina + llantas + (traila) + incidencia = 5 base
+  //  - llegada: items + estado_fisico + tablero + (traila) + incidencia = 4 base
+  // Interior y bonificaciones se cuentan aparte, como antes.
+  const baseObligatorios = esSalidaReporte
+    ? 3 + (kilometrajeAplica ? 1 : 0) + 1 + 1 // estado_fisico, gasolina, llantas, [km]
+    : 2 + 1 // estado_fisico, tablero
+
   const verificados =
     items.filter((item) => form[item.key]).length +
     (estadoFisicoCompleto ? 1 : 0) +
     (interiorCompleto ? 1 : 0) +
-    (kilometrajeAplica && kilometrajeCompleto ? 1 : 0) +
-    (gasolinaCompleto ? 1 : 0) +
-    (llantasCompleto ? 1 : 0) +
+    (esSalidaReporte
+      ? (kilometrajeAplica && kilometrajeCompleto ? 1 : 0)
+        + (gasolinaCompleto ? 1 : 0)
+        + (llantasCompleto ? 1 : 0)
+      : (tableroCompleto ? 1 : 0)) +
     (cargaTrailaAplica && cargaTrailaCompleto ? 1 : 0) +
     (incidenciaCompleta ? 1 : 0)
 
-  // Total de obligatorios: items + estado_fisico + gasolina + (km) + (traila) + incidencia.
-  // Llantas se cuenta aparte: solo aparece si subió foto, pero el slot siempre está en la lista.
-  const total = items.length + 3 + (kilometrajeAplica ? 1 : 0) + (cargaTrailaAplica ? 1 : 0)
+  const total = items.length + baseObligatorios + (cargaTrailaAplica ? 1 : 0)
 
-  // verificados puede incluir +1 del interior (opcional). El total no incluye al interior,
-  // así que "completo" se cumple cuando llegamos al total obligatorio, y el bonus del interior
-  // puede hacer que verificados > total sin que sea un problema.
   const completo = !incidenciaBloqueada && verificados >= total
   return { verificados, total, completo, incidenciaBloqueada }
 }
@@ -226,24 +244,36 @@ export function fotoSlotsAplicables({ form, tipoVehiculo }) {
 
   const slots = []
 
-  if (!sinKilometraje(tipoVehiculo)) {
+  if (tipoReporte === 'salida') {
+    if (!sinKilometraje(tipoVehiculo)) {
+      slots.push({
+        item: 'kilometraje',
+        icon: KILOMETRAJE_ITEM.icon,
+        label: esOffRoad(tipoVehiculo) ? 'Horas actuales (foto del tablero)' : 'Kilometraje actual (foto del tablero)',
+      })
+    }
+    // Gasolina — se sube como foto del tablero (solo en salidas; en llegadas va con km en `tablero`).
+    slots.push({ item: 'gasolina', icon: GASOLINA_ITEM.icon, label: 'Gasolina (foto del tablero)' })
+  } else {
+    // Llegada — una sola foto del tablero cubre kilometraje + gasolina.
     slots.push({
-      item: 'kilometraje',
-      icon: KILOMETRAJE_ITEM.icon,
-      label: esOffRoad(tipoVehiculo) ? 'Horas actuales (foto del tablero)' : 'Kilometraje actual (foto del tablero)',
+      item: TABLERO_ITEM.key,
+      icon: TABLERO_ITEM.icon,
+      label: esOffRoad(tipoVehiculo)
+        ? 'Horas + gasolina (foto del tablero)'
+        : 'Kilometraje + gasolina (foto del tablero)',
     })
   }
-
-  // Gasolina — se sube como foto del tablero.
-  slots.push({ item: 'gasolina', icon: GASOLINA_ITEM.icon, label: 'Gasolina (foto del tablero)' })
 
   ESTADO_FISICO_LADOS.forEach((lado) => {
     slots.push({ item: lado.key, icon: '📷', label: `Costado ${lado.label.toLowerCase()}` })
   })
   slots.push({ item: ESTADO_FISICO_INTERIOR.key, icon: '📷', label: 'Interior (opcional)' })
 
-  // Llantas / neumáticos — la foto se sube si alguna está baja o ponchada. El slot siempre se muestra.
-  slots.push({ item: PRESION_LLANTAS_ITEM.item, icon: PRESION_LLANTAS_ITEM.icon, label: 'Llantas / neumáticos (foto si alguna está baja)' })
+  // Llantas / neumáticos — solo se piden al sacar el vehículo; en llegadas ya no se exige.
+  if (tipoReporte === 'salida') {
+    slots.push({ item: PRESION_LLANTAS_ITEM.item, icon: PRESION_LLANTAS_ITEM.icon, label: 'Llantas / neumáticos (foto si alguna está baja)' })
+  }
 
   itemsAplicables({ tipoReporte, tipoVehiculo }).forEach((item) => {
     slots.push({ item: item.key, icon: item.icon, label: item.label })
