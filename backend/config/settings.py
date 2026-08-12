@@ -147,6 +147,14 @@ CORS_ALLOWED_ORIGINS = env.list(
 REDIS_URL = env('REDIS_URL', default='redis://localhost:6379/0')
 
 
+# SPOT Trace — rastreo satelital del dispositivo RSM2026 (Módulo 4 — Ganado)
+SPOT_FEED_ID = env('SPOT_FEED_ID', default='')
+SPOT_API_BASE = env(
+    'SPOT_API_BASE',
+    default='https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed',
+)
+
+
 # Celery — alertas y notificaciones (ver apps/*/tasks.py)
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
@@ -171,5 +179,13 @@ CELERY_BEAT_SCHEDULE = {
     'revisar-stock-minimo': {
         'task': 'apps.inventario.tasks.revisar_stock_minimo',
         'schedule': crontab(hour=17, minute=0),
+    },
+    'consultar-spot': {
+        'task': 'apps.ganado.tasks.consultar_spot',
+        'schedule': crontab(minute='*/5'),
+    },
+    'verificar-spot-sin-senal': {
+        'task': 'apps.ganado.tasks.verificar_sin_senal',
+        'schedule': crontab(minute=0),
     },
 }

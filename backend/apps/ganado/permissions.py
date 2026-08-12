@@ -60,7 +60,7 @@ class PuedeVerClasificacion(BasePermission):
         )
 
 
-class PuedeGestionarPlan(BasePermission):
+class PuedeVerSpot(BasePermission):
     def has_permission(self, request, view):
         return bool(
             request.user

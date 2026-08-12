@@ -1,13 +1,17 @@
 import io
+from datetime import timedelta
+from unittest.mock import Mock, patch
 
 from django.test import TestCase
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.models import User
 
-from .models import Corraleta, FotoRecorrido, ParadaRecorrido, RecorridoGanado
+from .models import AlertaSpot, AsignacionSpot, Corraleta, FotoRecorrido, ParadaRecorrido, PosicionSpot, RecorridoGanado
+from .tasks import consultar_spot, verificar_sin_senal
 
 TOTAL_CORRALETAS = 27
 
@@ -381,139 +385,6 @@ class HeatmapPastoreoAPITest(APITestCase):
         self.assertEqual(bucket_nuevo['weight'], 1)
 
 
-class PlanRecorridoAPITest(APITestCase):
-    def setUp(self):
-        self.admin = crear_usuario('plan_admin', 'administrador')
-        self.campo = crear_usuario('plan_campo', 'campo')
-        self.c1 = crear_corraleta('Plan-C1')
-        self.c2 = crear_corraleta('Plan-C2', lat=29.6)
-
-    def _auth(self, user):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
-
-    def _crear_plan(self, fecha='2026-07-01'):
-        self._auth(self.admin)
-        return self.client.post(
-            '/api/v1/ganado/recorridos/crear-plan/',
-            {
-                'fecha': fecha,
-                'narrativa_plan': 'Pasar por el sector norte primero.',
-                'paradas': [
-                    {'corraleta_id': self.c1.id, 'orden': 1},
-                    {'corraleta_id': self.c2.id, 'orden': 2},
-                ],
-            },
-            format='json',
-        )
-
-    def test_solo_administrador_crea_plan(self):
-        self._auth(self.campo)
-        resp = self.client.post(
-            '/api/v1/ganado/recorridos/crear-plan/',
-            {'fecha': '2026-07-01', 'paradas': [{'corraleta_id': self.c1.id, 'orden': 1}]},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_solo_un_plan_por_fecha(self):
-        resp1 = self._crear_plan('2026-07-01')
-        self.assertEqual(resp1.status_code, status.HTTP_201_CREATED)
-
-        resp2 = self._crear_plan('2026-07-01')
-        self.assertEqual(resp2.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertEqual(
-            RecorridoGanado.objects.filter(fecha='2026-07-01', tipo='planeado').count(), 1,
-        )
-
-    def test_plan_del_dia_visible_para_cualquier_rol_autenticado(self):
-        self._crear_plan('2026-07-02')
-        self._auth(self.campo)
-        resp = self.client.get('/api/v1/ganado/recorridos/plan-del-dia/', {'fecha': '2026-07-02'})
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(resp.data['paradas']), 2)
-        self.assertIsNone(resp.data['recorrido_vinculado_id'])
-
-    def test_plan_del_dia_404_si_no_existe(self):
-        self._auth(self.campo)
-        resp = self.client.get('/api/v1/ganado/recorridos/plan-del-dia/', {'fecha': '2026-07-03'})
-        self.assertEqual(resp.status_code, status.HTTP_404_NOT_FOUND)
-
-    def test_vinculacion_automatica_plan_recorrido(self):
-        resp_plan = self._crear_plan('2026-07-04')
-        plan_id = resp_plan.data['id']
-
-        self._auth(self.campo)
-        data = {
-            'fecha': '2026-07-04',
-            'estado_hato': 'bien',
-            'color': 'verde',
-            'narrativa': 'Salieron temprano, todo tranquilo.',
-            'paradas': [
-                {'corraleta': self.c1.id, 'orden': 1},
-                {'corraleta': self.c2.id, 'orden': 2},
-            ],
-        }
-        resp = self.client.post('/api/v1/ganado/recorridos/', data, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-
-        recorrido = RecorridoGanado.objects.get(pk=resp.data['id'])
-        self.assertEqual(recorrido.plan_referencia_id, plan_id)
-
-    def test_recorrido_sin_plan_no_se_vincula(self):
-        self._auth(self.campo)
-        data = {
-            'fecha': '2026-07-05',
-            'estado_hato': 'bien',
-            'color': 'verde',
-            'narrativa': 'Sin plan para hoy.',
-            'paradas': [
-                {'corraleta': self.c1.id, 'orden': 1},
-                {'corraleta': self.c2.id, 'orden': 2},
-            ],
-        }
-        resp = self.client.post('/api/v1/ganado/recorridos/', data, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-        recorrido = RecorridoGanado.objects.get(pk=resp.data['id'])
-        self.assertIsNone(recorrido.plan_referencia_id)
-
-    def test_plan_no_editable_si_tiene_recorrido_vinculado(self):
-        resp_plan = self._crear_plan('2026-07-06')
-        plan_id = resp_plan.data['id']
-
-        self._auth(self.campo)
-        data = {
-            'fecha': '2026-07-06',
-            'estado_hato': 'bien',
-            'color': 'verde',
-            'narrativa': 'Recorrido real del día.',
-            'paradas': [
-                {'corraleta': self.c1.id, 'orden': 1},
-                {'corraleta': self.c2.id, 'orden': 2},
-            ],
-        }
-        self.client.post('/api/v1/ganado/recorridos/', data, format='json')
-
-        self._auth(self.admin)
-        resp = self.client.patch(
-            f'/api/v1/ganado/recorridos/{plan_id}/editar-plan/',
-            {'narrativa_plan': 'Cambio de instrucciones', 'paradas': [{'corraleta_id': self.c1.id, 'orden': 1}]},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_plan_editable_si_no_tiene_recorrido_vinculado(self):
-        resp_plan = self._crear_plan('2026-07-07')
-        plan_id = resp_plan.data['id']
-
-        self._auth(self.admin)
-        resp = self.client.patch(
-            f'/api/v1/ganado/recorridos/{plan_id}/editar-plan/',
-            {'narrativa_plan': 'Cambio de instrucciones', 'paradas': [{'corraleta_id': self.c1.id, 'orden': 1}]},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(resp.data['paradas']), 1)
-        self.assertEqual(resp.data['narrativa'], 'Cambio de instrucciones')
 
 
 class ClasificacionCorraletasAPITest(APITestCase):
@@ -581,3 +452,84 @@ class ClasificacionCorraletasAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         por_nombre = {c['nombre']: c for c in resp.data}
         self.assertEqual(por_nombre['Clasif-Alta']['visitas'], 0)
+
+
+def _mock_feed_response(messages):
+    mock_resp = Mock()
+    mock_resp.json.return_value = {
+        'response': {
+            'feedMessageResponse': {
+                'messages': {'message': messages},
+            },
+        },
+    }
+    return mock_resp
+
+
+class SpotAPITest(APITestCase):
+    def setUp(self):
+        self.admin = crear_usuario('spot_admin', 'administrador')
+        self.campo = crear_usuario('spot_campo', 'campo')
+        self.asignacion = AsignacionSpot.objects.create(asignado_por=self.admin)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    @patch('apps.ganado.tasks.requests.get')
+    def test_posicion_duplicada_no_se_guarda(self, mock_get):
+        mensaje = {
+            'id': 111, 'latitude': 29.51, 'longitude': -101.55,
+            'altitude': 500, 'dateTime': '2026-08-11T10:00:00+0000',
+            'messageType': 'TRACK', 'batteryState': 'GOOD',
+        }
+        mock_get.return_value = _mock_feed_response([mensaje])
+
+        consultar_spot()
+        consultar_spot()
+
+        self.assertEqual(PosicionSpot.objects.filter(spot_message_id=111).count(), 1)
+
+    @patch('apps.ganado.tasks.requests.get')
+    def test_alerta_fuera_perimetro_se_genera(self, mock_get):
+        mensaje = {
+            'id': 222, 'latitude': 29.40, 'longitude': -101.40,
+            'altitude': 500, 'dateTime': '2026-08-11T10:05:00+0000',
+            'messageType': 'TRACK', 'batteryState': 'GOOD',
+        }
+        mock_get.return_value = _mock_feed_response([mensaje])
+
+        consultar_spot()
+
+        posicion = PosicionSpot.objects.get(spot_message_id=222)
+        self.assertFalse(posicion.dentro_perimetro)
+        self.assertTrue(
+            AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.FUERA_PERIMETRO, posicion=posicion).exists()
+        )
+
+    def test_alerta_sin_senal_no_duplicada(self):
+        PosicionSpot.objects.create(
+            asignacion=self.asignacion,
+            spot_message_id=333,
+            lat=29.51,
+            lng=-101.55,
+            fecha_hora_spot=timezone.now() - timedelta(hours=3),
+            message_type='TRACK',
+            bateria='GOOD',
+            dentro_perimetro=True,
+        )
+
+        verificar_sin_senal()
+        verificar_sin_senal()
+
+        self.assertEqual(
+            AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False).count(), 1,
+        )
+
+    def test_solo_admin_ve_spot(self):
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/ganado/spot/estado/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/spot/estado/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)

@@ -8,26 +8,35 @@ from rest_framework.views import APIView
 
 from apps.users.models import User
 
-from .models import Corraleta, FotoRecorrido, ParadaRecorrido, RecorridoGanado
+from .models import (
+    AlertaSpot,
+    AsignacionSpot,
+    Corraleta,
+    FotoRecorrido,
+    ParadaRecorrido,
+    PosicionSpot,
+    RecorridoGanado,
+)
 from .permissions import (
     PuedeCrearRecorrido,
     PuedeEliminarRecorrido,
     PuedeGestionarCorraletas,
-    PuedeGestionarPlan,
     PuedeVerClasificacion,
     PuedeVerHeatmap,
     PuedeVerRecorridos,
+    PuedeVerSpot,
 )
 from .serializers import (
     AgregarParadaSerializer,
+    AlertaSpotSerializer,
+    AsignacionSpotResumenSerializer,
     CorraletaSerializer,
-    CrearPlanSerializer,
-    EditarPlanSerializer,
+    CrearAsignacionSpotSerializer,
     FinalizarRecorridoSerializer,
     FotoRecorridoSerializer,
     IniciarRecorridoSerializer,
     ParadaRecorridoSerializer,
-    PlanRecorridoSerializer,
+    PosicionSpotSerializer,
     RecorridoGanadoCreateSerializer,
     RecorridoGanadoSerializer,
     SyncParadasSerializer,
@@ -43,19 +52,6 @@ def _qs_recorrido_base(user):
     if user.rol == User.Rol.CAMPO:
         qs = qs.filter(Q(responsable=user) | Q(asistentes=user)).distinct()
     return qs
-
-
-def _vincular_plan_si_existe(recorrido):
-    """Si existe un plan (tipo=planeado) para la misma fecha, vincula el recorrido real a ese plan."""
-    if recorrido.plan_referencia_id:
-        return None
-    plan = RecorridoGanado.objects.filter(
-        fecha=recorrido.fecha, tipo=RecorridoGanado.Tipo.PLANEADO,
-    ).first()
-    if plan:
-        recorrido.plan_referencia = plan
-        recorrido.save(update_fields=['plan_referencia'])
-    return plan
 
 
 def _percentil(valores_ordenados, pct):
@@ -133,8 +129,7 @@ class RecorridoGanadoListCreateView(generics.ListCreateAPIView):
         }
         if 'responsable' not in serializer.validated_data:
             extra['responsable'] = self.request.user
-        recorrido = serializer.save(**extra)
-        _vincular_plan_si_existe(recorrido)
+        serializer.save(**extra)
 
 
 class IniciarRecorridoView(generics.CreateAPIView):
@@ -336,7 +331,6 @@ class FinalizarRecorridoView(APIView):
 
         serializer.save(estado=RecorridoGanado.Estado.FINALIZADO, hora_fin=timezone.now())
         recorrido.refresh_from_db()
-        _vincular_plan_si_existe(recorrido)
         return Response(RecorridoGanadoSerializer(recorrido).data)
 
 
@@ -365,84 +359,6 @@ class FotoRecorridoDeleteView(APIView):
         foto = get_object_or_404(FotoRecorrido, pk=foto_id, recorrido_id=pk)
         foto.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class CrearPlanView(APIView):
-    """Alberto arma el plan del día antes de que salgan los vaqueros (junta 7:15 AM)."""
-    permission_classes = [IsAuthenticated, PuedeGestionarPlan]
-
-    def post(self, request):
-        serializer = CrearPlanSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        fecha = serializer.validated_data['fecha']
-        if RecorridoGanado.objects.filter(fecha=fecha, tipo=RecorridoGanado.Tipo.PLANEADO).exists():
-            return Response(
-                {'detail': 'Ya existe un plan para esta fecha.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        plan = RecorridoGanado.objects.create(
-            fecha=fecha,
-            responsable=request.user,
-            created_by=request.user,
-            tipo=RecorridoGanado.Tipo.PLANEADO,
-            estado=RecorridoGanado.Estado.FINALIZADO,
-            narrativa=serializer.validated_data.get('narrativa_plan', ''),
-        )
-        for item in serializer.validated_data['paradas']:
-            ParadaRecorrido.objects.create(
-                recorrido=plan, corraleta=item['corraleta'], orden=item['orden'],
-            )
-        return Response(PlanRecorridoSerializer(plan).data, status=status.HTTP_201_CREATED)
-
-
-class EditarPlanView(APIView):
-    """Solo editable mientras no exista un recorrido real vinculado."""
-    permission_classes = [IsAuthenticated, PuedeGestionarPlan]
-
-    def patch(self, request, pk):
-        plan = get_object_or_404(RecorridoGanado, pk=pk, tipo=RecorridoGanado.Tipo.PLANEADO)
-        if plan.recorridos_reales.exists():
-            return Response(
-                {'detail': 'No se puede editar: ya existe un recorrido real vinculado a este plan.'},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        serializer = EditarPlanSerializer(data=request.data)
-        if not serializer.is_valid():
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-        plan.narrativa = serializer.validated_data.get('narrativa_plan', '')
-        plan.save(update_fields=['narrativa'])
-        plan.paradas.all().delete()
-        for item in serializer.validated_data['paradas']:
-            ParadaRecorrido.objects.create(
-                recorrido=plan, corraleta=item['corraleta'], orden=item['orden'],
-            )
-        plan.refresh_from_db()
-        return Response(PlanRecorridoSerializer(plan).data)
-
-
-class PlanDelDiaView(APIView):
-    """Cualquier rol autenticado puede consultar el plan del día — los vaqueros lo ven antes de salir."""
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        fecha = request.query_params.get('fecha')
-        if not fecha:
-            return Response(
-                {'detail': 'El parámetro fecha es requerido.'}, status=status.HTTP_400_BAD_REQUEST,
-            )
-        plan = RecorridoGanado.objects.filter(
-            fecha=fecha, tipo=RecorridoGanado.Tipo.PLANEADO,
-        ).prefetch_related('paradas__corraleta').first()
-        if not plan:
-            return Response(
-                {'detail': 'No hay plan para esta fecha.'}, status=status.HTTP_404_NOT_FOUND,
-            )
-        return Response(PlanRecorridoSerializer(plan).data)
 
 
 class ClasificacionCorraletasView(APIView):
@@ -495,3 +411,101 @@ class ClasificacionCorraletasView(APIView):
 
         data.sort(key=lambda item: -item['visitas'])
         return Response(data)
+
+
+class SpotEstadoView(APIView):
+    """Estado actual del dispositivo SPOT: última posición, batería, señal y asignación activa."""
+    permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def get(self, request):
+        asignacion = AsignacionSpot.objects.filter(activa=True).select_related(
+            'recorrido', 'asignado_por'
+        ).first()
+
+        if not asignacion:
+            return Response({
+                'asignacion_activa': None,
+                'ultima_posicion': None,
+                'minutos_desde_ultima_senal': None,
+                'total_posiciones_hoy': 0,
+            })
+
+        ultima = asignacion.posiciones.order_by('-fecha_hora_spot').first()
+        hoy = timezone.now().date()
+        total_hoy = asignacion.posiciones.filter(fecha_hora_spot__date=hoy).count()
+
+        minutos_desde_ultima_senal = None
+        if ultima:
+            delta = timezone.now() - ultima.fecha_hora_spot
+            minutos_desde_ultima_senal = round(delta.total_seconds() / 60)
+
+        return Response({
+            'asignacion_activa': AsignacionSpotResumenSerializer(asignacion).data,
+            'ultima_posicion': PosicionSpotSerializer(ultima).data if ultima else None,
+            'minutos_desde_ultima_senal': minutos_desde_ultima_senal,
+            'total_posiciones_hoy': total_hoy,
+        })
+
+
+class SpotPosicionesListView(generics.ListAPIView):
+    """Posiciones SPOT del día actual (o de la fecha indicada en ?fecha=YYYY-MM-DD), en orden cronológico."""
+    serializer_class = PosicionSpotSerializer
+    permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def get_queryset(self):
+        fecha = self.request.query_params.get('fecha') or timezone.now().date()
+        return PosicionSpot.objects.filter(fecha_hora_spot__date=fecha).order_by('fecha_hora_spot')
+
+
+class SpotAlertasListView(generics.ListAPIView):
+    """Alertas SPOT activas (no resueltas), más recientes primero."""
+    serializer_class = AlertaSpotSerializer
+    permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def get_queryset(self):
+        return AlertaSpot.objects.filter(resuelta=False).select_related('posicion').order_by('-created_at')
+
+
+class SpotAlertaResolverView(APIView):
+    permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def patch(self, request, pk):
+        alerta = get_object_or_404(AlertaSpot, pk=pk)
+        if alerta.resuelta:
+            return Response(
+                {'detail': 'Esta alerta ya fue resuelta.'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        alerta.resuelta = True
+        alerta.resuelta_por = request.user
+        alerta.resuelta_en = timezone.now()
+        alerta.save(update_fields=['resuelta', 'resuelta_por', 'resuelta_en'])
+        return Response(AlertaSpotSerializer(alerta).data)
+
+
+class SpotAsignacionCreateView(generics.CreateAPIView):
+    """Crea una nueva asignación activa, cerrando automáticamente cualquier asignación previa."""
+    serializer_class = CrearAsignacionSpotSerializer
+    permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def perform_create(self, serializer):
+        AsignacionSpot.objects.filter(activa=True).update(activa=False, fecha_fin=timezone.now())
+        serializer.save(asignado_por=self.request.user)
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(
+            AsignacionSpotResumenSerializer(serializer.instance).data, status=status.HTTP_201_CREATED,
+        )
+
+
+class SpotAsignacionDesactivarView(APIView):
+    permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def patch(self, request, pk):
+        asignacion = get_object_or_404(AsignacionSpot, pk=pk, activa=True)
+        asignacion.activa = False
+        asignacion.fecha_fin = timezone.now()
+        asignacion.save(update_fields=['activa', 'fecha_fin'])
+        return Response(AsignacionSpotResumenSerializer(asignacion).data)

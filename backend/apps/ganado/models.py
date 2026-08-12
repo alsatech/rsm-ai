@@ -118,6 +118,99 @@ class ParadaRecorrido(models.Model):
         return f'{self.recorrido} — Parada {self.orden}: {nombre}'
 
 
+class AsignacionSpot(models.Model):
+    """Vincula el dispositivo SPOT Trace RSM2026 a un recorrido (opcional) mientras está activo."""
+    recorrido = models.ForeignKey(
+        RecorridoGanado,
+        on_delete=models.SET_NULL,
+        related_name='asignacion_spot',
+        null=True,
+        blank=True,
+    )
+    activa = models.BooleanField(default=True)
+    fecha_inicio = models.DateTimeField(auto_now_add=True)
+    fecha_fin = models.DateTimeField(null=True, blank=True)
+    asignado_por = models.ForeignKey(User, on_delete=models.PROTECT)
+    notas = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_inicio']
+        verbose_name = 'Asignación SPOT'
+        verbose_name_plural = 'Asignaciones SPOT'
+
+    def __str__(self):
+        estado = 'activa' if self.activa else 'cerrada'
+        return f'Asignación SPOT {estado} — {self.fecha_inicio:%Y-%m-%d %H:%M}'
+
+
+class PosicionSpot(models.Model):
+    class MessageType(models.TextChoices):
+        TRACK = 'TRACK', 'Track'
+        STOP = 'STOP', 'Stop'
+        OK = 'OK', 'Ok'
+        HELP = 'HELP', 'Help'
+        CUSTOM = 'CUSTOM', 'Custom'
+
+    class Bateria(models.TextChoices):
+        GOOD = 'GOOD', 'Buena'
+        LOW = 'LOW', 'Baja'
+        CRITICAL = 'CRITICAL', 'Crítica'
+
+    asignacion = models.ForeignKey(
+        AsignacionSpot, on_delete=models.CASCADE, related_name='posiciones'
+    )
+    spot_message_id = models.IntegerField(unique=True)
+    lat = models.DecimalField(max_digits=18, decimal_places=12)
+    lng = models.DecimalField(max_digits=18, decimal_places=12)
+    altitud = models.IntegerField(null=True, blank=True)
+    fecha_hora_spot = models.DateTimeField()
+    fecha_hora_registro = models.DateTimeField(auto_now_add=True)
+    message_type = models.CharField(max_length=20, choices=MessageType.choices, default=MessageType.TRACK)
+    bateria = models.CharField(max_length=20, choices=Bateria.choices, default=Bateria.GOOD)
+    dentro_perimetro = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_hora_spot']
+        verbose_name = 'Posición SPOT'
+        verbose_name_plural = 'Posiciones SPOT'
+
+    def __str__(self):
+        return f'Posición SPOT {self.fecha_hora_spot:%Y-%m-%d %H:%M} ({self.lat}, {self.lng})'
+
+
+class AlertaSpot(models.Model):
+    class Tipo(models.TextChoices):
+        SIN_SENAL = 'sin_senal', 'Sin señal'
+        FUERA_PERIMETRO = 'fuera_perimetro', 'Fuera del perímetro'
+        BATERIA_BAJA = 'bateria_baja', 'Batería baja'
+        BATERIA_CRITICA = 'bateria_critica', 'Batería crítica'
+
+    asignacion = models.ForeignKey(
+        AsignacionSpot, on_delete=models.CASCADE, related_name='alertas'
+    )
+    tipo = models.CharField(max_length=20, choices=Tipo.choices)
+    mensaje = models.TextField()
+    posicion = models.ForeignKey(
+        PosicionSpot, on_delete=models.SET_NULL, null=True, blank=True
+    )
+    resuelta = models.BooleanField(default=False)
+    resuelta_por = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, blank=True, related_name='alertas_spot_resueltas'
+    )
+    resuelta_en = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Alerta SPOT'
+        verbose_name_plural = 'Alertas SPOT'
+
+    def __str__(self):
+        return f'{self.get_tipo_display()} — {self.created_at:%Y-%m-%d %H:%M}'
+
+
 class FotoRecorrido(models.Model):
     recorrido = models.ForeignKey(
         RecorridoGanado, on_delete=models.CASCADE, related_name='fotos'

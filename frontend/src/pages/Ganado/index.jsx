@@ -7,15 +7,15 @@ import DetalleRecorrido from './components/DetalleRecorrido'
 import TabsGanado from './components/TabsGanado'
 import HeatmapPastoreo from './HeatmapPastoreo'
 import Historial from './components/Historial'
+import SpotTrace from './SpotTrace'
 import VistaClasificacion from './VistaClasificacion'
-import VistaPlanVsReal from './VistaPlanVsReal'
 import WizardNuevoRecorrido from './components/WizardNuevoRecorrido'
 
 const TABS = [
   { id: 'historial', label: 'Recorridos', soloAdmin: false },
   { id: 'heatmap', label: 'Heatmap', soloAdmin: true },
   { id: 'clasificacion', label: 'Clasificación', soloAdmin: true },
-  { id: 'planvsreal', label: 'Plan vs Real', soloAdmin: true },
+  { id: 'spot', label: '📡 SPOT Trace', soloAdmin: true },
 ]
 
 export default function Ganado() {
@@ -91,7 +91,7 @@ export default function Ganado() {
     )
   }
 
-  if (vista === 'planvsreal' && puedeVerAnalitica) {
+  if (vista === 'spot' && puedeVerAnalitica) {
     return (
       <div className="min-h-svh bg-bg">
         <CabeceraGanado
@@ -100,7 +100,7 @@ export default function Ganado() {
           vista={vista}
           setVista={setVista}
         />
-        <VistaPlanVsReal />
+        <SpotTrace />
       </div>
     )
   }

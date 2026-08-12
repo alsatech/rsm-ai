@@ -27,8 +27,11 @@ export const getHeatmap = (params) => api.get('/api/v1/ganado/heatmap/', { param
 
 export const getClasificacionCorraletas = (params) =>
   api.get('/api/v1/ganado/corraletas/clasificacion/', { params })
-export const crearPlanDelDia = (data) => api.post('/api/v1/ganado/recorridos/crear-plan/', data)
-export const editarPlanDelDia = (id, data) =>
-  api.patch(`/api/v1/ganado/recorridos/${id}/editar-plan/`, data)
-export const getPlanDelDia = (fecha) =>
-  api.get('/api/v1/ganado/recorridos/plan-del-dia/', { params: { fecha } })
+
+export const getSpotEstado = () => api.get('/api/v1/ganado/spot/estado/')
+export const getSpotPosiciones = (params) => api.get('/api/v1/ganado/spot/posiciones/', { params })
+export const getSpotAlertas = () => api.get('/api/v1/ganado/spot/alertas/')
+export const resolverSpotAlerta = (id) => api.patch(`/api/v1/ganado/spot/alertas/${id}/resolver/`)
+export const crearSpotAsignacion = (data) => api.post('/api/v1/ganado/spot/asignaciones/', data)
+export const desactivarSpotAsignacion = (id) =>
+  api.patch(`/api/v1/ganado/spot/asignaciones/${id}/desactivar/`)
