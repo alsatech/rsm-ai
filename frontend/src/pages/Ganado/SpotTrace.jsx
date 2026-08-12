@@ -2,7 +2,7 @@ import 'leaflet/dist/leaflet.css'
 
 import L from 'leaflet'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CircleMarker, MapContainer, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip } from 'react-leaflet'
+import { CircleMarker, MapContainer, Marker, Polygon, Polyline, Popup, TileLayer, Tooltip, useMap } from 'react-leaflet'
 
 import {
   crearSpotAsignacion,
@@ -19,7 +19,11 @@ import { CERCAS_RANCHO } from '../../constants/cercasRancho'
 import { useCercasVisibles } from '../../hooks/useCercasVisibles'
 import { useToast } from '../../hooks/useToast'
 
-const CENTER = [29.515, -101.545]
+// 🧪 Modo pruebas — dispositivo en El Paso, TX mientras se prueba el hardware
+// fuera del rancho. Poner en false para volver a operación normal.
+const MODO_PRUEBAS = true
+
+const CENTER = MODO_PRUEBAS ? [31.821106658459094, -106.54663358816666] : [29.515, -101.545]
 const ZOOM = 12
 const REFRESH_MS = 5 * 60 * 1000
 const TICK_MS = 30 * 1000
@@ -79,6 +83,16 @@ const iconoFueraPerimetro = L.divIcon({
   iconSize: [32, 32],
   iconAnchor: [16, 16],
 })
+
+function AjustarVista({ posiciones }) {
+  const map = useMap()
+  useEffect(() => {
+    if (!posiciones.length) return
+    const bounds = L.latLngBounds(posiciones.map((p) => [parseFloat(p.lat), parseFloat(p.lng)]))
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 })
+  }, [map, posiciones])
+  return null
+}
 
 function descargarCSV(posiciones) {
   const filas = [
@@ -171,9 +185,10 @@ export default function SpotTrace() {
   const bateriaInfo = estado?.ultima_posicion
     ? BATERIA_CONFIG[estado.ultima_posicion.bateria] ?? BATERIA_CONFIG.GOOD
     : null
-  const fueraDePerimetro = estado?.ultima_posicion && !estado.ultima_posicion.dentro_perimetro
-  const posicionesFuera = posiciones.filter((p) => !p.dentro_perimetro)
+  const fueraDePerimetro = !MODO_PRUEBAS && estado?.ultima_posicion && !estado.ultima_posicion.dentro_perimetro
+  const posicionesFuera = MODO_PRUEBAS ? [] : posiciones.filter((p) => !p.dentro_perimetro)
   const ultimaPosicionHoy = posiciones.length ? posiciones[posiciones.length - 1] : null
+  const alertasVisibles = MODO_PRUEBAS ? alertas.filter((a) => a.tipo !== 'fuera_perimetro') : alertas
 
   const handleActivarAsignacion = async (e) => {
     e.preventDefault()
@@ -241,6 +256,12 @@ export default function SpotTrace() {
           filter: drop-shadow(0 0 4px rgba(248, 113, 113, 0.9));
         }
       `}</style>
+
+      {MODO_PRUEBAS && (
+        <div className="mb-4 rounded-2xl border-2 border-warning bg-card px-4 py-3 text-center text-sm font-bold text-warning">
+          🧪 Modo pruebas activo — El Paso, TX
+        </div>
+      )}
 
       <div className="flex flex-col gap-4 lg:flex-row">
         {/* Columna izquierda — panel de estado */}
@@ -320,15 +341,15 @@ export default function SpotTrace() {
           <div className="rounded-2xl border border-border bg-card p-4">
             <p className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-text-secondary">
               Alertas activas
-              {alertas.length > 0 && (
-                <span className="rounded-full bg-error px-2 py-0.5 text-xs font-bold text-bg">{alertas.length}</span>
+              {alertasVisibles.length > 0 && (
+                <span className="rounded-full bg-error px-2 py-0.5 text-xs font-bold text-bg">{alertasVisibles.length}</span>
               )}
             </p>
-            {alertas.length === 0 ? (
+            {alertasVisibles.length === 0 ? (
               <p className="text-sm text-text-secondary">✅ Sin alertas activas</p>
             ) : (
               <div className="space-y-2">
-                {alertas.map((a) => (
+                {alertasVisibles.map((a) => (
                   <div key={a.id} className="rounded-xl border border-error/40 bg-bg p-3">
                     <p className="text-xs font-bold uppercase text-error">{TIPO_ALERTA_LABEL[a.tipo] ?? a.tipo}</p>
                     <p className="mt-1 text-sm text-text">{a.mensaje}</p>
@@ -473,6 +494,8 @@ export default function SpotTrace() {
                 attribution='Tiles &copy; <a href="https://www.esri.com">Esri</a>'
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               />
+
+              <AjustarVista posiciones={posiciones} />
 
               {PERIMETRO_SANTA_MARGARITA.length > 0 && (
                 <Polygon

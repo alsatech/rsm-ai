@@ -25,6 +25,22 @@ PERIMETRO_SANTA_MARGARITA = Polygon([
     (-101.4626777804628, 29.48396887686232),
 ])
 
+# 🧪 Polígono de pruebas — El Paso, TX. Caja amplia (~10 km) centrada en el
+# punto real desde donde arrancan casi todas las pruebas del dispositivo
+# (31.821106658459094, -106.54663358816666). Se usa en vez de
+# PERIMETRO_SANTA_MARGARITA cuando SPOT_MODO_PRUEBAS=true.
+_EL_PASO_LAT = 31.821106658459094
+_EL_PASO_LNG = -106.54663358816666
+_EL_PASO_DELTA_LAT = 0.05
+_EL_PASO_DELTA_LNG = 0.06
+PERIMETRO_EL_PASO_TX = Polygon([
+    (_EL_PASO_LNG - _EL_PASO_DELTA_LNG, _EL_PASO_LAT - _EL_PASO_DELTA_LAT),
+    (_EL_PASO_LNG + _EL_PASO_DELTA_LNG, _EL_PASO_LAT - _EL_PASO_DELTA_LAT),
+    (_EL_PASO_LNG + _EL_PASO_DELTA_LNG, _EL_PASO_LAT + _EL_PASO_DELTA_LAT),
+    (_EL_PASO_LNG - _EL_PASO_DELTA_LNG, _EL_PASO_LAT + _EL_PASO_DELTA_LAT),
+    (_EL_PASO_LNG - _EL_PASO_DELTA_LNG, _EL_PASO_LAT - _EL_PASO_DELTA_LAT),
+])
+
 HORAS_SIN_SENAL = 2
 
 
@@ -73,6 +89,9 @@ def consultar_spot():
         if not asignacion:
             return 'No active assignment'
 
+        modo_pruebas = getattr(settings, 'SPOT_MODO_PRUEBAS', False)
+        perimetro = PERIMETRO_EL_PASO_TX if modo_pruebas else PERIMETRO_SANTA_MARGARITA
+
         procesados = 0
         for msg in messages:
             spot_id = msg.get('id')
@@ -85,7 +104,7 @@ def consultar_spot():
             lat = float(msg.get('latitude', 0))
             lng = float(msg.get('longitude', 0))
             punto = Point(lng, lat)
-            dentro = PERIMETRO_SANTA_MARGARITA.contains(punto)
+            dentro = perimetro.contains(punto)
             bateria = msg.get('batteryState', 'GOOD')
 
             posicion = PosicionSpot.objects.create(
@@ -101,7 +120,7 @@ def consultar_spot():
             )
             procesados += 1
 
-            if not dentro:
+            if not dentro and not modo_pruebas:
                 AlertaSpot.objects.create(
                     asignacion=asignacion,
                     tipo=AlertaSpot.Tipo.FUERA_PERIMETRO,

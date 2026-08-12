@@ -2,7 +2,7 @@ import io
 from datetime import timedelta
 from unittest.mock import Mock, patch
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -489,6 +489,7 @@ class SpotAPITest(APITestCase):
 
         self.assertEqual(PosicionSpot.objects.filter(spot_message_id=111).count(), 1)
 
+    @override_settings(SPOT_MODO_PRUEBAS=False)
     @patch('apps.ganado.tasks.requests.get')
     def test_alerta_fuera_perimetro_se_genera(self, mock_get):
         mensaje = {
@@ -503,6 +504,25 @@ class SpotAPITest(APITestCase):
         posicion = PosicionSpot.objects.get(spot_message_id=222)
         self.assertFalse(posicion.dentro_perimetro)
         self.assertTrue(
+            AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.FUERA_PERIMETRO, posicion=posicion).exists()
+        )
+
+    @override_settings(SPOT_MODO_PRUEBAS=True)
+    @patch('apps.ganado.tasks.requests.get')
+    def test_modo_pruebas_no_genera_alerta_fuera_perimetro(self, mock_get):
+        """En modo pruebas se valida contra el polígono de El Paso y nunca se alerta perímetro."""
+        mensaje = {
+            'id': 223, 'latitude': 29.40, 'longitude': -101.40,
+            'altitude': 500, 'dateTime': '2026-08-11T10:06:00+0000',
+            'messageType': 'TRACK', 'batteryState': 'GOOD',
+        }
+        mock_get.return_value = _mock_feed_response([mensaje])
+
+        consultar_spot()
+
+        posicion = PosicionSpot.objects.get(spot_message_id=223)
+        self.assertFalse(posicion.dentro_perimetro)
+        self.assertFalse(
             AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.FUERA_PERIMETRO, posicion=posicion).exists()
         )
 

@@ -153,6 +153,9 @@ SPOT_API_BASE = env(
     'SPOT_API_BASE',
     default='https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed',
 )
+# 🧪 Modo pruebas: valida contra el polígono de El Paso, TX en vez de
+# SantaMargarita y no genera alertas de "fuera del perímetro".
+SPOT_MODO_PRUEBAS = env.bool('SPOT_MODO_PRUEBAS', default=False)
 
 
 # Celery — alertas y notificaciones (ver apps/*/tasks.py)
