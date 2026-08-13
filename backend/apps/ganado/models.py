@@ -120,6 +120,7 @@ class ParadaRecorrido(models.Model):
 
 class AsignacionSpot(models.Model):
     """Vincula el dispositivo SPOT Trace RSM2026 a un recorrido (opcional) mientras está activo."""
+    nombre = models.CharField(max_length=150, blank=True)
     recorrido = models.ForeignKey(
         RecorridoGanado,
         on_delete=models.SET_NULL,
@@ -141,7 +142,8 @@ class AsignacionSpot(models.Model):
 
     def __str__(self):
         estado = 'activa' if self.activa else 'cerrada'
-        return f'Asignación SPOT {estado} — {self.fecha_inicio:%Y-%m-%d %H:%M}'
+        etiqueta = self.nombre or f'{self.fecha_inicio:%Y-%m-%d %H:%M}'
+        return f'Asignación SPOT {estado} — {etiqueta}'
 
 
 class PosicionSpot(models.Model):

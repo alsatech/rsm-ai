@@ -275,7 +275,7 @@ class AsignacionSpotResumenSerializer(serializers.ModelSerializer):
     class Meta:
         model = AsignacionSpot
         fields = (
-            'id', 'recorrido', 'recorrido_fecha', 'activa',
+            'id', 'nombre', 'recorrido', 'recorrido_fecha', 'activa',
             'fecha_inicio', 'fecha_fin', 'asignado_por', 'asignado_por_nombre', 'notas',
         )
         read_only_fields = fields
@@ -285,10 +285,17 @@ class AsignacionSpotResumenSerializer(serializers.ModelSerializer):
 
 
 class CrearAsignacionSpotSerializer(serializers.ModelSerializer):
+    nombre = serializers.CharField(max_length=150)
+
     class Meta:
         model = AsignacionSpot
-        fields = ('id', 'recorrido', 'notas')
+        fields = ('id', 'nombre', 'recorrido', 'notas')
         read_only_fields = ('id',)
+
+    def validate_nombre(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Ponle un nombre a la asignación para identificar la prueba.')
+        return value.strip()
 
 
 class AlertaSpotSerializer(serializers.ModelSerializer):

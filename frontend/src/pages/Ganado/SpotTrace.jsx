@@ -10,6 +10,7 @@ import {
   getCorraletas,
   getRecorridos,
   getSpotAlertas,
+  getSpotAsignaciones,
   getSpotEstado,
   getSpotPosiciones,
   resolverSpotAlerta,
@@ -127,13 +128,14 @@ export default function SpotTrace() {
   const [posiciones, setPosiciones] = useState([])
   const [corraletas, setCorraletas] = useState([])
   const [recorridosHoy, setRecorridosHoy] = useState([])
+  const [historialAsignaciones, setHistorialAsignaciones] = useState([])
 
   const [cargando, setCargando] = useState(true)
   const [actualizando, setActualizando] = useState(false)
   const [ultimaActualizacion, setUltimaActualizacion] = useState(null)
   const [ahora, setAhora] = useState(new Date())
 
-  const [formAsignacion, setFormAsignacion] = useState({ recorrido: '', notas: '' })
+  const [formAsignacion, setFormAsignacion] = useState({ nombre: '', recorrido: '', notas: '' })
   const [guardandoAsignacion, setGuardandoAsignacion] = useState(false)
 
   const fechaRef = useRef(fecha)
@@ -161,10 +163,15 @@ export default function SpotTrace() {
     }
   }, [showToast])
 
+  const cargarHistorial = useCallback(() => {
+    getSpotAsignaciones().then(({ data }) => setHistorialAsignaciones(data)).catch(() => {})
+  }, [])
+
   useEffect(() => {
     getCorraletas().then(({ data }) => setCorraletas(data)).catch(() => {})
     getRecorridos({ fecha: hoyISO() }).then(({ data }) => setRecorridosHoy(data)).catch(() => {})
-  }, [])
+    cargarHistorial()
+  }, [cargarHistorial])
 
   useEffect(() => {
     setCargando(true)
@@ -192,15 +199,21 @@ export default function SpotTrace() {
 
   const handleActivarAsignacion = async (e) => {
     e.preventDefault()
+    if (!formAsignacion.nombre.trim()) {
+      showToast('Ponle un nombre a la asignación para identificar la prueba.', 'alerta')
+      return
+    }
     setGuardandoAsignacion(true)
     try {
       await crearSpotAsignacion({
+        nombre: formAsignacion.nombre.trim(),
         recorrido: formAsignacion.recorrido || null,
         notas: formAsignacion.notas,
       })
-      setFormAsignacion({ recorrido: '', notas: '' })
+      setFormAsignacion({ nombre: '', recorrido: '', notas: '' })
       showToast('Rastreo SPOT activado.', 'exito')
       cargarDatos()
+      cargarHistorial()
     } catch {
       showToast('No se pudo activar el rastreo.', 'error')
     } finally {
@@ -214,6 +227,7 @@ export default function SpotTrace() {
       await desactivarSpotAsignacion(estado.asignacion_activa.id)
       showToast('Asignación cerrada.', 'exito')
       cargarDatos()
+      cargarHistorial()
     } catch {
       showToast('No se pudo cerrar la asignación.', 'error')
     }
@@ -379,6 +393,7 @@ export default function SpotTrace() {
             <p className="mb-3 text-sm font-bold uppercase tracking-wide text-text-secondary">Asignación</p>
             {estado?.asignacion_activa ? (
               <div className="space-y-3 text-sm">
+                <p className="font-bold text-highlight">{estado.asignacion_activa.nombre || 'Sin nombre'}</p>
                 <p className="text-text">
                   {estado.asignacion_activa.recorrido_fecha
                     ? `Vinculada al recorrido del ${estado.asignacion_activa.recorrido_fecha}`
@@ -400,6 +415,19 @@ export default function SpotTrace() {
               </div>
             ) : (
               <form onSubmit={handleActivarAsignacion} className="space-y-3">
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-text-secondary">
+                    Nombre de la prueba
+                  </label>
+                  <input
+                    type="text"
+                    value={formAsignacion.nombre}
+                    onChange={(e) => setFormAsignacion((f) => ({ ...f, nombre: e.target.value }))}
+                    required
+                    placeholder="Ej. Prueba 3 — salida al patio"
+                    className="w-full rounded-lg border border-border bg-bg px-3 py-2.5 text-sm text-text outline-none focus:border-highlight"
+                  />
+                </div>
                 <div>
                   <label className="mb-1 block text-sm font-medium text-text-secondary">
                     Recorrido (opcional)
@@ -433,6 +461,25 @@ export default function SpotTrace() {
                   {guardandoAsignacion ? 'Activando...' : 'Activar rastreo'}
                 </button>
               </form>
+            )}
+
+            {historialAsignaciones.filter((a) => !a.activa).length > 0 && (
+              <div className="mt-4 border-t border-border pt-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-text-secondary">
+                  Historial de pruebas
+                </p>
+                <div className="max-h-56 space-y-2 overflow-y-auto">
+                  {historialAsignaciones.filter((a) => !a.activa).map((a) => (
+                    <div key={a.id} className="rounded-lg border border-border bg-bg px-3 py-2 text-xs">
+                      <p className="font-semibold text-text">{a.nombre || 'Sin nombre'}</p>
+                      <p className="mt-0.5 text-text-secondary">
+                        {fechaHoraLocal(a.fecha_inicio)} — {a.fecha_fin ? fechaHoraLocal(a.fecha_fin) : 'en curso'}
+                      </p>
+                      {a.notas && <p className="mt-0.5 text-text-secondary">📝 {a.notas}</p>}
+                    </div>
+                  ))}
+                </div>
+              </div>
             )}
           </div>
         </aside>

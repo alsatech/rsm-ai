@@ -576,3 +576,26 @@ class SpotAPITest(APITestCase):
         self.assertIsNone(resp.data['asignacion_activa'])
         self.assertIsNotNone(resp.data['ultima_posicion'])
         self.assertEqual(resp.data['ultima_posicion']['spot_message_id'], 444)
+
+    def test_crear_asignacion_requiere_nombre(self):
+        self._auth(self.admin)
+        resp = self.client.post(
+            '/api/v1/ganado/spot/asignaciones/', {'notas': 'sin nombre'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_crear_asignacion_con_nombre_aparece_en_historial(self):
+        self._auth(self.admin)
+        resp = self.client.post(
+            '/api/v1/ganado/spot/asignaciones/', {'nombre': 'Prueba 1 — salida principal'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['nombre'], 'Prueba 1 — salida principal')
+        nueva_id = resp.data['id']
+
+        self.client.patch(f'/api/v1/ganado/spot/asignaciones/{nueva_id}/desactivar/')
+
+        resp = self.client.get('/api/v1/ganado/spot/asignaciones/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        nombres = [a['nombre'] for a in resp.data]
+        self.assertIn('Prueba 1 — salida principal', nombres)

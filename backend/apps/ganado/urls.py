@@ -16,8 +16,8 @@ from .views import (
     ResumenGanadoView,
     SpotAlertaResolverView,
     SpotAlertasListView,
-    SpotAsignacionCreateView,
     SpotAsignacionDesactivarView,
+    SpotAsignacionListCreateView,
     SpotEstadoView,
     SpotPosicionesListView,
     SyncParadasView,
@@ -50,7 +50,7 @@ urlpatterns = [
     path('spot/posiciones/', SpotPosicionesListView.as_view(), name='spot-posiciones'),
     path('spot/alertas/', SpotAlertasListView.as_view(), name='spot-alertas'),
     path('spot/alertas/<int:pk>/resolver/', SpotAlertaResolverView.as_view(), name='spot-alerta-resolver'),
-    path('spot/asignaciones/', SpotAsignacionCreateView.as_view(), name='spot-asignacion-create'),
+    path('spot/asignaciones/', SpotAsignacionListCreateView.as_view(), name='spot-asignacion-list-create'),
     path(
         'spot/asignaciones/<int:pk>/desactivar/',
         SpotAsignacionDesactivarView.as_view(),

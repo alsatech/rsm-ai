@@ -479,10 +479,18 @@ class SpotAlertaResolverView(APIView):
         return Response(AlertaSpotSerializer(alerta).data)
 
 
-class SpotAsignacionCreateView(generics.CreateAPIView):
-    """Crea una nueva asignación activa, cerrando automáticamente cualquier asignación previa."""
-    serializer_class = CrearAsignacionSpotSerializer
+class SpotAsignacionListCreateView(generics.ListCreateAPIView):
+    """Lista el historial de asignaciones (más reciente primero) y crea una nueva activa,
+    cerrando automáticamente cualquier asignación previa."""
     permission_classes = [IsAuthenticated, PuedeVerSpot]
+
+    def get_queryset(self):
+        return AsignacionSpot.objects.select_related('recorrido', 'asignado_por').order_by('-fecha_inicio')
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return CrearAsignacionSpotSerializer
+        return AsignacionSpotResumenSerializer
 
     def perform_create(self, serializer):
         AsignacionSpot.objects.filter(activa=True).update(activa=False, fecha_fin=timezone.now())

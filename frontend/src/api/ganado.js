@@ -32,6 +32,7 @@ export const getSpotEstado = () => api.get('/api/v1/ganado/spot/estado/')
 export const getSpotPosiciones = (params) => api.get('/api/v1/ganado/spot/posiciones/', { params })
 export const getSpotAlertas = () => api.get('/api/v1/ganado/spot/alertas/')
 export const resolverSpotAlerta = (id) => api.patch(`/api/v1/ganado/spot/alertas/${id}/resolver/`)
+export const getSpotAsignaciones = () => api.get('/api/v1/ganado/spot/asignaciones/')
 export const crearSpotAsignacion = (data) => api.post('/api/v1/ganado/spot/asignaciones/', data)
 export const desactivarSpotAsignacion = (id) =>
   api.patch(`/api/v1/ganado/spot/asignaciones/${id}/desactivar/`)
