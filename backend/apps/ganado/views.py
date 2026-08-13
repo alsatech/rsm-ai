@@ -414,7 +414,12 @@ class ClasificacionCorraletasView(APIView):
 
 
 class SpotEstadoView(APIView):
-    """Estado actual del dispositivo SPOT: última posición, batería, señal y asignación activa."""
+    """Estado actual del dispositivo SPOT: última posición, batería, señal y asignación activa.
+
+    La última posición y el total del día se reportan de forma global (no solo de la
+    asignación activa), para que cerrar/reabrir una asignación no borre de la vista lo
+    último que se supo del dispositivo.
+    """
     permission_classes = [IsAuthenticated, PuedeVerSpot]
 
     def get(self, request):
@@ -422,17 +427,9 @@ class SpotEstadoView(APIView):
             'recorrido', 'asignado_por'
         ).first()
 
-        if not asignacion:
-            return Response({
-                'asignacion_activa': None,
-                'ultima_posicion': None,
-                'minutos_desde_ultima_senal': None,
-                'total_posiciones_hoy': 0,
-            })
-
-        ultima = asignacion.posiciones.order_by('-fecha_hora_spot').first()
+        ultima = PosicionSpot.objects.order_by('-fecha_hora_spot').first()
         hoy = timezone.now().date()
-        total_hoy = asignacion.posiciones.filter(fecha_hora_spot__date=hoy).count()
+        total_hoy = PosicionSpot.objects.filter(fecha_hora_spot__date=hoy).count()
 
         minutos_desde_ultima_senal = None
         if ultima:
@@ -440,7 +437,7 @@ class SpotEstadoView(APIView):
             minutos_desde_ultima_senal = round(delta.total_seconds() / 60)
 
         return Response({
-            'asignacion_activa': AsignacionSpotResumenSerializer(asignacion).data,
+            'asignacion_activa': AsignacionSpotResumenSerializer(asignacion).data if asignacion else None,
             'ultima_posicion': PosicionSpotSerializer(ultima).data if ultima else None,
             'minutos_desde_ultima_senal': minutos_desde_ultima_senal,
             'total_posiciones_hoy': total_hoy,

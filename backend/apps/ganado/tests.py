@@ -553,3 +553,26 @@ class SpotAPITest(APITestCase):
         self._auth(self.admin)
         resp = self.client.get('/api/v1/ganado/spot/estado/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_estado_muestra_ultima_posicion_sin_asignacion_activa(self):
+        """Cerrar la asignación no debe borrar de /spot/estado/ la última posición conocida."""
+        PosicionSpot.objects.create(
+            asignacion=self.asignacion,
+            spot_message_id=444,
+            lat=29.51,
+            lng=-101.55,
+            fecha_hora_spot=timezone.now(),
+            message_type='TRACK',
+            bateria='GOOD',
+            dentro_perimetro=True,
+        )
+        self.asignacion.activa = False
+        self.asignacion.fecha_fin = timezone.now()
+        self.asignacion.save(update_fields=['activa', 'fecha_fin'])
+
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/spot/estado/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertIsNone(resp.data['asignacion_activa'])
+        self.assertIsNotNone(resp.data['ultima_posicion'])
+        self.assertEqual(resp.data['ultima_posicion']['spot_message_id'], 444)

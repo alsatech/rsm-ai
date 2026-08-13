@@ -89,7 +89,7 @@ function AjustarVista({ posiciones }) {
   useEffect(() => {
     if (!posiciones.length) return
     const bounds = L.latLngBounds(posiciones.map((p) => [parseFloat(p.lat), parseFloat(p.lng)]))
-    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 15 })
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 13 })
   }, [map, posiciones])
   return null
 }
@@ -285,6 +285,11 @@ export default function SpotTrace() {
             ) : (
               <div className="space-y-2 text-sm">
                 <p className="font-bold text-highlight">RSM2026 🛰️</p>
+                {!estado?.asignacion_activa && estado?.ultima_posicion && (
+                  <p className="rounded-lg border border-warning/40 bg-warning/10 px-2 py-1.5 text-xs font-semibold text-warning">
+                    ⏸️ Rastreo pausado (sin asignación activa) — mostrando la última posición conocida
+                  </p>
+                )}
                 <div className="flex items-center justify-between">
                   <span className="text-text-secondary">Última señal</span>
                   <span className="font-mono text-text">{textoMinutos(minutosSinSenal)}</span>
