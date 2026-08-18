@@ -39,6 +39,16 @@ export const crearRecepcion = (solicitudId, formData) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 export const getComparativoSolicitud = (id) => api.get(`/api/v1/inventario/solicitudes/${id}/comparativo/`)
+export const registrarCompra = (solicitudId, formData) =>
+  api.post(`/api/v1/inventario/solicitudes/${solicitudId}/compra/`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+export const getUsuarios = () => api.get('/api/v1/auth/usuarios/')
+
+export const getRelacionesCompras = (params) => api.get('/api/v1/inventario/relaciones-compras/', { params })
+export const getRelacionCompras = (id) => api.get(`/api/v1/inventario/relaciones-compras/${id}/`)
+export const crearRelacionCompras = (data) => api.post('/api/v1/inventario/relaciones-compras/', data)
+export const enviarRelacionCompras = (id) => api.post(`/api/v1/inventario/relaciones-compras/${id}/enviar/`)
 
 export const getReportesFaltantes = (params) =>
   api.get('/api/v1/inventario/reportes-faltantes/', { params })

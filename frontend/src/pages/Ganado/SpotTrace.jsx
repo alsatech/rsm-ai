@@ -129,6 +129,7 @@ export default function SpotTrace() {
   const [corraletas, setCorraletas] = useState([])
   const [recorridosHoy, setRecorridosHoy] = useState([])
   const [historialAsignaciones, setHistorialAsignaciones] = useState([])
+  const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null)
 
   const [cargando, setCargando] = useState(true)
   const [actualizando, setActualizando] = useState(false)
@@ -143,13 +144,21 @@ export default function SpotTrace() {
     fechaRef.current = fecha
   }, [fecha])
 
+  const asignacionRef = useRef(null)
+  useEffect(() => {
+    asignacionRef.current = asignacionSeleccionada?.id ?? null
+  }, [asignacionSeleccionada])
+
   const cargarDatos = useCallback(async ({ mostrarSpinner } = {}) => {
     if (mostrarSpinner) setActualizando(true)
     try {
+      const paramsPosiciones = asignacionRef.current
+        ? { asignacion: asignacionRef.current }
+        : { fecha: fechaRef.current }
       const [estadoResp, alertasResp, posicionesResp] = await Promise.all([
         getSpotEstado(),
         getSpotAlertas(),
-        getSpotPosiciones({ fecha: fechaRef.current }),
+        getSpotPosiciones(paramsPosiciones),
       ])
       setEstado(estadoResp.data)
       setAlertas(alertasResp.data)
@@ -176,7 +185,13 @@ export default function SpotTrace() {
   useEffect(() => {
     setCargando(true)
     cargarDatos()
-  }, [fecha, cargarDatos])
+  }, [fecha, asignacionSeleccionada, cargarDatos])
+
+  const handleSeleccionarAsignacion = (a) => {
+    setAsignacionSeleccionada((prev) => (prev?.id === a.id ? null : { id: a.id, nombre: a.nombre || 'Sin nombre' }))
+  }
+
+  const handleLimpiarSeleccion = () => setAsignacionSeleccionada(null)
 
   useEffect(() => {
     const interval = setInterval(() => cargarDatos({ mostrarSpinner: true }), REFRESH_MS)
@@ -469,15 +484,29 @@ export default function SpotTrace() {
                   Historial de pruebas
                 </p>
                 <div className="max-h-56 space-y-2 overflow-y-auto">
-                  {historialAsignaciones.filter((a) => !a.activa).map((a) => (
-                    <div key={a.id} className="rounded-lg border border-border bg-bg px-3 py-2 text-xs">
-                      <p className="font-semibold text-text">{a.nombre || 'Sin nombre'}</p>
-                      <p className="mt-0.5 text-text-secondary">
-                        {fechaHoraLocal(a.fecha_inicio)} — {a.fecha_fin ? fechaHoraLocal(a.fecha_fin) : 'en curso'}
-                      </p>
-                      {a.notas && <p className="mt-0.5 text-text-secondary">📝 {a.notas}</p>}
-                    </div>
-                  ))}
+                  {historialAsignaciones.filter((a) => !a.activa).map((a) => {
+                    const seleccionada = asignacionSeleccionada?.id === a.id
+                    return (
+                      <button
+                        key={a.id}
+                        type="button"
+                        onClick={() => handleSeleccionarAsignacion(a)}
+                        className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition ${
+                          seleccionada
+                            ? 'border-highlight bg-highlight/10'
+                            : 'border-border bg-bg hover:border-accent'
+                        }`}
+                      >
+                        <p className="font-semibold text-text">
+                          {seleccionada && '🎯 '}{a.nombre || 'Sin nombre'}
+                        </p>
+                        <p className="mt-0.5 text-text-secondary">
+                          {fechaHoraLocal(a.fecha_inicio)} — {a.fecha_fin ? fechaHoraLocal(a.fecha_fin) : 'en curso'}
+                        </p>
+                        {a.notas && <p className="mt-0.5 text-text-secondary">📝 {a.notas}</p>}
+                      </button>
+                    )
+                  })}
                 </div>
               </div>
             )}
@@ -487,15 +516,25 @@ export default function SpotTrace() {
         {/* Columna derecha — mapa */}
         <div className="min-w-0 flex-1 space-y-4">
           <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '500px', height: '65svh' }}>
-            {/* Selector de fecha */}
+            {/* Selector de fecha / prueba seleccionada */}
             <div className="absolute left-2 top-2 z-[1000]">
-              <input
-                type="date"
-                value={fecha}
-                max={hoyISO()}
-                onChange={(e) => setFecha(e.target.value)}
-                className="rounded-lg border-2 border-border bg-bg/90 px-2 py-1.5 text-xs font-semibold text-text outline-none backdrop-blur-sm focus:border-highlight"
-              />
+              {asignacionSeleccionada ? (
+                <button
+                  type="button"
+                  onClick={handleLimpiarSeleccion}
+                  className="flex items-center gap-2 rounded-lg border-2 border-highlight bg-bg/90 px-2 py-1.5 text-xs font-bold text-highlight backdrop-blur-sm"
+                >
+                  🎯 {asignacionSeleccionada.nombre} <span className="text-text-secondary">✕</span>
+                </button>
+              ) : (
+                <input
+                  type="date"
+                  value={fecha}
+                  max={hoyISO()}
+                  onChange={(e) => setFecha(e.target.value)}
+                  className="rounded-lg border-2 border-border bg-bg/90 px-2 py-1.5 text-xs font-semibold text-text outline-none backdrop-blur-sm focus:border-highlight"
+                />
+              )}
             </div>
 
             {/* Toggles */}
@@ -636,7 +675,7 @@ export default function SpotTrace() {
           <div className="rounded-2xl border border-border bg-card p-4">
             <div className="mb-3 flex items-center justify-between">
               <p className="text-sm font-bold uppercase tracking-wide text-text-secondary">
-                Historial — {fecha}
+                Historial — {asignacionSeleccionada ? asignacionSeleccionada.nombre : fecha}
               </p>
               <button
                 type="button"

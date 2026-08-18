@@ -5,7 +5,7 @@ import { useAuth } from '../../../hooks/useAuth'
 import PanelAlertasStock from './PanelAlertasStock'
 import ResumenInventario from './ResumenInventario'
 
-export default function DashboardInventario({ recargar, onVerProductos }) {
+export default function DashboardInventario({ recargar, onVerProductos, onSolicitarMaterial }) {
   const { user } = useAuth()
   const [categorias, setCategorias] = useState([])
   const [productos, setProductos] = useState([])
@@ -124,7 +124,7 @@ export default function DashboardInventario({ recargar, onVerProductos }) {
       {puedeVerAlertas && (
         <div className="flex flex-col gap-4">
           <ResumenInventario recargar={recargar} />
-          <PanelAlertasStock alertas={alertas} />
+          <PanelAlertasStock alertas={alertas} onSolicitar={onSolicitarMaterial} />
         </div>
       )}
     </div>

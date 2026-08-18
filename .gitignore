@@ -20,3 +20,10 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+
+# Herramienta de análisis de minutas (uso interno de Alfredo, no es un módulo RSM)
+minutas/*.pdf
+minutas/*.docx
+minutas/*.txt
+# Los análisis generados sí se suben al repo como historial
+!minutas/*_analisis.md

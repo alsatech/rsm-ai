@@ -89,7 +89,14 @@ class MovimientoInventario(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='movimientos_inventario'
     )
     uso_descripcion = models.TextField(blank=True)  # "¿Para qué se usó?"
-    vehiculo_codigo = models.CharField(max_length=20, blank=True)  # combustibles: SM-A001, SM-R003, etc.
+    vehiculo_codigo = models.CharField(max_length=20, blank=True)  # legacy: copia legible del vehiculo FK
+    vehiculo = models.ForeignKey(
+        'flota.Vehiculo',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='movimientos_combustible',
+    )  # obligatorio cuando producto.categoria == 'Combustibles' y tipo == 'salida'
     proyecto_referencia = models.CharField(max_length=200, blank=True)
     fecha_movimiento = models.DateField(default=timezone.localdate)
     fecha_hora_registro = models.DateTimeField(auto_now_add=True)
@@ -333,3 +340,84 @@ class ReporteFaltanteDanio(models.Model):
 
     def __str__(self):
         return f'{self.get_tipo_display()} — {self.descripcion[:40]}'
+
+
+class Compra(models.Model):
+    # Una Compra viene exactamente de uno de dos orígenes: el flujo completo de Adquisiciones
+    # (solicitud) o una entrada directa registrada desde "+ Movimiento" (movimiento) — ver
+    # RegistrarCompraView y MovimientoInventarioSerializer.create() respectivamente.
+    solicitud = models.OneToOneField(
+        SolicitudMaterial, null=True, blank=True, on_delete=models.PROTECT, related_name='compra'
+    )
+    movimiento = models.OneToOneField(
+        MovimientoInventario, null=True, blank=True, on_delete=models.PROTECT, related_name='compra'
+    )
+    proveedor = models.CharField(max_length=200, blank=True)
+    comprado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='compras_realizadas'
+    )  # quien hizo la compra en campo (casi siempre Erik), no necesariamente quien la captura
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='compras_registradas'
+    )
+    monto_total = models.DecimalField(max_digits=10, decimal_places=2)
+    foto_factura = models.ImageField(upload_to='inventario/compras/%Y/%m/')
+    notas = models.TextField(blank=True)
+    fecha_compra = models.DateField(default=timezone.localdate)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Compra'
+        verbose_name_plural = 'Compras'
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(solicitud__isnull=False, movimiento__isnull=True)
+                    | models.Q(solicitud__isnull=True, movimiento__isnull=False)
+                ),
+                name='compra_de_solicitud_xor_movimiento',
+            ),
+        ]
+
+    def __str__(self):
+        origen = self.solicitud.folio if self.solicitud_id else f'movimiento #{self.movimiento_id}'
+        return f'Compra {origen} — ${self.monto_total}'
+
+
+class RelacionCompras(models.Model):
+    class Estado(models.TextChoices):
+        BORRADOR = 'borrador', 'Borrador'
+        ENVIADA = 'enviada', 'Enviada'
+
+    folio = models.CharField(max_length=20, unique=True, blank=True)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField()
+    compras = models.ManyToManyField(Compra, related_name='relaciones', blank=True)
+    generado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='relaciones_compras_generadas'
+    )
+    estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.BORRADOR)
+    enviada_en = models.DateTimeField(null=True, blank=True)
+    notas = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = 'Relación de compras'
+        verbose_name_plural = 'Relaciones de compras'
+
+    def __str__(self):
+        return f'{self.folio} — {self.get_estado_display()}'
+
+    def save(self, *args, **kwargs):
+        if not self.folio:
+            year = timezone.localdate().year
+            prefix = f'RC-{year}-'
+            ultima = RelacionCompras.objects.filter(folio__startswith=prefix).order_by('-folio').first()
+            siguiente = int(ultima.folio.rsplit('-', 1)[-1]) + 1 if ultima else 1
+            self.folio = f'{prefix}{siguiente:03d}'
+        super().save(*args, **kwargs)
+
+    @property
+    def monto_total(self):
+        return self.compras.aggregate(total=models.Sum('monto_total'))['total'] or 0

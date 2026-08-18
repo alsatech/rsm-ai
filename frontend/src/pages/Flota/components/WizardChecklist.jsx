@@ -2,7 +2,7 @@ import { useState } from 'react'
 
 import { createChecklist, subirAudioChecklist, subirFotoChecklist } from '../../../api/flota'
 import { useToast } from '../../../hooks/useToast'
-import { esOffRoad, sinKilometraje } from '../constants'
+import { TRAILA_EN_MOTO_ITEMS, esOffRoad, sinKilometraje } from '../constants'
 import FlotaLayout from './FlotaLayout'
 import Paso1Identificacion from './Paso1Identificacion'
 import Paso2Inspeccion from './Paso2Inspeccion'
@@ -39,6 +39,11 @@ function estadoInicial(vehiculoPreseleccionado) {
     limpieza: false,
     sin_herramientas: false,
     sin_carga: false,
+    // Ítems de la traila que se jalan como parte del mismo checklist de la moto.
+    // Se llenan cuando se sube foto del ítem correspondiente (ver handleAgregarFoto).
+    traila_limpieza: false,
+    traila_sin_herramientas: false,
+    traila_sin_carga: false,
     // Incidencias — respuesta Sí/No + texto + foto. Solo el campo del tipo correspondiente se usa.
     hubo_incidencia: null,
     incidencia_previa: '',
@@ -100,6 +105,11 @@ export default function WizardChecklist({ vehiculoPreseleccionado, onVolver, onG
       if (offRoad) items.push('soplado_filtro_aire')
     } else {
       items.push('lavado')
+    }
+    // Unificación moto+traila: cuando la moto lleva traila, los 3 ítems de la traila
+    // cuentan aquí también (se llenan al subir foto del slot).
+    if (offRoad && form.traila) {
+      items.push(...TRAILA_EN_MOTO_ITEMS.map((it) => it.key))
     }
     return items
   })()

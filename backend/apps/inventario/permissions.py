@@ -16,6 +16,10 @@ ROLES_AUTORIZAN_SOLICITUD = (User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_REGISTRAN_ENVIO = (User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_REGISTRAN_RECEPCION = (User.Rol.CAMPO, User.Rol.INVENTARIO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_RESUELVEN_REPORTE = (User.Rol.INVENTARIO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
+ROLES_REGISTRAN_COMPRA = (
+    User.Rol.INVENTARIO, User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN,
+)
+ROLES_GESTIONAN_RELACION_COMPRAS = (User.Rol.INVENTARIO, User.Rol.SUPERADMIN)
 
 
 def _rol_en(request, roles):
@@ -77,6 +81,16 @@ class PuedeReportarFaltante(BasePermission):
 class PuedeResolverReporte(BasePermission):
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_RESUELVEN_REPORTE)
+
+
+class PuedeRegistrarCompra(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_REGISTRAN_COMPRA)
+
+
+class PuedeGestionarRelacionCompras(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_GESTIONAN_RELACION_COMPRAS)
 
 
 class PuedeEditarSolicitud(BasePermission):

@@ -1,12 +1,24 @@
-import { UNIDAD_LABELS } from '../constants'
+import { UNIDAD_LABELS, esProductoCombustible } from '../constants'
 
-export default function Paso3Confirmar({ form, productoSeleccionado, stockResultante, guardando, onGuardar }) {
+export default function Paso3Confirmar({
+  form, productoSeleccionado, stockResultante, guardando, onGuardar, vehiculos = [], usuarios = [],
+}) {
   const unidad = UNIDAD_LABELS[productoSeleccionado?.unidad_medida]
   const dejaEnCero = form.tipo === 'salida' && stockResultante <= 0
   const dejaEnMinimo =
     !dejaEnCero &&
     productoSeleccionado?.stock_minimo > 0 &&
     stockResultante <= Number(productoSeleccionado.stock_minimo)
+
+  const esCombustible = esProductoCombustible(productoSeleccionado)
+  const vehiculoSeleccionado = esCombustible
+    ? vehiculos.find((v) => Number(v.id) === Number(form.vehiculo))
+    : null
+
+  const esCompra = form.tipo === 'entrada' && Number(form.monto_compra) > 0
+  const compradorSeleccionado = esCompra
+    ? usuarios.find((u) => Number(u.id) === Number(form.comprado_por))
+    : null
 
   return (
     <div className="flex flex-col gap-5">
@@ -26,6 +38,22 @@ export default function Paso3Confirmar({ form, productoSeleccionado, stockResult
             <span className="text-text-secondary">Cantidad</span>
             <span className="font-mono font-semibold text-text">{form.cantidad} {unidad}</span>
           </div>
+          {vehiculoSeleccionado && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Vehículo</span>
+              <span className="text-right font-semibold text-text">
+                {vehiculoSeleccionado.nombre} — {vehiculoSeleccionado.marca} {vehiculoSeleccionado.modelo}
+              </span>
+            </div>
+          )}
+          {esCompra && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Compra</span>
+              <span className="text-right font-semibold text-text">
+                ${form.monto_compra} · {compradorSeleccionado?.nombre ?? 'sin comprador'}
+              </span>
+            </div>
+          )}
           <div className="flex justify-between border-t border-border pt-2">
             <span className="text-text-secondary">Stock actual</span>
             <span className="font-mono text-text">{productoSeleccionado?.stock_actual} {unidad}</span>

@@ -1,6 +1,6 @@
 import { UBICACION_LABELS } from '../constants'
 
-export default function PanelAlertasStock({ alertas }) {
+export default function PanelAlertasStock({ alertas, onSolicitar }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-4">
       <h2 className="mb-3 font-bold text-text">⚠️ Alertas de stock mínimo</h2>
@@ -25,6 +25,15 @@ export default function PanelAlertasStock({ alertas }) {
                 <p className="mt-0.5 text-xs text-text-secondary">
                   Stock: {producto.stock_actual} / mín. {producto.stock_minimo} · {UBICACION_LABELS[producto.ubicacion_detalle?.nombre]}
                 </p>
+                {onSolicitar && (
+                  <button
+                    type="button"
+                    onClick={() => onSolicitar(producto)}
+                    className="mt-2 rounded-lg border border-accent px-3 py-1.5 text-xs font-semibold text-highlight transition hover:bg-accent"
+                  >
+                    📋 Solicitar material
+                  </button>
+                )}
               </div>
             )
           })}

@@ -163,6 +163,15 @@ export const TRAILA_ITEMS = [
   { key: 'sin_carga', icon: '📦', label: 'Sin carga' },
 ]
 
+// Ítems de la traila cuando se revisan como parte del checklist de la moto
+// que la jala (unificación). Los `key` aquí deben coincidir con los campos
+// del modelo (traila_limpieza, etc.) para que `items_verificados` los cuente.
+export const TRAILA_EN_MOTO_ITEMS = [
+  { key: 'traila_limpieza', icon: '🧼', label: 'Limpieza de la traila' },
+  { key: 'traila_sin_herramientas', icon: '🧰', label: 'Traila sin herramientas' },
+  { key: 'traila_sin_carga', icon: '📦', label: 'Traila sin carga' },
+]
+
 export function itemsAplicables({ tipoReporte, tipoVehiculo }) {
   const ctx = { tipoReporte, tipoVehiculo }
   return CHECKLIST_ITEMS.filter((item) => item.aplica(ctx))
@@ -297,6 +306,14 @@ export function fotoSlotsAplicables({ form, tipoVehiculo }) {
 
   if (esOffRoad(tipoVehiculo) && form.traila) {
     slots.push({ item: 'carga_traila', icon: CARGA_TRAILA_ITEM.icon, label: CARGA_TRAILA_ITEM.label })
+  }
+
+  // Ítems de la traila cuando se está revisando como parte del checklist de la
+  // moto que la jala (unificación). Aplican tanto en salida como en llegada.
+  if (esOffRoad(tipoVehiculo) && form.traila) {
+    TRAILA_EN_MOTO_ITEMS.forEach((item) => {
+      slots.push({ item: item.key, icon: item.icon, label: item.label })
+    })
   }
 
   return slots

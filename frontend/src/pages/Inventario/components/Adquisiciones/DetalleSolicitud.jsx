@@ -7,6 +7,7 @@ import { useToast } from '../../../../hooks/useToast'
 import { AREA_LABELS, ESTADO_SOLICITUD_CONFIG } from '../../constants'
 
 const ROLES_AUTORIZAN = ['administrador', 'superadmin']
+const ROLES_COMPRAN = ['operaciones', 'inventario', 'administrador', 'superadmin']
 const ROLES_ENVIAN = ['operaciones', 'administrador', 'superadmin']
 const ROLES_RECIBEN = ['campo', 'inventario', 'administrador', 'superadmin']
 const ROLES_COMPARATIVO = ['inventario', 'administrador', 'superadmin']
@@ -19,7 +20,7 @@ const TIMELINE = [
   { estados: ['recibida_parcial', 'recibida_completa'], label: 'Recepción' },
 ]
 
-export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirEnvio, onAbrirRecepcion }) {
+export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra, onAbrirEnvio, onAbrirRecepcion }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -170,6 +171,28 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirEnvio, 
         </div>
       </div>
 
+      {solicitud.compra && (
+        <div className="rounded-2xl border border-border bg-card p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-secondary">Compra</p>
+          <div className="flex items-start gap-4">
+            <img
+              src={solicitud.compra.foto_factura}
+              alt="Factura"
+              className="h-20 w-20 shrink-0 rounded-xl border border-border object-cover"
+            />
+            <div className="flex flex-col gap-0.5 text-sm">
+              <p className="font-semibold text-text">
+                Compró: {solicitud.compra.comprado_por_detalle?.nombre}
+              </p>
+              <p className="text-text-secondary">Monto: ${solicitud.compra.monto_total}</p>
+              {solicitud.compra.proveedor && <p className="text-text-secondary">Proveedor: {solicitud.compra.proveedor}</p>}
+              <p className="text-text-secondary">Fecha: {solicitud.compra.fecha_compra}</p>
+              {solicitud.compra.notas && <p className="text-text-secondary">📝 {solicitud.compra.notas}</p>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {comparativo && (
         <div className="rounded-2xl border border-border bg-card p-5">
           <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-text-secondary">
@@ -237,7 +260,18 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirEnvio, 
         </div>
       )}
 
-      {['autorizada', 'en_compra'].includes(solicitud.estado) && ROLES_ENVIAN.includes(user?.rol) && (
+      {solicitud.estado === 'autorizada' && ROLES_COMPRAN.includes(user?.rol) && (
+        <button
+          type="button"
+          onClick={() => onAbrirCompra(solicitud)}
+          style={{ minHeight: '56px' }}
+          className="w-full rounded-xl bg-accent text-base font-bold text-highlight transition hover:opacity-90"
+        >
+          💰 Registrar compra
+        </button>
+      )}
+
+      {solicitud.estado === 'en_compra' && ROLES_ENVIAN.includes(user?.rol) && (
         <button
           type="button"
           onClick={() => onAbrirEnvio(solicitud)}

@@ -1,18 +1,24 @@
 import { useState } from 'react'
 
 import { createSolicitud } from '../../../../api/inventario'
+import { useAuth } from '../../../../hooks/useAuth'
 import { useToast } from '../../../../hooks/useToast'
 import ChecklistRecepcion from './ChecklistRecepcion'
 import DetalleSolicitud from './DetalleSolicitud'
+import FormularioCompra from './FormularioCompra'
 import FormularioEnvio from './FormularioEnvio'
 import FormularioSolicitud from './FormularioSolicitud'
 import ListaSolicitudes from './ListaSolicitudes'
+import RelacionComprasPanel from './RelacionComprasPanel'
 import ReportesFaltantes from './ReportesFaltantes'
 
-export default function VistaAdquisiciones({ onVolver }) {
+const ROLES_VEN_RELACION = ['inventario', 'administrador', 'superadmin']
+
+export default function VistaAdquisiciones({ onVolver, prefill }) {
+  const { user } = useAuth()
   const { showToast } = useToast()
-  const [seccion, setSeccion] = useState('solicitudes') // solicitudes | reportes
-  const [vista, setVista] = useState('lista') // lista | nueva | detalle | envio | recepcion
+  const [seccion, setSeccion] = useState('solicitudes') // solicitudes | reportes | relacion
+  const [vista, setVista] = useState(() => (prefill ? 'nueva' : 'lista')) // lista | nueva | detalle | compra | envio | recepcion
   const [solicitudId, setSolicitudId] = useState(null)
   const [solicitudActiva, setSolicitudActiva] = useState(null)
   const [guardando, setGuardando] = useState(false)
@@ -46,7 +52,12 @@ export default function VistaAdquisiciones({ onVolver }) {
 
   if (vista === 'nueva') {
     return (
-      <FormularioSolicitud onGuardar={handleCrearSolicitud} onCancelar={irALista} guardando={guardando} />
+      <FormularioSolicitud
+        onGuardar={handleCrearSolicitud}
+        onCancelar={irALista}
+        guardando={guardando}
+        prefill={prefill}
+      />
     )
   }
 
@@ -55,6 +66,10 @@ export default function VistaAdquisiciones({ onVolver }) {
       <DetalleSolicitud
         solicitudId={solicitudId}
         onVolver={irALista}
+        onAbrirCompra={(solicitud) => {
+          setSolicitudActiva(solicitud)
+          setVista('compra')
+        }}
         onAbrirEnvio={(solicitud) => {
           setSolicitudActiva(solicitud)
           setVista('envio')
@@ -63,6 +78,16 @@ export default function VistaAdquisiciones({ onVolver }) {
           setSolicitudActiva(solicitud)
           setVista('recepcion')
         }}
+      />
+    )
+  }
+
+  if (vista === 'compra' && solicitudActiva) {
+    return (
+      <FormularioCompra
+        solicitud={solicitudActiva}
+        onCancelar={() => setVista('detalle')}
+        onRegistrada={irALista}
       />
     )
   }
@@ -112,6 +137,19 @@ export default function VistaAdquisiciones({ onVolver }) {
         >
           ⚠️ Faltantes y daños
         </button>
+        {ROLES_VEN_RELACION.includes(user?.rol) && (
+          <button
+            type="button"
+            onClick={() => setSeccion('relacion')}
+            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
+              seccion === 'relacion'
+                ? 'border-highlight bg-highlight/10 text-highlight'
+                : 'border-border text-text-secondary hover:border-accent hover:text-text'
+            }`}
+          >
+            📊 Relación de compras
+          </button>
+        )}
       </div>
 
       {seccion === 'solicitudes' && (
@@ -126,6 +164,8 @@ export default function VistaAdquisiciones({ onVolver }) {
       )}
 
       {seccion === 'reportes' && <ReportesFaltantes />}
+
+      {seccion === 'relacion' && ROLES_VEN_RELACION.includes(user?.rol) && <RelacionComprasPanel />}
 
       <button
         type="button"

@@ -1,4 +1,4 @@
-import { ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, esOffRoad } from '../constants'
+import { ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, esOffRoad, esTraila } from '../constants'
 
 function formatFechaHora(fechaHora) {
   if (!fechaHora) return ''
@@ -70,7 +70,7 @@ export default function TarjetaVehiculo({ vehiculo, onVerDetalle, onNuevoCheckli
         </div>
       </button>
 
-      {puedeCrearChecklist && (
+      {puedeCrearChecklist && !esTraila(vehiculo.tipo) && (
         <button
           type="button"
           onClick={onNuevoChecklist}

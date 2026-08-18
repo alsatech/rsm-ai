@@ -8,6 +8,7 @@ import {
   INCIDENCIA_PREVIA_ITEM,
   MODELO_TRAILA_PERMITIDO,
   TABLERO_ITEM,
+  TRAILA_EN_MOTO_ITEMS,
   TRAILA_ITEMS,
   esOffRoad,
   esTraila,
@@ -112,6 +113,7 @@ function SubidorMasivo({ slots, fotos, onAgregarFoto, onEliminarFoto, inputRefEx
 // Selector Sí/No para "¿Hubo alguna incidencia?". En salida = preexistente, en llegada = nueva.
 function SelectorIncidencia({ tipoReporte, value, onChange }) {
   const esSalida = tipoReporte === 'salida'
+  const fotosPorItem = (item) => fotos.filter((f) => f.item === item)
   const titulo = esSalida ? '¿El vehículo ya tenía daños visibles?' : '¿Hubo alguna incidencia durante el uso?'
   const ayuda = esSalida
     ? 'Si trae golpes, rayones o piezas rotas, repórtalo aquí para deslindarte.'
@@ -323,6 +325,7 @@ export default function Paso2Inspeccion({
   }, [offRoad])
 
   const esSalida = form.tipo_reporte === 'salida'
+  const fotosPorItem = (item) => fotos.filter((f) => f.item === item)
 
   // Slots del checklist (en orden). Si el usuario responde Sí en la incidencia,
   // agregamos una casilla para su foto también.
@@ -463,6 +466,82 @@ export default function Paso2Inspeccion({
 
       {/* Carga masiva de evidencia fotográfica */}
       <SubidorMasivo slots={slots} fotos={fotos} onAgregarFoto={onAgregarFoto} onEliminarFoto={onEliminarFoto} />
+
+      {/* Sub-sección de la traila — solo cuando es off-road y se eligió una traila.
+          Aquí se revisan los 3 ítems propios de la traila (limpieza, sin
+          herramientas, sin carga) que ahora forman parte del mismo checklist de
+          la moto en vez de ser un checklist independiente. */}
+      {offRoad && form.traila && (
+        <div className="glass-card-strong flex flex-col gap-4 rounded-2xl border-2 border-accent/40 bg-accent/5 p-4">
+          <div className="flex items-center gap-2">
+            <IconoSeccion icono="🚛" />
+            <div className="flex-1">
+              <h2 className="text-lg font-bold text-flotafg">Revisión de la traila</h2>
+              <p className="text-xs text-flotafg-muted">
+                {form.traila_detalle?.equipo || form.traila_detalle?.nombre || 'Traila'} —
+                {' '}
+                {esSalida
+                  ? 'verifica antes de salir'
+                  : 'verifica al regresar'}
+              </p>
+            </div>
+            <span className="font-mono text-xs font-bold text-flotafg-muted">
+              {TRAILA_EN_MOTO_ITEMS.filter((it) => fotosPorItem(it.key).length > 0).length}/{TRAILA_EN_MOTO_ITEMS.length}
+            </span>
+          </div>
+
+          <div className="glass-card flex flex-col divide-y divide-flotafg-muted/15 overflow-hidden rounded-xl">
+            {TRAILA_EN_MOTO_ITEMS.map((item) => {
+              const listo = fotosPorItem(item.key).length > 0
+              return (
+                <button
+                  key={item.key}
+                  type="button"
+                  onClick={() => listo && onEliminarFoto(fotos.findIndex((f) => f.item === item.key))}
+                  style={{ minHeight: '52px' }}
+                  className={`flex items-center gap-3 px-4 text-left transition ${listo ? 'bg-accent/15' : 'hover:bg-flotacard/50'}`}
+                >
+                  <span className="text-xl">{item.icon}</span>
+                  <span className={`flex-1 text-sm font-semibold ${listo ? 'text-flotafg' : 'text-flotafg-muted'}`}>
+                    {item.label}
+                  </span>
+                  <span
+                    className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full border-2 text-xs font-bold transition ${
+                      listo ? 'border-accent bg-accent text-white' : 'border-flotafg-muted/40'
+                    }`}
+                  >
+                    {listo ? '✓' : ''}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            className="hidden"
+            onChange={(e) => {
+              const pendientes = TRAILA_EN_MOTO_ITEMS.filter((it) => !fotosPorItem(it.key).length)
+              Array.from(e.target.files).forEach((file, i) => {
+                const slot = pendientes[i]
+                if (slot) onAgregarFoto(slot.key, file)
+              })
+              e.target.value = ''
+            }}
+            id="traila-fotos-input"
+          />
+          <button
+            type="button"
+            onClick={() => document.getElementById('traila-fotos-input')?.click()}
+            style={{ minHeight: '56px' }}
+            className="flex items-center justify-center gap-2 rounded-xl border-2 border-dashed border-accent/60 bg-flotacard/40 text-base font-bold text-flotafg transition hover:border-accent hover:bg-accent/5 active:scale-[0.98]"
+          >
+            📷 Subir fotos de la traila
+          </button>
+        </div>
+      )}
 
       {/* Pregunta Sí/No sobre incidencias */}
       <SelectorIncidencia

@@ -2,6 +2,7 @@ from django.contrib import admin
 
 from .models import (
     CategoriaInventario,
+    Compra,
     EnvioMaterial,
     FotoEnvio,
     ItemRecepcion,
@@ -9,6 +10,7 @@ from .models import (
     MovimientoInventario,
     Producto,
     RecepcionMaterial,
+    RelacionCompras,
     ReporteFaltanteDanio,
     SolicitudMaterial,
     Ubicacion,
@@ -81,6 +83,22 @@ class RecepcionMaterialAdmin(admin.ModelAdmin):
     list_filter = ('estado_general',)
     raw_id_fields = ('envio', 'recibido_por')
     inlines = [ItemRecepcionInline]
+
+
+@admin.register(Compra)
+class CompraAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'proveedor', 'comprado_por', 'registrado_por', 'monto_total', 'fecha_compra')
+    list_filter = ('fecha_compra',)
+    search_fields = ('proveedor',)
+    raw_id_fields = ('solicitud', 'movimiento', 'comprado_por', 'registrado_por')
+
+
+@admin.register(RelacionCompras)
+class RelacionComprasAdmin(admin.ModelAdmin):
+    list_display = ('folio', 'fecha_inicio', 'fecha_fin', 'estado', 'generado_por', 'created_at')
+    list_filter = ('estado',)
+    raw_id_fields = ('generado_por',)
+    filter_horizontal = ('compras',)
 
 
 @admin.register(ReporteFaltanteDanio)

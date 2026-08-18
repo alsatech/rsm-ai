@@ -450,6 +450,9 @@ class SpotPosicionesListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, PuedeVerSpot]
 
     def get_queryset(self):
+        asignacion_id = self.request.query_params.get('asignacion')
+        if asignacion_id:
+            return PosicionSpot.objects.filter(asignacion_id=asignacion_id).order_by('fecha_hora_spot')
         fecha = self.request.query_params.get('fecha') or timezone.now().date()
         return PosicionSpot.objects.filter(fecha_hora_spot__date=fecha).order_by('fecha_hora_spot')
 

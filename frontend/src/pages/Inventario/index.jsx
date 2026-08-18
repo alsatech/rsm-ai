@@ -14,6 +14,7 @@ export default function Inventario() {
   const [vista, setVista] = useState('dashboard')
   const [categoriaFiltro, setCategoriaFiltro] = useState(null)
   const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
+  const [productoParaSolicitud, setProductoParaSolicitud] = useState(null)
   const [recargar, setRecargar] = useState(0)
 
   const puedeValidar = ['inventario', 'superadmin'].includes(user?.rol)
@@ -33,6 +34,12 @@ export default function Inventario() {
     setVista('dashboard')
     setCategoriaFiltro(null)
     setProductoPreseleccionado(null)
+    setProductoParaSolicitud(null)
+  }
+
+  const handleSolicitarMaterial = (producto) => {
+    setProductoParaSolicitud(producto)
+    setVista('adquisiciones')
   }
 
   const handleGuardado = () => {
@@ -78,7 +85,7 @@ export default function Inventario() {
           </div>
         </header>
         <div className="px-4 py-5">
-          <VistaAdquisiciones onVolver={handleVolver} />
+          <VistaAdquisiciones onVolver={handleVolver} prefill={productoParaSolicitud} />
         </div>
       </div>
     )
@@ -151,7 +158,11 @@ export default function Inventario() {
         </div>
       </header>
 
-      <DashboardInventario recargar={recargar} onVerProductos={handleVerProductos} />
+      <DashboardInventario
+        recargar={recargar}
+        onVerProductos={handleVerProductos}
+        onSolicitarMaterial={handleSolicitarMaterial}
+      />
     </div>
   )
 }

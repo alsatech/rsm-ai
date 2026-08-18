@@ -11,12 +11,14 @@ from rest_framework.views import APIView
 
 from .models import (
     CategoriaInventario,
+    Compra,
     EnvioMaterial,
     FotoEnvio,
     ItemRecepcion,
     MovimientoInventario,
     Producto,
     RecepcionMaterial,
+    RelacionCompras,
     ReporteFaltanteDanio,
     SolicitudMaterial,
     Ubicacion,
@@ -26,6 +28,8 @@ from .permissions import (
     PuedeCrearSolicitud,
     PuedeEditarSolicitud,
     PuedeGestionarCatalogo,
+    PuedeGestionarRelacionCompras,
+    PuedeRegistrarCompra,
     PuedeRegistrarEnvio,
     PuedeRegistrarMovimiento,
     PuedeRegistrarRecepcion,
@@ -39,11 +43,13 @@ from .permissions import (
 from .serializers import (
     AutorizarSolicitudSerializer,
     CategoriaInventarioSerializer,
+    CompraSerializer,
     EnvioMaterialSerializer,
     MovimientoInventarioSerializer,
     ProductoSerializer,
     RecepcionMaterialSerializer,
     RechazarSolicitudSerializer,
+    RelacionComprasSerializer,
     ReporteFaltanteDanioSerializer,
     ResolverReporteSerializer,
     SolicitudMaterialSerializer,
@@ -112,7 +118,7 @@ class ProductoMovimientosView(APIView):
 
     def get(self, request, pk):
         producto = get_object_or_404(Producto, pk=pk)
-        movimientos = producto.movimientos.select_related('producto', 'responsable', 'validado_por')
+        movimientos = producto.movimientos.select_related('producto', 'responsable', 'validado_por', 'compra')
         if request.user.rol not in ROLES_REPORTES_COMPLETOS:
             movimientos = movimientos.filter(responsable=request.user)
         serializer = MovimientoInventarioSerializer(movimientos, many=True, context={'request': request})
@@ -128,7 +134,7 @@ class MovimientoListCreateView(generics.ListCreateAPIView):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        qs = MovimientoInventario.objects.select_related('producto', 'responsable', 'validado_por')
+        qs = MovimientoInventario.objects.select_related('producto', 'responsable', 'validado_por', 'compra')
         user = self.request.user
 
         if user.rol in ROLES_REPORTES_COMPLETOS:
@@ -377,6 +383,34 @@ class EnviarSolicitudView(APIView):
         )
 
 
+class RegistrarCompraView(APIView):
+    """POST /solicitudes/{id}/compra/ — registra la compra realizada (Yajaira/Erik)."""
+
+    permission_classes = [IsAuthenticated, PuedeRegistrarCompra]
+
+    def post(self, request, pk):
+        solicitud = get_object_or_404(SolicitudMaterial, pk=pk)
+        if solicitud.estado != SolicitudMaterial.Estado.AUTORIZADA:
+            return Response(
+                {'detail': 'Solo se puede registrar la compra de solicitudes autorizadas.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if hasattr(solicitud, 'compra'):
+            return Response(
+                {'detail': 'Esta solicitud ya tiene una compra registrada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = CompraSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        compra = serializer.save(solicitud=solicitud, registrado_por=request.user)
+
+        solicitud.estado = SolicitudMaterial.Estado.EN_COMPRA
+        solicitud.save(update_fields=['estado', 'updated_at'])
+
+        return Response(CompraSerializer(compra).data, status=status.HTTP_201_CREATED)
+
+
 class RecepcionesSolicitudView(APIView):
     """GET/POST /solicitudes/{id}/recepciones/ — checklist de recepción de campo/inventario."""
 
@@ -502,6 +536,70 @@ class ComparativoSolicitudView(APIView):
                 'diferencia': diferencia,
             })
         return Response({'folio': solicitud.folio, 'items': comparativo})
+
+
+class RelacionComprasListCreateView(generics.ListCreateAPIView):
+    """GET: historial de relaciones (Yajaira, Alexia, Superadmin). POST: genera una relación en borrador
+    con las compras sin asignar dentro del rango de fechas dado (Yajaira/Superadmin)."""
+
+    serializer_class = RelacionComprasSerializer
+    queryset = RelacionCompras.objects.select_related('generado_por').prefetch_related(
+        'compras__solicitud', 'compras__movimiento__producto', 'compras__comprado_por', 'compras__registrado_por',
+    )
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), PuedeGestionarRelacionCompras()]
+        return [IsAuthenticated(), PuedeVerReportesCompletos()]
+
+    def create(self, request, *args, **kwargs):
+        fecha_inicio = request.data.get('fecha_inicio')
+        fecha_fin = request.data.get('fecha_fin')
+        if not fecha_inicio or not fecha_fin:
+            return Response(
+                {'detail': 'Debes indicar fecha_inicio y fecha_fin.'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        compras = Compra.objects.filter(
+            fecha_compra__gte=fecha_inicio, fecha_compra__lte=fecha_fin, relaciones__isnull=True,
+        )
+        if not compras.exists():
+            return Response(
+                {'detail': 'No hay compras sin asignar en ese rango de fechas.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        relacion = RelacionCompras.objects.create(
+            fecha_inicio=fecha_inicio, fecha_fin=fecha_fin, generado_por=request.user,
+        )
+        relacion.compras.set(compras)
+
+        return Response(RelacionComprasSerializer(relacion).data, status=status.HTTP_201_CREATED)
+
+
+class RelacionComprasDetailView(generics.RetrieveAPIView):
+    queryset = RelacionCompras.objects.select_related('generado_por').prefetch_related(
+        'compras__solicitud', 'compras__movimiento__producto', 'compras__comprado_por', 'compras__registrado_por',
+    )
+    serializer_class = RelacionComprasSerializer
+    permission_classes = [IsAuthenticated, PuedeVerReportesCompletos]
+
+
+class EnviarRelacionComprasView(APIView):
+    """POST /relaciones-compras/{id}/enviar/ — Yajaira marca la relación como enviada a Alexia."""
+
+    permission_classes = [IsAuthenticated, PuedeGestionarRelacionCompras]
+
+    def post(self, request, pk):
+        relacion = get_object_or_404(RelacionCompras, pk=pk)
+        if relacion.estado != RelacionCompras.Estado.BORRADOR:
+            return Response(
+                {'detail': 'Esta relación ya fue enviada.'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        relacion.estado = RelacionCompras.Estado.ENVIADA
+        relacion.enviada_en = timezone.now()
+        relacion.save(update_fields=['estado', 'enviada_en'])
+        return Response(RelacionComprasSerializer(relacion).data)
 
 
 class ReporteFaltanteListCreateView(generics.ListCreateAPIView):

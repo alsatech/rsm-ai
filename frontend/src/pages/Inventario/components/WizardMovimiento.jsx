@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 import { createMovimiento } from '../../../api/inventario'
+import { getUsuarios, getVehiculos } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { UNIDAD_LABELS } from '../constants'
+import { UNIDAD_LABELS, esProductoCombustible } from '../constants'
 import Paso1Producto from './Paso1Producto'
 import Paso2Detalle from './Paso2Detalle'
 import Paso3Confirmar from './Paso3Confirmar'
@@ -23,9 +24,12 @@ function estadoInicial(producto) {
     cantidad: '',
     responsable: '',
     uso_descripcion: '',
-    vehiculo_codigo: '',
+    vehiculo: null,           // ID del vehiculo de flota (obligatorio en salidas de combustibles)
+    vehiculo_codigo: '',      // legacy: el backend lo autollena desde vehiculo
     proyecto_referencia: '',
     notas: '',
+    monto_compra: '',         // si se llena en una entrada, el backend crea una Compra ligada
+    comprado_por: '',
   }
 }
 
@@ -37,12 +41,31 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
   const [form, setForm] = useState(() => estadoInicial(productoPreseleccionado))
   const [foto, setFoto] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  const [vehiculos, setVehiculos] = useState([])
+  const [usuarios, setUsuarios] = useState([])
+
+  // Cargamos la lista de vehículos una sola vez al montar — Paso2 y Paso3 la consumen.
+  // Excluimos tipos que no usan combustible propio: trailas, plataformas y remolques.
+  // (La lista de flota los trae porque también se usan en checklists, pero en salidas
+  // de gasolina/diésel no aplica — son elementos que jalan o transportan, no que carguen.)
+  useEffect(() => {
+    const TIPOS_SIN_COMBUSTIBLE = new Set(['traila', 'plataforma', 'remolque'])
+    getVehiculos()
+      .then(({ data }) => setVehiculos(data.filter((v) => !TIPOS_SIN_COMBUSTIBLE.has(v.tipo))))
+      .catch(() => setVehiculos([]))
+    getUsuarios().then(({ data }) => setUsuarios(data)).catch(() => setUsuarios([]))
+  }, [])
 
   const puedeRegistrarEntrada = ROLES_REGISTRAN_ENTRADA.includes(user?.rol)
 
   const puedeAvanzar1 = Boolean(productoSeleccionado && form.tipo)
   const cantidadValida = Number(form.cantidad) > 0
-  const puedeAvanzar2 = cantidadValida
+  const esCombustible = esProductoCombustible(productoSeleccionado)
+  // En salidas de combustible el vehiculo es obligatorio; en el resto del flujo no.
+  const vehiculoObligatorioOk = !esCombustible || form.tipo !== 'salida' || Boolean(form.vehiculo)
+  const esCompra = form.tipo === 'entrada' && Number(form.monto_compra) > 0
+  const compraValidaOk = !esCompra || (Boolean(form.comprado_por) && Boolean(foto))
+  const puedeAvanzar2 = cantidadValida && vehiculoObligatorioOk && compraValidaOk
 
   const cantidad = Number(form.cantidad) || 0
   const stockActual = Number(productoSeleccionado?.stock_actual) || 0
@@ -57,10 +80,14 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
       fd.append('cantidad', form.cantidad)
       if (form.responsable) fd.append('responsable', form.responsable)
       if (form.uso_descripcion) fd.append('uso_descripcion', form.uso_descripcion)
-      if (form.vehiculo_codigo) fd.append('vehiculo_codigo', form.vehiculo_codigo)
+      if (form.vehiculo) fd.append('vehiculo', form.vehiculo)
       if (form.proyecto_referencia) fd.append('proyecto_referencia', form.proyecto_referencia)
       if (form.notas) fd.append('notas', form.notas)
       if (foto) fd.append('foto_evidencia', foto)
+      if (esCompra) {
+        fd.append('monto_compra', form.monto_compra)
+        fd.append('comprado_por', form.comprado_por)
+      }
 
       await createMovimiento(fd)
 
@@ -119,6 +146,8 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
             productoSeleccionado={productoSeleccionado}
             foto={foto}
             setFoto={setFoto}
+            vehiculos={vehiculos}
+            usuarios={usuarios}
           />
         )}
         {paso === 3 && (
@@ -128,6 +157,8 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
             stockResultante={stockResultante}
             guardando={guardando}
             onGuardar={handleGuardar}
+            vehiculos={vehiculos}
+            usuarios={usuarios}
           />
         )}
 

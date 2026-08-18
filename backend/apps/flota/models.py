@@ -104,6 +104,15 @@ class ChecklistVehiculo(models.Model):
     sin_herramientas = models.BooleanField(default=False)
     sin_carga = models.BooleanField(default=False)
 
+    # Ítems de la traila cuando se está registrando como PARTE del checklist de la
+    # moto/cuatrimoto que la jala (unificación moto+traila). Es la misma triada que
+    # arriba pero con prefijo `traila_` para que convivan en el mismo modelo sin
+    # colisionar con los flags que se usan cuando el vehículo del checklist ES la
+    # traila. El serializer los expone como un solo grupo de 3 ítems al frontend.
+    traila_limpieza = models.BooleanField(default=False)
+    traila_sin_herramientas = models.BooleanField(default=False)
+    traila_sin_carga = models.BooleanField(default=False)
+
     # Incidencias — texto libre + foto (item='incidencia_previa' o 'incidencia_nueva').
     # SALIDA: el usuario reporta daños preexistentes para deslindarse ("ya lo entregué así").
     # LLEGADA: el usuario reporta daños nuevos/choques ocurridos durante el uso.
@@ -174,6 +183,7 @@ class ChecklistVehiculo(models.Model):
 
         off_road = self._es_off_road()
         sin_kilometraje = self._sin_kilometraje()
+        lleva_traila = bool(self.traila_id)
 
         if self.tipo_reporte == self.TipoReporte.LLEGADA:
             items = ['estado_fisico', 'lavado']
@@ -181,6 +191,10 @@ class ChecklistVehiculo(models.Model):
                 items.append('kilometraje')
             if off_road:
                 items.append('carga_traila')
+            # Unificación moto+traila: si jaló traila, los 3 ítems de la traila
+            # también cuentan como parte de este mismo checklist (salida y llegada).
+            if lleva_traila:
+                items += ['traila_limpieza', 'traila_sin_herramientas', 'traila_sin_carga']
             return items
 
         items = ['estado_fisico', 'nivel_aceite_motor', 'anticongelante']
@@ -190,6 +204,10 @@ class ChecklistVehiculo(models.Model):
             items += ['soplado_filtro_aire', 'carga_traila']
         else:
             items.append('nivel_aceite_transmision')
+        # Unificación moto+traila: la traila se revisa junto con la moto tanto al
+        # sacar como al regresar.
+        if lleva_traila:
+            items += ['traila_limpieza', 'traila_sin_herramientas', 'traila_sin_carga']
         return items
 
     def items_verificados(self):
@@ -197,6 +215,10 @@ class ChecklistVehiculo(models.Model):
         for campo in self.items_aplicables():
             if campo == 'kilometraje':
                 verificados += 1 if self.pk and self.fotos.filter(item='kilometraje').exists() else 0
+            elif campo in ('traila_limpieza', 'traila_sin_herramientas', 'traila_sin_carga'):
+                # Los ítems de la traila requieren foto por separado (item='traila_*').
+                foto_item = campo.replace('traila_', 'traila_')  # mismo nombre
+                verificados += 1 if self.pk and self.fotos.filter(item=foto_item).exists() else 0
             else:
                 verificados += 1 if getattr(self, campo) else 0
         return verificados

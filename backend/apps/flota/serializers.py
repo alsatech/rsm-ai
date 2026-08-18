@@ -183,6 +183,7 @@ class ChecklistVehiculoSerializer(serializers.ModelSerializer):
             'estado_fisico', 'lavado', 'soplado_filtro_aire',
             'anticongelante', 'nivel_aceite_motor', 'nivel_aceite_transmision',
             'carga_traila', 'traila', 'traila_detalle', 'limpieza', 'sin_herramientas', 'sin_carga',
+            'traila_limpieza', 'traila_sin_herramientas', 'traila_sin_carga',
             'incidencia_previa', 'incidencia_nueva',
             'proyecto',
             'salida_relacionada', 'salida_relacionada_detalle',

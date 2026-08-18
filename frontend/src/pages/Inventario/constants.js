@@ -33,23 +33,6 @@ export const SUGERENCIAS_USO = [
   'Para el ganado',
 ]
 
-// Vehículos de la reserva para el selector de combustible (códigos de flota).
-export const VEHICULOS_COMBUSTIBLE = [
-  { codigo: 'SM-A001', nombre: 'Moto roja (CAN AM Outlander)' },
-  { codigo: 'SM-A002', nombre: 'Moto azul (Polaris Sport Man)' },
-  { codigo: 'SM-R001', nombre: 'El 1000 (Polaris Ranger 1000)' },
-  { codigo: 'SM-R002', nombre: '166/#1 amarillo (CAN AM)' },
-  { codigo: 'SM-R003', nombre: '107/#2 café (CAN AM)' },
-  { codigo: 'SM-C001', nombre: 'Sierra (Chevrolet Sierra)' },
-  { codigo: 'SM-C002', nombre: 'Blazer (Chevrolet Blazer)' },
-  { codigo: 'SM-C003', nombre: 'Toyota (Tacoma)' },
-  { codigo: 'SM-C004', nombre: 'Camioncito (Ford F250)' },
-  { codigo: 'SM-R004', nombre: 'El 700 (Polaris Ranger 700)' },
-  { codigo: 'SM-R005', nombre: 'El 900 (Polaris Ranger 900)' },
-  { codigo: 'SM-V001', nombre: 'Savana (GMC Savana Van)' },
-  { codigo: 'SM-M001', nombre: 'El piolín (Caterpillar)' },
-]
-
 export function esProductoCombustible(producto) {
   return producto?.categoria_detalle?.nombre === 'Combustibles'
 }

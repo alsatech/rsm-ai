@@ -131,13 +131,31 @@ function BuscadorProducto({ onElegir }) {
   )
 }
 
-export default function FormularioSolicitud({ onGuardar, onCancelar, guardando }) {
+function itemDesdePrefill(producto) {
+  if (!producto) return null
+  return {
+    producto: producto.id,
+    productoDetalle: producto,
+    descripcion_libre: '',
+    cantidad_solicitada: producto.stock_minimo || 1,
+    unidad: producto.unidad_medida_display || '',
+    notas: '',
+    es_producto_nuevo: false,
+  }
+}
+
+export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, prefill }) {
   const confirm = useConfirm()
   const [paso, setPaso] = useState(1)
   const [area, setArea] = useState('campo')
-  const [descripcionNecesidad, setDescripcionNecesidad] = useState('')
+  const [descripcionNecesidad, setDescripcionNecesidad] = useState(
+    prefill ? `Reponer stock bajo de ${prefill.descripcion}` : ''
+  )
   const [fechaRequerida, setFechaRequerida] = useState('')
-  const [items, setItems] = useState([])
+  const [items, setItems] = useState(() => {
+    const item = itemDesdePrefill(prefill)
+    return item ? [item] : []
+  })
   const [itemActual, setItemActual] = useState(ITEM_VACIO)
 
   const puedeAvanzar1 = Boolean(descripcionNecesidad.trim())
