@@ -162,7 +162,7 @@ class PosicionSpot(models.Model):
     asignacion = models.ForeignKey(
         AsignacionSpot, on_delete=models.CASCADE, related_name='posiciones'
     )
-    spot_message_id = models.IntegerField(unique=True)
+    spot_message_id = models.BigIntegerField(unique=True)
     lat = models.DecimalField(max_digits=18, decimal_places=12)
     lng = models.DecimalField(max_digits=18, decimal_places=12)
     altitud = models.IntegerField(null=True, blank=True)
