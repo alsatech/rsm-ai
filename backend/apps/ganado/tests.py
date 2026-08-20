@@ -545,6 +545,37 @@ class SpotAPITest(APITestCase):
             AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False).count(), 1,
         )
 
+    @patch('apps.ganado.tasks.requests.get')
+    def test_posicion_nueva_resuelve_alerta_sin_senal(self, mock_get):
+        """Al volver la señal, la alerta SIN_SEÑAL abierta debe cerrarse sola."""
+        vieja = PosicionSpot.objects.create(
+            asignacion=self.asignacion,
+            spot_message_id=444,
+            lat=29.51,
+            lng=-101.55,
+            fecha_hora_spot=timezone.now() - timedelta(hours=5),
+            message_type='STOP',
+            bateria='GOOD',
+            dentro_perimetro=True,
+        )
+        AlertaSpot.objects.create(
+            asignacion=self.asignacion, tipo=AlertaSpot.Tipo.SIN_SENAL,
+            mensaje='sin señal', posicion=vieja,
+        )
+
+        mensaje = {
+            'id': 445, 'latitude': 29.51, 'longitude': -101.55,
+            'altitude': 500, 'dateTime': timezone.now().isoformat(),
+            'messageType': 'STOP', 'batteryState': 'GOOD',
+        }
+        mock_get.return_value = _mock_feed_response([mensaje])
+
+        consultar_spot()
+
+        self.assertEqual(
+            AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False).count(), 0,
+        )
+
     def test_solo_admin_ve_spot(self):
         self._auth(self.campo)
         resp = self.client.get('/api/v1/ganado/spot/estado/')
@@ -576,6 +607,29 @@ class SpotAPITest(APITestCase):
         self.assertIsNone(resp.data['asignacion_activa'])
         self.assertIsNotNone(resp.data['ultima_posicion'])
         self.assertEqual(resp.data['ultima_posicion']['spot_message_id'], 444)
+
+    @patch('django.utils.timezone.now')
+    def test_total_hoy_usa_fecha_local_no_utc(self, mock_now):
+        """Pasada la medianoche UTC pero aún de noche en CDMX/El Paso (UTC-6), una posición
+        de 'hoy' en hora local debe contarse aunque su fecha_hora_spot ya sea de mañana en UTC."""
+        ahora_utc = timezone.datetime(2026, 8, 20, 3, 0, 0, tzinfo=timezone.UTC)
+        mock_now.return_value = ahora_utc
+
+        PosicionSpot.objects.create(
+            asignacion=self.asignacion,
+            spot_message_id=446,
+            lat=29.51,
+            lng=-101.55,
+            fecha_hora_spot=ahora_utc,
+            message_type='STOP',
+            bateria='GOOD',
+            dentro_perimetro=True,
+        )
+
+        self._auth(self.admin)
+        resp = self.client.get('/api/v1/ganado/spot/estado/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['total_posiciones_hoy'], 1)
 
     def test_crear_asignacion_requiere_nombre(self):
         self._auth(self.admin)

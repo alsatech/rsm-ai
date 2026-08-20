@@ -120,6 +120,10 @@ def consultar_spot():
             )
             procesados += 1
 
+            AlertaSpot.objects.filter(
+                asignacion=asignacion, tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False,
+            ).update(resuelta=True, resuelta_en=timezone.now())
+
             if not dentro and not modo_pruebas:
                 AlertaSpot.objects.create(
                     asignacion=asignacion,

@@ -85,6 +85,14 @@ const iconoFueraPerimetro = L.divIcon({
   iconAnchor: [16, 16],
 })
 
+// SPOT reporta lat/lng -99999 cuando el mensaje no trae fix GPS (p.ej. POWER-OFF).
+// Esas coordenadas centinela rompen el fitBounds del mapa (fuerza el zoom al mínimo).
+function tieneCoordenadaValida(p) {
+  const lat = parseFloat(p.lat)
+  const lng = parseFloat(p.lng)
+  return Number.isFinite(lat) && Number.isFinite(lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180
+}
+
 function AjustarVista({ posiciones }) {
   const map = useMap()
   useEffect(() => {
@@ -208,8 +216,9 @@ export default function SpotTrace() {
     ? BATERIA_CONFIG[estado.ultima_posicion.bateria] ?? BATERIA_CONFIG.GOOD
     : null
   const fueraDePerimetro = !MODO_PRUEBAS && estado?.ultima_posicion && !estado.ultima_posicion.dentro_perimetro
-  const posicionesFuera = MODO_PRUEBAS ? [] : posiciones.filter((p) => !p.dentro_perimetro)
-  const ultimaPosicionHoy = posiciones.length ? posiciones[posiciones.length - 1] : null
+  const posicionesConFix = useMemo(() => posiciones.filter(tieneCoordenadaValida), [posiciones])
+  const posicionesFuera = MODO_PRUEBAS ? [] : posicionesConFix.filter((p) => !p.dentro_perimetro)
+  const ultimaPosicionHoy = posicionesConFix.length ? posicionesConFix[posicionesConFix.length - 1] : null
   const alertasVisibles = MODO_PRUEBAS ? alertas.filter((a) => a.tipo !== 'fuera_perimetro') : alertas
 
   const handleActivarAsignacion = async (e) => {
@@ -586,7 +595,7 @@ export default function SpotTrace() {
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
               />
 
-              <AjustarVista posiciones={posiciones} />
+              <AjustarVista posiciones={posicionesConFix} />
 
               {PERIMETRO_SANTA_MARGARITA.length > 0 && (
                 <Polygon
@@ -610,14 +619,14 @@ export default function SpotTrace() {
                 </CircleMarker>
               ))}
 
-              {rastroVisible && posiciones.length > 1 && (
+              {rastroVisible && posicionesConFix.length > 1 && (
                 <Polyline
-                  positions={posiciones.map((p) => [parseFloat(p.lat), parseFloat(p.lng)])}
+                  positions={posicionesConFix.map((p) => [parseFloat(p.lat), parseFloat(p.lng)])}
                   pathOptions={{ color: '#60a5fa', weight: 3, opacity: 0.85 }}
                 />
               )}
 
-              {rastroVisible && posiciones.map((p) => {
+              {rastroVisible && posicionesConFix.map((p) => {
                 const esUltima = p.id === ultimaPosicionHoy?.id
                 if (esUltima) return null
                 return (
