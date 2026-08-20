@@ -191,4 +191,14 @@
 
 ---
 
+### 🟢 Push #15
+**Módulo:** Ajuste Módulo 4 — Ganado: SPOT Trace mobile-first para Campo, mapa bajo demanda para Admin
+**Fecha:** 2026-08-20
+**Branch:** main
+**Commit:** `[GANADO] feat: SPOT Trace mobile-first para vaqueros y mapa bajo demanda para admin`
+**Descripción:** La línea recta que cruzaba los edificios en el mapa (reportada por Alfredo con captura) se confirmó como comportamiento normal de cualquier traza GPS con puntos discretos — el dispositivo SPOT solo reporta un fix cada N minutos, así que entre dos posiciones lejanas `Polyline` de Leaflet solo puede trazar línea recta. No se tocó ese comportamiento (map-matching no tiene sentido para ganado en campo abierto sin caminos). En su lugar se rediseñó el frontend: los vaqueros necesitan activar el rastreo de forma muy simple, así que se creó `IniciarRastreoSpot.jsx`, una vista mobile-first con un solo campo (título del recorrido) y un botón grande para iniciar/terminar, sin mapa ni historial — confirmado con Alfredo que Campo solo debe poder activar, no ver el historial completo. Backend: permiso nuevo `PuedeActivarSpot` (incluye rol `campo`) separado de `PuedeVerSpot` (solo admin); `SpotEstadoView`, el POST de `SpotAsignacionListCreateView` y `SpotAsignacionDesactivarView` ahora aceptan Campo, mientras que el GET de historial (`SpotAsignacionListCreateView`), `SpotPosicionesListView` y `SpotAlertasListView` siguen exclusivos de administrador/superadmin. La pestaña "📡 SPOT Trace" en `/ganado` (antes oculta para Campo) ahora es visible para ese rol y renderiza `IniciarRastreoSpot`; Admin/Superadmin siguen viendo `SpotTrace.jsx`, que se reestructuró para que el mapa ya no aparezca por defecto — solo al hacer clic en un recorrido del "Historial de recorridos" o en el nuevo botón "📅 Ver por fecha" (más "🗺️ Ver mapa en vivo" en la asignación activa) — y se agregó una columna "Fecha" a la tabla de posiciones para confirmar de un vistazo que todas las filas son del mismo día.
+**Notas:** El endpoint `SpotEstadoView` ahora usa `get_permissions()` por método en vez de `permission_classes` fijo, para que POST (crear) sea de Campo+Admin pero GET (listar historial) siga siendo solo Admin en la misma vista. Se reemplazó el test `test_solo_admin_ve_spot` (ya no aplica) por 2 tests nuevos: Campo ve `/spot/estado/` pero recibe 403 en historial/posiciones/alertas, y Campo puede crear y desactivar su propia asignación. 34/34 tests de `apps.ganado` OK. `npm run build` (vite) y `python manage.py check` sin errores. No fue posible probar en navegador real en este entorno (faltan librerías del sistema para Chromium headless y no hay sudo) — pendiente que Alfredo lo pruebe con un usuario `campo` real antes de dar por cerrado el ajuste.
+
+---
+
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._

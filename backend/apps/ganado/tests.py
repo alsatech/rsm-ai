@@ -576,13 +576,35 @@ class SpotAPITest(APITestCase):
             AlertaSpot.objects.filter(tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False).count(), 0,
         )
 
-    def test_solo_admin_ve_spot(self):
+    def test_campo_ve_estado_pero_no_historial_ni_posiciones_ni_alertas(self):
+        """Campo consulta /spot/estado/ para saber si mostrar iniciar/terminar, pero no ve
+        el historial de asignaciones, las posiciones crudas ni las alertas."""
         self._auth(self.campo)
         resp = self.client.get('/api/v1/ganado/spot/estado/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        resp = self.client.get('/api/v1/ganado/spot/asignaciones/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        resp = self.client.get('/api/v1/ganado/spot/posiciones/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+        resp = self.client.get('/api/v1/ganado/spot/alertas/')
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
         self._auth(self.admin)
         resp = self.client.get('/api/v1/ganado/spot/estado/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_campo_puede_iniciar_y_terminar_su_recorrido(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/ganado/spot/asignaciones/', {'nombre': 'Recorrido potrero norte'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        nueva_id = resp.data['id']
+
+        resp = self.client.patch(f'/api/v1/ganado/spot/asignaciones/{nueva_id}/desactivar/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
     def test_estado_muestra_ultima_posicion_sin_asignacion_activa(self):

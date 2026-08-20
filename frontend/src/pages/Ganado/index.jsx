@@ -7,6 +7,7 @@ import DetalleRecorrido from './components/DetalleRecorrido'
 import TabsGanado from './components/TabsGanado'
 import HeatmapPastoreo from './HeatmapPastoreo'
 import Historial from './components/Historial'
+import IniciarRastreoSpot from './IniciarRastreoSpot'
 import SpotTrace from './SpotTrace'
 import VistaClasificacion from './VistaClasificacion'
 import WizardNuevoRecorrido from './components/WizardNuevoRecorrido'
@@ -27,10 +28,15 @@ export default function Ganado() {
 
   useGanadoSync()
 
+  const esCampo = user?.rol === 'campo'
   const puedeCrear = ['campo', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeVerHeatmap = ['administrador', 'superadmin'].includes(user?.rol)
   const puedeVerAnalitica = ['administrador', 'superadmin'].includes(user?.rol)
-  const tabsVisibles = TABS.filter((t) => !t.soloAdmin || puedeVerAnalitica)
+  const puedeVerSpot = puedeVerAnalitica || esCampo
+  const tabsVisibles = TABS.filter((t) => {
+    if (t.id === 'spot') return puedeVerSpot
+    return !t.soloAdmin || puedeVerAnalitica
+  })
 
   const handleVerDetalle = (recorrido) => {
     if (recorrido.estado === 'en_curso' && puedeCrear) {
@@ -91,7 +97,7 @@ export default function Ganado() {
     )
   }
 
-  if (vista === 'spot' && puedeVerAnalitica) {
+  if (vista === 'spot' && puedeVerSpot) {
     return (
       <div className="min-h-svh bg-bg">
         <CabeceraGanado
@@ -100,7 +106,7 @@ export default function Ganado() {
           vista={vista}
           setVista={setVista}
         />
-        <SpotTrace />
+        {esCampo ? <IniciarRastreoSpot /> : <SpotTrace />}
       </div>
     )
   }

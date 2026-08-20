@@ -58,6 +58,11 @@ function fechaHoraLocal(iso) {
   return new Date(iso).toLocaleString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
+function fechaCorta(iso) {
+  if (!iso) return '—'
+  return new Date(iso).toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
+}
+
 function minutosDesde(iso, ahora) {
   if (!iso) return null
   return Math.max(0, Math.round((ahora.getTime() - new Date(iso).getTime()) / 60000))
@@ -138,6 +143,8 @@ export default function SpotTrace() {
   const [recorridosHoy, setRecorridosHoy] = useState([])
   const [historialAsignaciones, setHistorialAsignaciones] = useState([])
   const [asignacionSeleccionada, setAsignacionSeleccionada] = useState(null)
+  // null = lista (sin mapa) · 'asignacion' = viendo el rastro de una asignación del historial · 'fecha' = viendo el rastro de un día
+  const [vistaMapa, setVistaMapa] = useState(null)
 
   const [cargando, setCargando] = useState(true)
   const [actualizando, setActualizando] = useState(false)
@@ -196,10 +203,21 @@ export default function SpotTrace() {
   }, [fecha, asignacionSeleccionada, cargarDatos])
 
   const handleSeleccionarAsignacion = (a) => {
-    setAsignacionSeleccionada((prev) => (prev?.id === a.id ? null : { id: a.id, nombre: a.nombre || 'Sin nombre' }))
+    setAsignacionSeleccionada({ id: a.id, nombre: a.nombre || 'Sin nombre' })
+    setVistaMapa('asignacion')
   }
 
-  const handleLimpiarSeleccion = () => setAsignacionSeleccionada(null)
+  const handleVerPorFecha = () => {
+    setAsignacionSeleccionada(null)
+    setVistaMapa('fecha')
+  }
+
+  const handleVolverLista = () => setVistaMapa(null)
+
+  const handleLimpiarSeleccion = () => {
+    setAsignacionSeleccionada(null)
+    setVistaMapa(null)
+  }
 
   useEffect(() => {
     const interval = setInterval(() => cargarDatos({ mostrarSpinner: true }), REFRESH_MS)
@@ -431,6 +449,13 @@ export default function SpotTrace() {
                 </p>
                 <button
                   type="button"
+                  onClick={() => handleSeleccionarAsignacion(estado.asignacion_activa)}
+                  className="w-full rounded-xl border-2 border-highlight py-2 text-sm font-bold text-highlight transition hover:bg-accent"
+                >
+                  🗺️ Ver mapa en vivo
+                </button>
+                <button
+                  type="button"
                   onClick={handleCerrarAsignacion}
                   className="w-full rounded-xl border-2 border-error py-2 text-sm font-bold text-error transition hover:bg-error/10"
                 >
@@ -487,14 +512,29 @@ export default function SpotTrace() {
               </form>
             )}
 
-            {historialAsignaciones.filter((a) => !a.activa).length > 0 && (
-              <div className="mt-4 border-t border-border pt-3">
-                <p className="mb-2 text-xs font-bold uppercase tracking-wide text-text-secondary">
-                  Historial de pruebas
+            <div className="mt-4 border-t border-border pt-3">
+              <div className="mb-2 flex items-center justify-between">
+                <p className="text-xs font-bold uppercase tracking-wide text-text-secondary">
+                  Historial de recorridos
                 </p>
+                <button
+                  type="button"
+                  onClick={handleVerPorFecha}
+                  className={`rounded-lg border px-2 py-1 text-xs font-bold transition ${
+                    vistaMapa === 'fecha'
+                      ? 'border-highlight bg-highlight/10 text-highlight'
+                      : 'border-border text-text-secondary hover:border-accent'
+                  }`}
+                >
+                  📅 Ver por fecha
+                </button>
+              </div>
+              {historialAsignaciones.filter((a) => !a.activa).length === 0 ? (
+                <p className="text-xs text-text-secondary">Aún no hay recorridos cerrados.</p>
+              ) : (
                 <div className="max-h-56 space-y-2 overflow-y-auto">
                   {historialAsignaciones.filter((a) => !a.activa).map((a) => {
-                    const seleccionada = asignacionSeleccionada?.id === a.id
+                    const seleccionada = vistaMapa === 'asignacion' && asignacionSeleccionada?.id === a.id
                     return (
                       <button
                         key={a.id}
@@ -517,13 +557,31 @@ export default function SpotTrace() {
                     )
                   })}
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </aside>
 
-        {/* Columna derecha — mapa */}
+        {/* Columna derecha — mapa (solo visible al elegir un recorrido del historial o una fecha) */}
+        {vistaMapa === null ? (
+          <div className="flex min-w-0 flex-1 items-center justify-center rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+            <div>
+              <p className="text-3xl">🗺️</p>
+              <p className="mt-2 text-sm font-semibold text-text">Elige un recorrido del historial para ver el mapa</p>
+              <p className="mt-1 text-xs text-text-secondary">
+                O usa "📅 Ver por fecha" para revisar las posiciones crudas de un día.
+              </p>
+            </div>
+          </div>
+        ) : (
         <div className="min-w-0 flex-1 space-y-4">
+          <button
+            type="button"
+            onClick={handleVolverLista}
+            className="flex items-center gap-2 text-sm font-semibold text-text-secondary hover:text-text"
+          >
+            ← Volver al historial
+          </button>
           <div className="relative overflow-hidden rounded-2xl" style={{ minHeight: '500px', height: '65svh' }}>
             {/* Selector de fecha / prueba seleccionada */}
             <div className="absolute left-2 top-2 z-[1000]">
@@ -705,6 +763,7 @@ export default function SpotTrace() {
                 <table className="w-full text-left text-sm">
                   <thead className="sticky top-0 bg-card text-xs uppercase text-text-secondary">
                     <tr>
+                      <th className="py-2 pr-2">Fecha</th>
                       <th className="py-2 pr-2">Hora</th>
                       <th className="py-2 pr-2">Lat</th>
                       <th className="py-2 pr-2">Lng</th>
@@ -716,6 +775,7 @@ export default function SpotTrace() {
                   <tbody>
                     {posiciones.map((p) => (
                       <tr key={p.id} className="border-t border-border">
+                        <td className="py-1.5 pr-2 font-mono text-text-secondary">{fechaCorta(p.fecha_hora_spot)}</td>
                         <td className="py-1.5 pr-2 font-mono text-text">{horaLocal(p.fecha_hora_spot)}</td>
                         <td className="py-1.5 pr-2 font-mono text-text-secondary">{Number(p.lat).toFixed(5)}</td>
                         <td className="py-1.5 pr-2 font-mono text-text-secondary">{Number(p.lng).toFixed(5)}</td>
@@ -738,6 +798,7 @@ export default function SpotTrace() {
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
   )

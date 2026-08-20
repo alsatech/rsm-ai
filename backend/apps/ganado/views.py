@@ -18,6 +18,7 @@ from .models import (
     RecorridoGanado,
 )
 from .permissions import (
+    PuedeActivarSpot,
     PuedeCrearRecorrido,
     PuedeEliminarRecorrido,
     PuedeGestionarCorraletas,
@@ -419,8 +420,11 @@ class SpotEstadoView(APIView):
     La última posición y el total del día se reportan de forma global (no solo de la
     asignación activa), para que cerrar/reabrir una asignación no borre de la vista lo
     último que se supo del dispositivo.
+
+    Campo también consulta este endpoint para saber si mostrar el botón de
+    iniciar o terminar recorrido.
     """
-    permission_classes = [IsAuthenticated, PuedeVerSpot]
+    permission_classes = [IsAuthenticated, PuedeActivarSpot]
 
     def get(self, request):
         asignacion = AsignacionSpot.objects.filter(activa=True).select_related(
@@ -484,8 +488,16 @@ class SpotAlertaResolverView(APIView):
 
 class SpotAsignacionListCreateView(generics.ListCreateAPIView):
     """Lista el historial de asignaciones (más reciente primero) y crea una nueva activa,
-    cerrando automáticamente cualquier asignación previa."""
-    permission_classes = [IsAuthenticated, PuedeVerSpot]
+    cerrando automáticamente cualquier asignación previa.
+
+    Listar el historial completo es solo para roles admin (PuedeVerSpot); Campo puede
+    crear (POST) una asignación para iniciar su propio recorrido, pero no ve el historial.
+    """
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), PuedeActivarSpot()]
+        return [IsAuthenticated(), PuedeVerSpot()]
 
     def get_queryset(self):
         return AsignacionSpot.objects.select_related('recorrido', 'asignado_por').order_by('-fecha_inicio')
@@ -509,7 +521,8 @@ class SpotAsignacionListCreateView(generics.ListCreateAPIView):
 
 
 class SpotAsignacionDesactivarView(APIView):
-    permission_classes = [IsAuthenticated, PuedeVerSpot]
+    """Cierra la asignación activa. Campo puede cerrarla para terminar su propio recorrido."""
+    permission_classes = [IsAuthenticated, PuedeActivarSpot]
 
     def patch(self, request, pk):
         asignacion = get_object_or_404(AsignacionSpot, pk=pk, activa=True)

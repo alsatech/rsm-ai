@@ -67,3 +67,13 @@ class PuedeVerSpot(BasePermission):
             and request.user.is_authenticated
             and request.user.rol in ROLES_ADMIN
         )
+
+
+class PuedeActivarSpot(BasePermission):
+    """Campo puede iniciar/cerrar su propio rastreo SPOT, sin ver historial ni posiciones."""
+    def has_permission(self, request, view):
+        return bool(
+            request.user
+            and request.user.is_authenticated
+            and request.user.rol in ROLES_CON_ACCESO
+        )
