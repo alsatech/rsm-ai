@@ -607,6 +607,59 @@ class SpotAPITest(APITestCase):
         resp = self.client.patch(f'/api/v1/ganado/spot/asignaciones/{nueva_id}/desactivar/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
 
+    @patch('apps.ganado.tasks.requests.get')
+    def test_mensaje_tardio_se_vincula_al_recorrido_recien_cerrado(self, mock_get):
+        """El feed de SPOT puede tardar en propagar un mensaje: si llega después de
+        cerrar el recorrido pero dentro del margen de HORAS_SIN_SENAL, no se pierde —
+        se vincula a esa asignación en vez de descartarse."""
+        self.asignacion.activa = False
+        self.asignacion.save(update_fields=['activa'])
+
+        cerrada = AsignacionSpot.objects.create(asignado_por=self.admin, nombre='Recorrido recién cerrado')
+        fecha_fin = timezone.now() - timedelta(minutes=10)
+        AsignacionSpot.objects.filter(pk=cerrada.pk).update(
+            activa=False, fecha_inicio=fecha_fin - timedelta(minutes=30), fecha_fin=fecha_fin,
+        )
+
+        mensaje_tardio = fecha_fin + timedelta(minutes=5)
+        mensaje = {
+            'id': 555, 'latitude': 29.51, 'longitude': -101.55, 'altitude': 500,
+            'dateTime': mensaje_tardio.strftime('%Y-%m-%dT%H:%M:%S+0000'),
+            'messageType': 'STOP', 'batteryState': 'GOOD',
+        }
+        mock_get.return_value = _mock_feed_response([mensaje])
+
+        consultar_spot()
+
+        posicion = PosicionSpot.objects.get(spot_message_id=555)
+        self.assertEqual(posicion.asignacion_id, cerrada.pk)
+
+    @patch('apps.ganado.tasks.requests.get')
+    def test_mensaje_muy_tardio_se_guarda_sin_asignacion(self, mock_get):
+        """Más allá del margen de HORAS_SIN_SENAL ya no se adivina a qué recorrido
+        pertenece — se guarda con asignacion=None en vez de perderse."""
+        self.asignacion.activa = False
+        self.asignacion.save(update_fields=['activa'])
+
+        cerrada = AsignacionSpot.objects.create(asignado_por=self.admin, nombre='Recorrido viejo')
+        fecha_fin = timezone.now() - timedelta(hours=5)
+        AsignacionSpot.objects.filter(pk=cerrada.pk).update(
+            activa=False, fecha_inicio=fecha_fin - timedelta(minutes=30), fecha_fin=fecha_fin,
+        )
+
+        ahora = timezone.now()
+        mensaje = {
+            'id': 556, 'latitude': 29.51, 'longitude': -101.55, 'altitude': 500,
+            'dateTime': ahora.strftime('%Y-%m-%dT%H:%M:%S+0000'),
+            'messageType': 'STOP', 'batteryState': 'GOOD',
+        }
+        mock_get.return_value = _mock_feed_response([mensaje])
+
+        consultar_spot()
+
+        posicion = PosicionSpot.objects.get(spot_message_id=556)
+        self.assertIsNone(posicion.asignacion_id)
+
     def test_estado_muestra_ultima_posicion_sin_asignacion_activa(self):
         """Cerrar la asignación no debe borrar de /spot/estado/ la última posición conocida."""
         PosicionSpot.objects.create(

@@ -160,7 +160,7 @@ class PosicionSpot(models.Model):
         CRITICAL = 'CRITICAL', 'Crítica'
 
     asignacion = models.ForeignKey(
-        AsignacionSpot, on_delete=models.CASCADE, related_name='posiciones'
+        AsignacionSpot, on_delete=models.SET_NULL, related_name='posiciones', null=True, blank=True,
     )
     spot_message_id = models.BigIntegerField(unique=True)
     lat = models.DecimalField(max_digits=18, decimal_places=12)
@@ -190,7 +190,7 @@ class AlertaSpot(models.Model):
         BATERIA_CRITICA = 'bateria_critica', 'Batería crítica'
 
     asignacion = models.ForeignKey(
-        AsignacionSpot, on_delete=models.CASCADE, related_name='alertas'
+        AsignacionSpot, on_delete=models.SET_NULL, related_name='alertas', null=True, blank=True,
     )
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
     mensaje = models.TextField()

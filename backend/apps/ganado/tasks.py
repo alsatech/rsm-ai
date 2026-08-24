@@ -65,9 +65,44 @@ def _parsear_altitud(valor):
         return None
 
 
+def _asignacion_para_mensaje(asignacion_activa, fecha_hora_spot):
+    """Decide a qué asignación pertenece un mensaje que llega sin asignación activa.
+
+    El feed de SPOT puede tardar en propagar un mensaje (retraso satelital), así que
+    puede llegar después de que el vaquero ya cerró su recorrido en la app. Si la hora
+    real del mensaje (dateTime del dispositivo) cae dentro de la ventana de la última
+    asignación cerrada, se vincula ahí; si no, se guarda sin asignación (nunca se
+    descarta) para no perder la posición.
+    """
+    if asignacion_activa:
+        return asignacion_activa
+    from .models import AsignacionSpot
+
+    candidata = AsignacionSpot.objects.filter(
+        activa=False, fecha_inicio__lte=fecha_hora_spot, fecha_fin__gte=fecha_hora_spot,
+    ).order_by('-fecha_fin').first()
+    if candidata:
+        return candidata
+
+    # Retraso satelital: el mensaje llegó después de cerrar el recorrido. Se acepta
+    # hasta HORAS_SIN_SENAL de margen; más allá de eso ya no se adivina y se guarda
+    # sin asignación en vez de pegarlo a un recorrido viejo sin relación real.
+    limite_retraso = fecha_hora_spot - timedelta(hours=HORAS_SIN_SENAL)
+    return AsignacionSpot.objects.filter(
+        activa=False, fecha_fin__lte=fecha_hora_spot, fecha_fin__gte=limite_retraso,
+    ).order_by('-fecha_fin').first()
+
+
 @shared_task
 def consultar_spot():
-    """Consulta la API SPOT cada 5 minutos y guarda posiciones nuevas."""
+    """Consulta la API SPOT cada 5 minutos y guarda posiciones nuevas.
+
+    Ya no se descarta ningún mensaje por falta de asignación activa: si el mensaje
+    llegó con retraso satelital después de cerrar el recorrido, se intenta vincular a
+    la asignación cerrada cuya ventana de tiempo lo contiene, o se guarda con
+    `asignacion=None` para que siga visible en /spot/estado/ y en el historial por
+    fecha, en vez de perderse para siempre.
+    """
     from .models import AlertaSpot, AsignacionSpot, PosicionSpot
 
     feed_id = settings.SPOT_FEED_ID
@@ -85,10 +120,7 @@ def consultar_spot():
         if isinstance(messages, dict):
             messages = [messages]
 
-        asignacion = AsignacionSpot.objects.filter(activa=True).first()
-        if not asignacion:
-            return 'No active assignment'
-
+        asignacion_activa = AsignacionSpot.objects.filter(activa=True).first()
         modo_pruebas = getattr(settings, 'SPOT_MODO_PRUEBAS', False)
         perimetro = PERIMETRO_EL_PASO_TX if modo_pruebas else PERIMETRO_SANTA_MARGARITA
 
@@ -103,6 +135,9 @@ def consultar_spot():
 
             lat = float(msg.get('latitude', 0))
             lng = float(msg.get('longitude', 0))
+            fecha_hora_spot = _parsear_fecha_spot(msg.get('dateTime'))
+            asignacion = _asignacion_para_mensaje(asignacion_activa, fecha_hora_spot)
+
             punto = Point(lng, lat)
             dentro = perimetro.contains(punto)
             bateria = msg.get('batteryState', 'GOOD')
@@ -113,16 +148,17 @@ def consultar_spot():
                 lat=lat,
                 lng=lng,
                 altitud=_parsear_altitud(msg.get('altitude')),
-                fecha_hora_spot=_parsear_fecha_spot(msg.get('dateTime')),
+                fecha_hora_spot=fecha_hora_spot,
                 message_type=msg.get('messageType', 'TRACK'),
                 bateria=bateria,
                 dentro_perimetro=dentro,
             )
             procesados += 1
 
-            AlertaSpot.objects.filter(
-                asignacion=asignacion, tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False,
-            ).update(resuelta=True, resuelta_en=timezone.now())
+            if asignacion:
+                AlertaSpot.objects.filter(
+                    asignacion=asignacion, tipo=AlertaSpot.Tipo.SIN_SENAL, resuelta=False,
+                ).update(resuelta=True, resuelta_en=timezone.now())
 
             if not dentro and not modo_pruebas:
                 AlertaSpot.objects.create(
