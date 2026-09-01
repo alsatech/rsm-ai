@@ -83,6 +83,7 @@ export const MODULOS = [
     descripcion: 'Gestión de proyectos, materiales, avances y contratistas',
     icono: '🏗️',
     roles: ['operaciones', 'administrador', 'superadmin'],
+    ruta: '/proyectos',
   },
   {
     id: 'compras',

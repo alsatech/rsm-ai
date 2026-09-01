@@ -7,8 +7,8 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 6 / 11  
-**Fase actual:** Mes 2
+**Módulos completados:** 7 / 12  
+**Fase actual:** Mes 3
 
 ---
 
@@ -30,6 +30,7 @@
 - [ ] **Módulo 9** — Personal
 - [ ] **Módulo 10** — Minuta automática
 - [ ] **Módulo 11** — Facturación
+- [x] **Módulo 12** — Proyectos
 
 ---
 
@@ -200,6 +201,17 @@
 **Notas:** El endpoint `SpotEstadoView` ahora usa `get_permissions()` por método en vez de `permission_classes` fijo, para que POST (crear) sea de Campo+Admin pero GET (listar historial) siga siendo solo Admin en la misma vista. Se reemplazó el test `test_solo_admin_ve_spot` (ya no aplica) por 2 tests nuevos: Campo ve `/spot/estado/` pero recibe 403 en historial/posiciones/alertas, y Campo puede crear y desactivar su propia asignación. 34/34 tests de `apps.ganado` OK. `npm run build` (vite) y `python manage.py check` sin errores. No fue posible probar en navegador real en este entorno (faltan librerías del sistema para Chromium headless y no hay sudo) — pendiente que Alfredo lo pruebe con un usuario `campo` real antes de dar por cerrado el ajuste.
 
 **Ajuste posterior (misma sesión) — bug real encontrado en prueba con el dispositivo en el VPS:** Alfredo hizo la prueba real (chino inicia recorrido → camina con el SPOT prendido → cierra recorrido → alberto revisa) y no vio coordenadas. Diagnóstico con `curl` directo al feed de SPOT (sin pasar por Django) confirmó que el mensaje real del dispositivo (`STOP`, `dateTime` 2026-08-21T14:12:21Z) llegó **después** de que el recorrido ya estaba cerrado en la app (retraso normal del feed satelital) — y `consultar_spot` descartaba por completo cualquier mensaje sin asignación activa, porque `PosicionSpot.asignacion`/`AlertaSpot.asignacion` eran FK obligatorios. Se corrigió: migración `0010_alter_alertaspot_asignacion_and_more` los vuelve `null=True` (`on_delete=SET_NULL`); `consultar_spot` ya no descarta nada — vincula el mensaje a la última asignación cerrada si su hora cae dentro de la ventana de esa asignación o dentro del margen de `HORAS_SIN_SENAL` (2h) después de cerrarla, y si no, lo guarda con `asignacion=None` en vez de perderlo (sigue visible en `/spot/estado/` y en "Ver por fecha"). 2 tests nuevos cubren ambos casos (36/36 en `apps.ganado`). **Pendiente aparte, no es bug de código:** el feed de SPOT de los últimos 7 días solo tiene mensajes tipo `STOP`/`POWER-OFF`, ningún `TRACK` — el dispositivo RSM2026 nunca ha mandado un ping periódico de rastreo en ninguna prueba. Falta revisar en el portal findmespot.com que el modo Tracking esté activado con un intervalo configurado (no basta con encender el dispositivo).
+
+---
+
+### 🟢 Push #17
+**Módulo:** Módulo 12 — Proyectos
+**Fecha:** 2026-09-01
+**Branch:** main
+**Commit:** `[PROYECTOS] feat: módulo completo de proyectos con cotizaciones, compras, inventario propio y avances`
+**Descripción:** App `apps/proyectos` completa. 10 modelos: `Contratista` (catálogo de mano de obra/proveedores), `Proyecto` (folio autogenerado `PRY<año>-NNN`, estados borrador→autorizado→en_progreso→pausado→completado/cancelado, `requiere_autorizacion` calculado automáticamente por señal `pre_save` cuando `presupuesto_total` > $50,000 MXN, asignado a un usuario — normalmente Erik), `CotizacionManoObra` (por contratista, con archivo adjunto y aprobación), `ItemProyecto` (inventario propio del proyecto, independiente del inventario general, con `codigo_proyecto` autogenerado tipo `PRY001-SM-001` si viene del catálogo o `PRY001-NUEVO-001` si es material nuevo), `MovimientoProyecto` (entrada/salida/devolución con stock antes/después), `CompraProyecto` (folio `CMP<año>-NNN`, autorización automática si supera $50,000, fotos de evidencia), `FotoCompra`, `AvanceProyecto` (porcentaje + descripción + fotos), `FotoAvance` y `DevolucionInventario` (material sobrante que regresa al inventario general). Señal en `DevolucionInventario.post_save` genera automáticamente el `MovimientoProyecto` tipo devolución (descuenta del proyecto) y el `MovimientoInventario` tipo entrada en `apps.inventario` (sube el inventario general), todo en una sola transacción atómica de Django. Permisos estrictos: crear/editar proyecto y autorizar (proyecto o compra > $50k) — solo superadmin; gestionar cotizaciones/compras/inventario del proyecto — operaciones/superadmin; registrar avances — operaciones/campo/superadmin (evidencia desde el campo); CRUD de contratistas — operaciones/administrador/superadmin. Operaciones solo ve/lista los proyectos que tiene asignados; administrador/superadmin ven todos. Endpoints completos según spec: proyectos, autorizar/rechazar, cotizaciones + aprobar, compras + autorizar, avances, inventario del proyecto + movimiento + devolver, contratistas, y resumen para dashboard (en progreso, pendientes de autorización, completados del mes).
+**Frontend:** `src/pages/Proyectos/` — Dashboard con cards por estado (contador clicable como filtro), lista de proyectos con folio/estado/asignado/presupuesto/barra de avance, badge rojo parpadeante en proyectos pendientes de autorización, botón "Nuevo proyecto" solo superadmin. Detalle de proyecto con tabs [Resumen][Cotizaciones][Compras][Inventario][Avances]: Resumen con banner de autorización (superadmin), edición de estado/fechas reales/observaciones; Cotizaciones con selector de contratista con alta inline y aprobar/rechazar; Compras con aviso automático "requiere autorización del Licenciado" si supera $50k y 1-4 fotos de evidencia; Inventario propio del proyecto con buscador del catálogo general o material nuevo, botones de entrada/salida y devolución al inventario general con confirmación; Avances con wizard mobile-first de 2 pasos (slider de porcentaje + descripción, luego 1-6 fotos obligatorias) y barra de avance acumulado. Catálogo de contratistas con buscador y alta/edición. Widget `ResumenProyectos` (proyectos en progreso, pendientes de autorización con badge rojo, visible solo operaciones/administrador/superadmin) wireado directamente en el Dashboard principal — a diferencia de otros módulos, la spec pedía explícitamente el widget "para Dashboard principal", así que aquí sí se conectó (los demás módulos construyeron su widget pero lo dejaron dentro de su propia vista). Ruta `/proyectos` protegida por rol y `modules.js` actualizado con la `ruta`.
+**Notas:** 10 tests nuevos en `apps.proyectos` (proyecto >$50k requiere autorización, solo superadmin autoriza/erik no puede, folio autogenerado único, erik no puede crear proyecto, stock del proyecto no puede quedar negativo, devolución sube el inventario general correctamente, CRUD de contratistas por rol, operaciones solo ve proyectos asignados, compra >$50k requiere autorización). Suite completa del backend corrida (197 tests): los 7 fallos son preexistentes en `apps.flota` de otra sesión en curso (checklists de llegada, endpoint de incidencias), no relacionados con este módulo y no se tocaron. `npm run build` y `npm run lint` sin errores nuevos (los 10 errores de lint reportados son preexistentes en Flota/Pendientes de esa misma sesión en curso, en archivos no tocados aquí). No fue posible probar en navegador real en este entorno (faltan librerías del sistema para Chromium headless y no hay sudo).
 
 ---
 

@@ -8,6 +8,7 @@ import Hidraulica from './pages/Hidraulica'
 import Inventario from './pages/Inventario'
 import Login from './pages/Login'
 import Pendientes from './pages/Pendientes'
+import Proyectos from './pages/Proyectos'
 
 function App() {
   return (
@@ -58,6 +59,14 @@ function App() {
         element={
           <ProtectedRoute roles={['campo', 'inventario', 'operaciones', 'administrador', 'superadmin']}>
             <Inventario />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/proyectos"
+        element={
+          <ProtectedRoute roles={['operaciones', 'administrador', 'superadmin']}>
+            <Proyectos />
           </ProtectedRoute>
         }
       />

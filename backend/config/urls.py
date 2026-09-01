@@ -11,6 +11,7 @@ urlpatterns = [
     path('api/v1/ganado/', include('apps.ganado.urls')),
     path('api/v1/flota/', include('apps.flota.urls')),
     path('api/v1/inventario/', include('apps.inventario.urls')),
+    path('api/v1/proyectos/', include('apps.proyectos.urls')),
 ]
 
 if settings.DEBUG:

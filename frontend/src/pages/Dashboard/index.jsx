@@ -4,6 +4,7 @@ import ModuleCard from '../../components/ModuleCard'
 import { MODULOS } from '../../config/modules'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
+import ResumenProyectos from '../Proyectos/components/ResumenProyectos'
 
 const ROL_LABELS = {
   campo: 'Campo',
@@ -43,6 +44,10 @@ export default function Dashboard() {
           Cerrar sesión
         </button>
       </header>
+
+      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ResumenProyectos />
+      </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {modulosVisibles.map((modulo) => {

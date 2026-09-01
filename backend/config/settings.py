@@ -45,6 +45,7 @@ INSTALLED_APPS = [
     'apps.ganado',
     'apps.flota',
     'apps.inventario',
+    'apps.proyectos',
 ]
 
 MIDDLEWARE = [
