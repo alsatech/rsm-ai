@@ -42,7 +42,7 @@ class MovimientoInventarioAdmin(admin.ModelAdmin):
     )
     list_filter = ('tipo', 'validado', 'rechazado')
     search_fields = ('producto__codigo', 'producto__descripcion', 'responsable__username')
-    raw_id_fields = ('producto', 'responsable', 'validado_por')
+    raw_id_fields = ('producto', 'responsable', 'validado_por', 'solicitud')
 
 
 class ItemSolicitudInline(admin.TabularInline):
@@ -52,7 +52,7 @@ class ItemSolicitudInline(admin.TabularInline):
 
 @admin.register(SolicitudMaterial)
 class SolicitudMaterialAdmin(admin.ModelAdmin):
-    list_display = ('folio', 'area', 'solicitante', 'estado', 'fecha_requerida', 'created_at')
+    list_display = ('folio', 'area', 'solicitante', 'estado', 'created_at')
     list_filter = ('estado', 'area')
     search_fields = ('folio', 'descripcion_necesidad', 'solicitante__username')
     raw_id_fields = ('solicitante', 'autorizado_por', 'created_by')
@@ -79,9 +79,9 @@ class ItemRecepcionInline(admin.TabularInline):
 
 @admin.register(RecepcionMaterial)
 class RecepcionMaterialAdmin(admin.ModelAdmin):
-    list_display = ('envio', 'recibido_por', 'fecha_recepcion', 'estado_general')
-    list_filter = ('estado_general',)
-    raw_id_fields = ('envio', 'recibido_por')
+    list_display = ('envio', 'recibido_por', 'fecha_recepcion', 'estado_general', 'entrada_confirmada')
+    list_filter = ('estado_general', 'entrada_confirmada')
+    raw_id_fields = ('envio', 'recibido_por', 'entrada_confirmada_por')
     inlines = [ItemRecepcionInline]
 
 

@@ -27,6 +27,12 @@ class Vehiculo(models.Model):
         EN_TALLER = 'en_taller', 'En taller'
         DE_BAJA = 'de_baja', 'De baja'
 
+    # Polaris, CAN-AM y cuatrimotos (las "motos" reales de la reserva: Moto azul,
+    # Moto roja) llevan horómetro en vez de kilometraje — el resto de la flota
+    # lleva kilometraje. Se usa para el cambio de aceite y para etiquetar el dato
+    # que se guarda en `kilometraje_actual` (mismo campo, unidad distinta).
+    TIPOS_HORAS = (Tipo.POLARIS, Tipo.CAN_AM, Tipo.CUATRIMOTO)
+
     equipo = models.CharField(max_length=150, blank=True)
     nombre = models.CharField(max_length=100)
     tipo = models.CharField(max_length=20, choices=Tipo.choices)
@@ -53,6 +59,10 @@ class Vehiculo(models.Model):
 
     def __str__(self):
         return f'{self.nombre} — {self.marca} {self.modelo} ({self.anio})'
+
+    @property
+    def unidad_medicion(self):
+        return 'hrs' if self.tipo in self.TIPOS_HORAS else 'km'
 
 
 class ChecklistVehiculo(models.Model):
@@ -170,9 +180,11 @@ class ChecklistVehiculo(models.Model):
     def _es_traila(self):
         return bool(self.vehiculo_id and self.vehiculo.tipo == Vehiculo.Tipo.TRAILA)
 
-    # Las "motos" reales de la reserva están dadas de alta como tipo cuatrimoto
-    # (ej. "Moto roja", "Moto azul") — ninguna de las dos registra kilometraje ni horómetro.
-    TIPOS_SIN_KILOMETRAJE = (Vehiculo.Tipo.MOTO, Vehiculo.Tipo.CUATRIMOTO)
+    # Las "motos" reales de la reserva están dadas de alta como tipo cuatrimoto (ej.
+    # "Moto roja", "Moto azul") y sí llevan horómetro (ver Vehiculo.TIPOS_HORAS) —
+    # solo el tipo "moto" (motocicleta de calle, sin uso actual en la flota) queda
+    # sin ningún registro de kilometraje/horómetro.
+    TIPOS_SIN_KILOMETRAJE = (Vehiculo.Tipo.MOTO,)
 
     def _sin_kilometraje(self):
         return bool(self.vehiculo_id and self.vehiculo.tipo in self.TIPOS_SIN_KILOMETRAJE)
@@ -350,3 +362,41 @@ class AlertaFlota(models.Model):
 
     def __str__(self):
         return f'{self.vehiculo.nombre} — {self.get_tipo_display()}'
+
+
+class CambioAceite(models.Model):
+    """Bitácora manual de cambios de aceite — reemplaza el reporte que antes se
+
+    llevaba por WhatsApp/Excel. Celery usa el último registro con
+    estado=REALIZADO de cada vehículo como base para calcular la siguiente
+    alerta de cambio de aceite (ver flota/tasks.py).
+    """
+
+    class Estado(models.TextChoices):
+        REALIZADO = 'realizado', 'Realizado'
+        PENDIENTE = 'pendiente', 'Pendiente'
+        EN_REPARACION = 'en_reparacion', 'En reparación'
+
+    vehiculo = models.ForeignKey(Vehiculo, on_delete=models.CASCADE, related_name='cambios_aceite')
+    fecha = models.DateField(default=timezone.now)
+    estado = models.CharField(max_length=15, choices=Estado.choices, default=Estado.REALIZADO)
+    km_horas = models.DecimalField(
+        max_digits=10, decimal_places=2, null=True, blank=True,
+    )  # kilometraje u horas del vehículo al momento del registro, según Vehiculo.TIPOS_HORAS
+    observaciones = models.TextField(blank=True)
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='cambios_aceite_registrados'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha', '-created_at']
+        verbose_name = 'Cambio de aceite'
+        verbose_name_plural = 'Cambios de aceite'
+
+    def __str__(self):
+        return f'{self.vehiculo.nombre} — {self.get_estado_display()} ({self.fecha:%Y-%m-%d})'
+
+    @property
+    def unidad(self):
+        return self.vehiculo.unidad_medicion

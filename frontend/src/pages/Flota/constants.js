@@ -59,11 +59,29 @@ export function esOffRoad(tipoVehiculo) {
 }
 
 // Las motos reales de la reserva están dadas de alta como cuatrimoto (Moto roja, Moto
-// azul) — ni motos ni cuatrimotos registran kilometraje ni horómetro, salida o llegada.
-export const TIPOS_SIN_KILOMETRAJE = ['moto', 'cuatrimoto']
+// azul) y sí registran horómetro (ver TIPOS_HORAS) — solo el tipo "moto" (motocicleta
+// de calle, sin uso actual en la flota) no registra ningún kilometraje ni horómetro.
+export const TIPOS_SIN_KILOMETRAJE = ['moto']
 
 export function sinKilometraje(tipoVehiculo) {
   return TIPOS_SIN_KILOMETRAJE.includes(tipoVehiculo)
+}
+
+// Polaris, CAN-AM y cuatrimotos llevan horómetro en vez de kilometraje.
+export const TIPOS_HORAS = ['polaris', 'can_am', 'cuatrimoto']
+
+export function esHoras(tipoVehiculo) {
+  return TIPOS_HORAS.includes(tipoVehiculo)
+}
+
+export function unidadMedicion(tipoVehiculo) {
+  return esHoras(tipoVehiculo) ? 'hrs' : 'km'
+}
+
+export const ESTADO_CAMBIO_ACEITE_CONFIG = {
+  realizado: { label: 'Realizado', icon: '✅', border: 'border-highlight/40', text: 'text-highlight', bg: 'bg-highlight/15' },
+  pendiente: { label: 'Pendiente', icon: '🟡', border: 'border-warning/40', text: 'text-warning', bg: 'bg-warning/15' },
+  en_reparacion: { label: 'En reparación', icon: '🔧', border: 'border-error/40', text: 'text-error', bg: 'bg-error/15' },
 }
 
 // Ítems booleanos del checklist — cada uno se marca automáticamente al adjuntar su foto de evidencia.

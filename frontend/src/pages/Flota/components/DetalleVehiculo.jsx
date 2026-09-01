@@ -2,7 +2,9 @@ import { useCallback, useEffect, useState } from 'react'
 
 import {
   crearAdvertenciaChecklist,
+  crearCambioAceite,
   getAlertasFlota,
+  getCambiosAceite,
   getHistorialVehiculo,
   getVehiculo,
   resolverAlertaFlota,
@@ -11,7 +13,8 @@ import {
 } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { ALERTA_TIPO_LABELS, ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, TIPO_LABELS, esOffRoad } from '../constants'
+import { ALERTA_TIPO_LABELS, ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, unidadMedicion } from '../constants'
+import BitacoraAceite from './BitacoraAceite'
 import DetalleChecklist from './DetalleChecklist'
 import FormularioVehiculo from './FormularioVehiculo'
 import HistorialChecklists from './HistorialChecklists'
@@ -22,6 +25,7 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
   const [vehiculo, setVehiculo] = useState(null)
   const [checklists, setChecklists] = useState([])
   const [alertas, setAlertas] = useState([])
+  const [cambiosAceite, setCambiosAceite] = useState([])
   const [loading, setLoading] = useState(true)
   const [mostrarEdicion, setMostrarEdicion] = useState(false)
   const [checklistSeleccionado, setChecklistSeleccionado] = useState(null)
@@ -31,16 +35,19 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
   const puedeVerAlertas = ['administrador', 'superadmin'].includes(user?.rol)
   const puedeValidar = ['administrador', 'superadmin'].includes(user?.rol)
   const puedeCrearChecklist = ['campo', 'administrador', 'superadmin'].includes(user?.rol)
+  const puedeRegistrarCambioAceite = ['administrador', 'operaciones', 'superadmin'].includes(user?.rol)
 
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
-      const [{ data: v }, { data: hist }] = await Promise.all([
+      const [{ data: v }, { data: hist }, { data: cambios }] = await Promise.all([
         getVehiculo(id),
         getHistorialVehiculo(id),
+        getCambiosAceite({ vehiculo: id }),
       ])
       setVehiculo(v)
       setChecklists(hist)
+      setCambiosAceite(cambios)
       if (puedeVerAlertas) {
         const { data: alertasData } = await getAlertasFlota({ vehiculo: id, activa: true, resuelta: false })
         setAlertas(alertasData)
@@ -94,6 +101,19 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
     }
   }
 
+  const handleRegistrarCambioAceite = async (payload) => {
+    setGuardando(true)
+    try {
+      await crearCambioAceite({ ...payload, vehiculo: id })
+      showToast('✅ Cambio de aceite registrado', 'exito')
+      cargar()
+    } catch {
+      showToast('No se pudo registrar el cambio de aceite.', 'error')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
   const handleAgregarAdvertencia = async (motivo) => {
     if (!checklistSeleccionado) return
     setGuardando(true)
@@ -123,7 +143,7 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
   if (!vehiculo) return null
 
   const estadoConfig = ESTADO_VEHICULO_CONFIG[vehiculo.estado] ?? ESTADO_VEHICULO_CONFIG.activo
-  const unidad = esOffRoad(vehiculo.tipo) ? 'hrs' : 'km'
+  const unidad = unidadMedicion(vehiculo.tipo)
 
   return (
     <div className="flex flex-col gap-5">
@@ -258,6 +278,17 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
       </div>
 
       <div className="glass-card flota-fade-in rounded-2xl p-4" style={{ animationDelay: '80ms' }}>
+        <h2 className="mb-3 font-bold text-flotafg">Cambios de aceite</h2>
+        <BitacoraAceite
+          cambios={cambiosAceite}
+          unidad={unidad}
+          puedeRegistrar={puedeRegistrarCambioAceite}
+          onRegistrar={handleRegistrarCambioAceite}
+          guardando={guardando}
+        />
+      </div>
+
+      <div className="glass-card flota-fade-in rounded-2xl p-4" style={{ animationDelay: '100ms' }}>
         <h2 className="mb-3 font-bold text-flotafg">Historial de checklists</h2>
         <HistorialChecklists checklists={checklists} onVerDetalle={setChecklistSeleccionado} />
       </div>

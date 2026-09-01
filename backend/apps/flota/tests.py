@@ -9,7 +9,8 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.models import User
 
-from .models import AdvertenciaChecklist, AlertaFlota, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AdvertenciaChecklist, AlertaFlota, CambioAceite, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .tasks import revisar_alertas_flota
 
 TOTAL_VEHICULOS_PRECARGADOS = 20
 
@@ -328,15 +329,17 @@ class FlotaAPITest(APITestCase):
         )
         self.assertNotIn('kilometraje', checklist_llegada.items_aplicables())
 
-    def test_cuatrimoto_sin_kilometraje(self):
-        # Las "motos" reales de la reserva (Moto roja, Moto azul) están dadas de alta como cuatrimoto.
+    def test_cuatrimoto_registra_horometro(self):
+        # Las "motos" reales de la reserva (Moto roja, Moto azul) están dadas de alta como
+        # cuatrimoto y sí registran horómetro (Vehiculo.TIPOS_HORAS), a diferencia de "moto".
         cuatrimoto = crear_vehiculo(nombre='Moto Roja Test', kilometraje_actual=0, tipo=Vehiculo.Tipo.CUATRIMOTO)
+        self.assertEqual(cuatrimoto.unidad_medicion, 'hrs')
         checklist_salida = ChecklistVehiculo.objects.create(
             vehiculo=cuatrimoto, tipo_reporte='salida', responsable=self.campo,
             km_reporte=0, nivel_combustible=80,
         )
         items = checklist_salida.items_aplicables()
-        self.assertNotIn('kilometraje', items)
+        self.assertIn('kilometraje', items)  # mismo ítem/foto, guarda horas en vez de km
         self.assertIn('soplado_filtro_aire', items)  # sigue siendo off-road para lo demás
         self.assertIn('carga_traila', items)
 
@@ -344,7 +347,7 @@ class FlotaAPITest(APITestCase):
             vehiculo=cuatrimoto, tipo_reporte='llegada', responsable=self.campo,
             km_reporte=0, nivel_combustible=80,
         )
-        self.assertNotIn('kilometraje', checklist_llegada.items_aplicables())
+        self.assertIn('kilometraje', checklist_llegada.items_aplicables())
 
     def test_no_puede_salir_vehiculo_en_taller(self):
         vehiculo_taller = crear_vehiculo(nombre='En Taller Test', kilometraje_actual=1000)
@@ -653,3 +656,164 @@ class IncidenciasAPITest(APITestCase):
         resp = self.client.get('/api/v1/flota/resumen/')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(resp.data['incidencias_total'], 2)
+
+
+class CambioAceiteAPITest(APITestCase):
+    """Bitácora manual de cambios de aceite — POST /cambios-aceite/, GET filtrado por vehículo."""
+
+    def setUp(self):
+        self.campo = crear_usuario('chino_test', 'campo')
+        self.admin = crear_usuario('abigail_test', 'administrador')
+        self.operaciones = crear_usuario('erik_test', 'operaciones')
+        self.superadmin = crear_usuario('alberto_test', 'superadmin')
+        self.vehiculo = crear_vehiculo(kilometraje_actual=1000)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def test_admin_y_operaciones_pueden_registrar_cambio(self):
+        for user in (self.admin, self.operaciones, self.superadmin):
+            self._auth(user)
+            resp = self.client.post('/api/v1/flota/cambios-aceite/', {
+                'vehiculo': self.vehiculo.id,
+                'fecha': '2026-08-15',
+                'estado': 'realizado',
+                'km_horas': '1000.00',
+                'observaciones': 'Se realizó cambio de aceite',
+            }, format='json')
+            self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+            self.assertEqual(resp.data['registrado_por'], user.id)
+            self.assertEqual(resp.data['unidad'], 'km')
+
+    def test_campo_no_puede_registrar_cambio(self):
+        self._auth(self.campo)
+        resp = self.client.post('/api/v1/flota/cambios-aceite/', {
+            'vehiculo': self.vehiculo.id, 'fecha': '2026-08-15', 'estado': 'realizado',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_cuatrimoto_y_polaris_registran_horas(self):
+        cuatrimoto = crear_vehiculo(nombre='Moto Roja Test', kilometraje_actual=0, tipo=Vehiculo.Tipo.CUATRIMOTO)
+        self._auth(self.admin)
+        resp = self.client.post('/api/v1/flota/cambios-aceite/', {
+            'vehiculo': cuatrimoto.id, 'fecha': '2026-08-15', 'estado': 'realizado', 'km_horas': '42.2',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['unidad'], 'hrs')
+
+    def test_registrar_realizado_resuelve_alerta_activa(self):
+        AlertaFlota.objects.create(
+            vehiculo=self.vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE,
+            descripcion='Toca cambio de aceite', km_alerta=1000,
+        )
+        self._auth(self.admin)
+        resp = self.client.post('/api/v1/flota/cambios-aceite/', {
+            'vehiculo': self.vehiculo.id, 'fecha': '2026-08-15', 'estado': 'realizado', 'km_horas': '1000',
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+        alerta = AlertaFlota.objects.get(vehiculo=self.vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE)
+        self.assertTrue(alerta.resuelta)
+        self.assertFalse(alerta.activa)
+        self.assertEqual(alerta.resuelta_por, self.admin)
+
+    def test_registrar_pendiente_no_resuelve_alerta(self):
+        AlertaFlota.objects.create(
+            vehiculo=self.vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE,
+            descripcion='Toca cambio de aceite', km_alerta=1000,
+        )
+        self._auth(self.operaciones)
+        self.client.post('/api/v1/flota/cambios-aceite/', {
+            'vehiculo': self.vehiculo.id, 'fecha': '2026-08-15', 'estado': 'en_reparacion',
+            'observaciones': 'En reparación en Cd. Acuña, pendiente fecha.',
+        }, format='json')
+
+        alerta = AlertaFlota.objects.get(vehiculo=self.vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE)
+        self.assertFalse(alerta.resuelta)
+        self.assertTrue(alerta.activa)
+
+    def test_filtra_por_vehiculo(self):
+        otro_vehiculo = crear_vehiculo(nombre='Otra Savana', kilometraje_actual=500)
+        CambioAceite.objects.create(
+            vehiculo=self.vehiculo, fecha='2026-08-15', estado='realizado',
+            km_horas=1000, registrado_por=self.admin,
+        )
+        CambioAceite.objects.create(
+            vehiculo=otro_vehiculo, fecha='2026-08-10', estado='realizado',
+            km_horas=500, registrado_por=self.admin,
+        )
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/flota/cambios-aceite/', {'vehiculo': self.vehiculo.id})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['vehiculo'], self.vehiculo.id)
+
+
+class CambioAceiteTaskTest(TestCase):
+    """Celery revisar_alertas_flota — la bitácora CambioAceite es la fuente de verdad."""
+
+    def setUp(self):
+        self.usuario = crear_usuario('abigail_test', 'administrador')
+
+    def test_alerta_se_genera_al_superar_intervalo_desde_ultimo_cambio_realizado(self):
+        vehiculo = crear_vehiculo(kilometraje_actual=6000, tipo=Vehiculo.Tipo.CAMIONETA)
+        CambioAceite.objects.create(
+            vehiculo=vehiculo, fecha='2026-01-01', estado='realizado',
+            km_horas=1000, registrado_por=self.usuario,
+        )  # 6000 - 1000 = 5000 >= KM_INTERVALO_ACEITE
+
+        revisar_alertas_flota()
+
+        self.assertTrue(
+            AlertaFlota.objects.filter(vehiculo=vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE).exists()
+        )
+
+    def test_no_genera_alerta_si_no_se_alcanza_el_intervalo(self):
+        vehiculo = crear_vehiculo(kilometraje_actual=4000, tipo=Vehiculo.Tipo.CAMIONETA)
+        CambioAceite.objects.create(
+            vehiculo=vehiculo, fecha='2026-01-01', estado='realizado',
+            km_horas=0, registrado_por=self.usuario,
+        )
+
+        revisar_alertas_flota()
+
+        self.assertFalse(
+            AlertaFlota.objects.filter(vehiculo=vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE).exists()
+        )
+
+    def test_registro_pendiente_no_cuenta_como_base(self):
+        # Un registro "pendiente"/"en_reparacion" no debe usarse como base del intervalo —
+        # solo un "realizado" resetea el conteo (ver tabla real: motos con horas pendientes).
+        vehiculo = crear_vehiculo(kilometraje_actual=6000, tipo=Vehiculo.Tipo.CAMIONETA)
+        CambioAceite.objects.create(
+            vehiculo=vehiculo, fecha='2026-08-01', estado='pendiente',
+            km_horas=5900, registrado_por=self.usuario,
+        )
+        # Sin ningún "realizado" previo, la base es 0 — 6000km ya superan el intervalo.
+        revisar_alertas_flota()
+
+        self.assertTrue(
+            AlertaFlota.objects.filter(vehiculo=vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE).exists()
+        )
+
+    def test_horometro_cuatrimoto_polaris_can_am_usa_intervalo_de_horas(self):
+        for tipo in (Vehiculo.Tipo.CUATRIMOTO, Vehiculo.Tipo.POLARIS, Vehiculo.Tipo.CAN_AM):
+            vehiculo = crear_vehiculo(nombre=f'{tipo} Test', kilometraje_actual=250, tipo=tipo)
+            CambioAceite.objects.create(
+                vehiculo=vehiculo, fecha='2026-01-01', estado='realizado',
+                km_horas=40, registrado_por=self.usuario,
+            )  # 250 - 40 = 210hrs >= HORAS_INTERVALO_ACEITE (200)
+
+            revisar_alertas_flota()
+
+            self.assertTrue(
+                AlertaFlota.objects.filter(vehiculo=vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE).exists(),
+                f'{tipo} debería generar alerta por horómetro',
+            )
+
+    def test_moto_sin_registro_no_genera_alerta_cambio_aceite(self):
+        moto = crear_vehiculo(nombre='Moto Calle Test', kilometraje_actual=99999, tipo=Vehiculo.Tipo.MOTO)
+        revisar_alertas_flota()
+        self.assertFalse(
+            AlertaFlota.objects.filter(vehiculo=moto, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE).exists()
+        )

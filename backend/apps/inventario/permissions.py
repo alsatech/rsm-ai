@@ -93,6 +93,14 @@ class PuedeGestionarRelacionCompras(BasePermission):
         return _rol_en(request, ROLES_GESTIONAN_RELACION_COMPRAS)
 
 
+class PuedeDarEntradaRecepcion(BasePermission):
+    """Mismos roles que registran entradas manuales — Yajaira revisa lo que reportó Campo y
+    da entrada, comparándolo contra la compra."""
+
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_REGISTRAN_ENTRADA)
+
+
 class PuedeEditarSolicitud(BasePermission):
     """El creador solo edita mientras está en borrador; administrador/superadmin editan siempre."""
 

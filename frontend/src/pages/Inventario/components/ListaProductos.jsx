@@ -4,6 +4,7 @@ import { createProducto, getCategorias, getProductos, getUbicaciones } from '../
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { ESTADO_STOCK_CONFIG, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
+import EtiquetaProducto from './EtiquetaProducto'
 import FormularioProducto from './FormularioProducto'
 
 const inputClass =
@@ -22,6 +23,7 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
   const [estadoFiltro, setEstadoFiltro] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [productoParaEtiqueta, setProductoParaEtiqueta] = useState(null)
 
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeRegistrarMovimiento = user?.rol !== 'operaciones'
@@ -165,16 +167,29 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
                       {Number(producto.stock_actual).toLocaleString('es-MX')}
                       <span className="ml-1 text-xs font-normal text-text-secondary">{UNIDAD_LABELS[producto.unidad_medida]}</span>
                     </p>
-                    {puedeRegistrarMovimiento && (
-                      <button
-                        type="button"
-                        onClick={() => onNuevoMovimiento(producto)}
-                        style={{ minHeight: '44px' }}
-                        className="rounded-xl bg-accent px-4 text-sm font-bold text-highlight transition hover:opacity-90"
-                      >
-                        Movimiento
-                      </button>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {puedeGestionarCatalogo && (
+                        <button
+                          type="button"
+                          onClick={() => setProductoParaEtiqueta(producto)}
+                          aria-label="Ver etiqueta QR"
+                          style={{ minHeight: '44px', minWidth: '44px' }}
+                          className="rounded-xl border border-border px-3 text-sm transition hover:border-accent"
+                        >
+                          🏷️
+                        </button>
+                      )}
+                      {puedeRegistrarMovimiento && (
+                        <button
+                          type="button"
+                          onClick={() => onNuevoMovimiento(producto)}
+                          style={{ minHeight: '44px' }}
+                          className="rounded-xl bg-accent px-4 text-sm font-bold text-highlight transition hover:opacity-90"
+                        >
+                          Movimiento
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
@@ -191,6 +206,10 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
           onCancelar={() => setMostrarFormulario(false)}
           guardando={guardando}
         />
+      )}
+
+      {productoParaEtiqueta && (
+        <EtiquetaProducto producto={productoParaEtiqueta} onCerrar={() => setProductoParaEtiqueta(null)} />
       )}
     </div>
   )

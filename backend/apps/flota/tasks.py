@@ -4,6 +4,7 @@ from celery import shared_task
 from django.utils import timezone
 
 KM_INTERVALO_ACEITE = 5000
+HORAS_INTERVALO_ACEITE = 200  # Polaris, Can-Am y cuatrimotos registran horómetro, no kilometraje
 DIAS_INTERVALO_CALIBRACION = 90
 DIAS_AVISO_VENCIMIENTO = 30
 
@@ -41,15 +42,26 @@ def _revisar_alertas_por_km_y_fecha(hoy):
 
 
 def _revisar_cambio_aceite(hoy):
-    from .models import AlertaFlota, Vehiculo
+    from .models import AlertaFlota, CambioAceite, ChecklistVehiculo, Vehiculo
 
-    for vehiculo in Vehiculo.objects.filter(estado=Vehiculo.Estado.ACTIVO):
-        ultimo_cambio = AlertaFlota.objects.filter(
-            vehiculo=vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE, resuelta=True,
-        ).order_by('-resuelta_en').first()
-        km_base = ultimo_cambio.km_alerta if (ultimo_cambio and ultimo_cambio.km_alerta) else 0
+    # Polaris, Can-Am y cuatrimotos ("motos" reales de la reserva) llevan horómetro
+    # (200 hrs); el resto de la flota lleva kilometraje (5000 km). El tipo "moto"
+    # (sin uso actual) no registra ninguno de los dos — ver TIPOS_SIN_KILOMETRAJE.
+    for vehiculo in Vehiculo.objects.filter(estado=Vehiculo.Estado.ACTIVO).exclude(
+        tipo__in=ChecklistVehiculo.TIPOS_SIN_KILOMETRAJE
+    ):
+        es_horas = vehiculo.tipo in Vehiculo.TIPOS_HORAS
+        intervalo = HORAS_INTERVALO_ACEITE if es_horas else KM_INTERVALO_ACEITE
+        unidad = vehiculo.unidad_medicion
 
-        if float(vehiculo.kilometraje_actual) - km_base < KM_INTERVALO_ACEITE:
+        # La bitácora manual (CambioAceite) es la fuente de verdad: solo un
+        # registro con estado=REALIZADO cuenta como base para el próximo intervalo.
+        ultimo_cambio = CambioAceite.objects.filter(
+            vehiculo=vehiculo, estado=CambioAceite.Estado.REALIZADO, km_horas__isnull=False,
+        ).order_by('-fecha', '-created_at').first()
+        base = float(ultimo_cambio.km_horas) if ultimo_cambio else 0
+
+        if float(vehiculo.kilometraje_actual) - base < intervalo:
             continue
 
         existe_activa = AlertaFlota.objects.filter(
@@ -58,14 +70,14 @@ def _revisar_cambio_aceite(hoy):
         if existe_activa:
             continue
 
-        siguiente_km = km_base + KM_INTERVALO_ACEITE
+        siguiente = base + intervalo
         AlertaFlota.objects.create(
             vehiculo=vehiculo,
             tipo=AlertaFlota.Tipo.CAMBIO_ACEITE,
-            descripcion=f'{vehiculo.nombre} lleva {int(float(vehiculo.kilometraje_actual) - km_base)}km desde el último cambio de aceite.',
-            km_alerta=siguiente_km,
+            descripcion=f'{vehiculo.nombre} lleva {int(float(vehiculo.kilometraje_actual) - base)}{unidad} desde el último cambio de aceite.',
+            km_alerta=siguiente,
         )
-        print(f'[ALERTA FLOTA] {vehiculo.nombre} — cambio de aceite requerido ({vehiculo.kilometraje_actual}km).')
+        print(f'[ALERTA FLOTA] {vehiculo.nombre} — cambio de aceite requerido ({vehiculo.kilometraje_actual}{unidad}).')
 
 
 def _revisar_calibracion_llantas(hoy):

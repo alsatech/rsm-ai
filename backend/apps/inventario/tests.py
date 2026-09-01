@@ -251,6 +251,19 @@ class InventarioAPITest(APITestCase):
         self.assertIn('total_productos', resp.data)
         self.assertIn('alertas_stock', resp.data)
 
+    def test_reporte_diario_requiere_permiso(self):
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/inventario/reporte-diario/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_reporte_diario_genera_pdf(self):
+        self._auth(self.inventario)
+        resp = self.client.get('/api/v1/inventario/reporte-diario/', {'fecha': '2026-08-26'})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp['Content-Type'], 'application/pdf')
+        self.assertIn('reporte_inventario_2026-08-26.pdf', resp['Content-Disposition'])
+        self.assertTrue(resp.content.startswith(b'%PDF'))
+
     def test_todos_los_roles_ven_productos(self):
         for user in (self.campo, self.inventario, self.operaciones, self.admin, self.superadmin):
             self._auth(user)
@@ -262,6 +275,12 @@ def _fake_foto(nombre='evidencia.jpg'):
     from django.core.files.uploadedfile import SimpleUploadedFile
 
     return SimpleUploadedFile(nombre, b'contenido-fake-de-imagen', content_type='image/jpeg')
+
+
+def _fake_audio(nombre='nota.webm'):
+    from django.core.files.uploadedfile import SimpleUploadedFile
+
+    return SimpleUploadedFile(nombre, b'contenido-fake-de-audio', content_type='audio/webm')
 
 
 def _imagen_valida(nombre='factura.png'):
@@ -303,12 +322,6 @@ class AdquisicionesAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
         return resp.data
 
-    def _autorizar(self, solicitud_id):
-        self._auth(self.admin)
-        resp = self.client.post(f'/api/v1/inventario/solicitudes/{solicitud_id}/autorizar/', {}, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
-        return resp.data
-
     def _enviar(self, solicitud_id, item_id, enviador, cantidad='5.00'):
         self._auth(enviador)
         data = {
@@ -329,26 +342,43 @@ class AdquisicionesAPITest(APITestCase):
         self.assertTrue(s1['folio'].startswith('SM-'))
         self.assertNotEqual(s1['folio'], s2['folio'])
 
-    def test_solo_admin_autoriza_solicitud(self):
-        solicitud = self._crear_solicitud(self.campo)
+    def test_filtro_estado_acepta_lista_separada_por_comas(self):
+        # La pantalla de recepción de Campo necesita ver 'enviada_rancho' y 'recibida_parcial'
+        # a la vez, así que el filtro ?estado= acepta varios valores separados por coma.
+        s1 = self._crear_solicitud(self.campo)  # queda en 'autorizada'
+        s2 = self._crear_solicitud(self.campo)
+        item2_id = s2['items'][0]['id']
+        self._enviar(s2['id'], item2_id, self.operaciones)  # pasa a 'enviada_rancho'
 
         self._auth(self.campo)
-        resp = self.client.post(f'/api/v1/inventario/solicitudes/{solicitud["id"]}/autorizar/', {}, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        resp = self.client.get('/api/v1/inventario/solicitudes/?estado=autorizada,enviada_rancho')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ids = {s['id'] for s in resp.data}
+        self.assertIn(s1['id'], ids)
+        self.assertIn(s2['id'], ids)
 
-        self._auth(self.inventario)
-        resp = self.client.post(f'/api/v1/inventario/solicitudes/{solicitud["id"]}/autorizar/', {}, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        resp = self.client.get('/api/v1/inventario/solicitudes/?estado=enviada_rancho')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        ids = {s['id'] for s in resp.data}
+        self.assertNotIn(s1['id'], ids)
+        self.assertIn(s2['id'], ids)
 
-        data = self._autorizar(solicitud['id'])
-        self.assertEqual(data['estado'], 'autorizada')
-        self.assertEqual(data['autorizado_por'], self.admin.id)
+    def test_solicitud_enviada_queda_lista_para_compra_sin_autorizacion_manual(self):
+        # Las solicitudes de material ya no pasan por autorización manual: la coordinación es
+        # comunicación directa entre solicitante y quien captura, así que quedan listas para
+        # compra de inmediato (el endpoint /autorizar/ queda solo para solicitudes legacy).
+        solicitud = self._crear_solicitud(self.campo)
+        self.assertEqual(solicitud['estado'], 'autorizada')
+        self.assertIsNone(solicitud['autorizado_por'])
+
+        self._auth(self.admin)
+        resp = self.client.post(f'/api/v1/inventario/solicitudes/{solicitud["id"]}/autorizar/', {}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_recibido_por_distinto_enviado_por(self):
         # se usa administrador como enviador porque es el único rol que puede enviar Y recibir,
         # para aislar la regla de "distinto usuario" de la regla de permisos por rol.
         solicitud = self._crear_solicitud(self.campo)
-        self._autorizar(solicitud['id'])
         item_id = solicitud['items'][0]['id']
         self._enviar(solicitud['id'], item_id, self.admin)
 
@@ -371,27 +401,50 @@ class AdquisicionesAPITest(APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
 
-    def test_recepcion_completa_genera_entrada_inventario(self):
-        solicitud = self._crear_solicitud(self.campo, cantidad='5.00')
-        self._autorizar(solicitud['id'])
+    def _crear_recepcion_completa(self, cantidad='5.00'):
+        """Crea solicitud → envío → recepción completa. Ya NO mueve stock — eso lo hace
+        DarEntradaRecepcionView cuando Yajaira lo confirma."""
+        solicitud = self._crear_solicitud(self.campo, cantidad=cantidad)
         item_id = solicitud['items'][0]['id']
-        self._enviar(solicitud['id'], item_id, self.operaciones, cantidad='5.00')
-
-        stock_antes = self.producto.stock_actual
+        self._enviar(solicitud['id'], item_id, self.operaciones, cantidad=cantidad)
 
         self._auth(self.campo)
         data = {
             'estado_general': 'completo',
-            'items': json.dumps([{'item_solicitud': item_id, 'cantidad_recibida': '5.00', 'estado_item': 'ok'}]),
+            'items': json.dumps([{'item_solicitud': item_id, 'cantidad_recibida': cantidad, 'estado_item': 'ok'}]),
             'fotos_llegada': [_fake_foto('llegada.jpg')],
         }
         resp = self.client.post(
             f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/', data, format='multipart',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        return solicitud, resp.data
+
+    def test_recepcion_no_mueve_stock_todavia(self):
+        stock_antes = self.producto.stock_actual
+        solicitud, _ = self._crear_recepcion_completa(cantidad='5.00')
 
         solicitud_db = SolicitudMaterial.objects.get(pk=solicitud['id'])
         self.assertEqual(solicitud_db.estado, SolicitudMaterial.Estado.RECIBIDA_COMPLETA)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, stock_antes)
+        self.assertFalse(
+            MovimientoInventario.objects.filter(producto=self.producto, tipo=MovimientoInventario.Tipo.ENTRADA).exists()
+        )
+
+    def test_dar_entrada_genera_movimiento_ligado_a_la_solicitud(self):
+        stock_antes = self.producto.stock_actual
+        solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
+
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
+            {}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertTrue(resp.data['entrada_confirmada'])
+        self.assertEqual(resp.data['entrada_confirmada_por'], self.inventario.id)
 
         self.producto.refresh_from_db()
         self.assertEqual(self.producto.stock_actual, stock_antes + 5)
@@ -400,6 +453,66 @@ class AdquisicionesAPITest(APITestCase):
             producto=self.producto, tipo=MovimientoInventario.Tipo.ENTRADA,
         ).latest('fecha_hora_registro')
         self.assertEqual(movimiento.cantidad, 5)
+        self.assertEqual(movimiento.solicitud_id, solicitud['id'])
+        self.assertTrue(movimiento.validado)
+        self.assertEqual(movimiento.validado_por_id, self.inventario.id)
+
+    def test_dar_entrada_dos_veces_falla(self):
+        solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
+
+        self._auth(self.inventario)
+        url = f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/'
+        resp = self.client.post(url, {}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+
+        resp = self.client.post(url, {}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_campo_no_puede_dar_entrada(self):
+        solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
+
+        self._auth(self.campo)
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
+            {}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_recepcion_con_nota_de_voz_se_guarda(self):
+        solicitud = self._crear_solicitud(self.campo, cantidad='5.00')
+        item_id = solicitud['items'][0]['id']
+        self._enviar(solicitud['id'], item_id, self.operaciones, cantidad='5.00')
+
+        self._auth(self.campo)
+        data = {
+            'estado_general': 'completo',
+            'items': json.dumps([{'item_solicitud': item_id, 'cantidad_recibida': '5.00', 'estado_item': 'ok'}]),
+            'fotos_llegada': [_fake_foto('llegada.jpg')],
+            'audio': _fake_audio(),
+        }
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/', data, format='multipart',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertTrue(resp.data['audio'])
+
+    def test_recepcion_con_audio_formato_invalido_falla(self):
+        solicitud = self._crear_solicitud(self.campo, cantidad='5.00')
+        item_id = solicitud['items'][0]['id']
+        self._enviar(solicitud['id'], item_id, self.operaciones, cantidad='5.00')
+
+        self._auth(self.campo)
+        data = {
+            'estado_general': 'completo',
+            'items': json.dumps([{'item_solicitud': item_id, 'cantidad_recibida': '5.00', 'estado_item': 'ok'}]),
+            'fotos_llegada': [_fake_foto('llegada.jpg')],
+            'audio': _fake_audio('nota.exe'),
+        }
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/', data, format='multipart',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('audio', resp.data)
 
     def test_reporte_faltante_genera_alerta(self):
         self._auth(self.campo)
@@ -414,7 +527,6 @@ class AdquisicionesAPITest(APITestCase):
 
     def test_operaciones_no_puede_registrar_recepcion(self):
         solicitud = self._crear_solicitud(self.campo)
-        self._autorizar(solicitud['id'])
         item_id = solicitud['items'][0]['id']
         self._enviar(solicitud['id'], item_id, self.operaciones)
 
@@ -431,7 +543,6 @@ class AdquisicionesAPITest(APITestCase):
 
     def test_campo_no_puede_registrar_envio(self):
         solicitud = self._crear_solicitud(self.campo)
-        self._autorizar(solicitud['id'])
         item_id = solicitud['items'][0]['id']
 
         self._auth(self.campo)
@@ -446,7 +557,6 @@ class AdquisicionesAPITest(APITestCase):
 
     def test_comparativo_solo_visible_para_roles_completos(self):
         solicitud = self._crear_solicitud(self.campo)
-        self._autorizar(solicitud['id'])
 
         self._auth(self.campo)
         resp = self.client.get(f'/api/v1/inventario/solicitudes/{solicitud["id"]}/comparativo/')
@@ -480,12 +590,7 @@ class ComprasYRelacionAPITest(APITestCase):
         }
         resp = self.client.post('/api/v1/inventario/solicitudes/', payload, format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
-        solicitud = resp.data
-
-        self._auth(self.admin)
-        resp = self.client.post(f'/api/v1/inventario/solicitudes/{solicitud["id"]}/autorizar/', {}, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
-        return solicitud
+        return resp.data
 
     def _registrar_compra(self, solicitud_id, registrador, comprador=None, monto='500.00', fecha=None):
         self._auth(registrador)
@@ -522,16 +627,65 @@ class ComprasYRelacionAPITest(APITestCase):
         resp = self._registrar_compra(solicitud['id'], self.campo)
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_no_se_puede_comprar_sin_autorizar(self):
+    def _actualizar_compra(self, solicitud_id, registrador, **overrides):
+        self._auth(registrador)
+        return self.client.patch(
+            f'/api/v1/inventario/solicitudes/{solicitud_id}/compra/', overrides, format='multipart',
+        )
+
+    def test_editar_compra_corrige_monto_antes_de_enviar(self):
+        solicitud = self._crear_solicitud_autorizada()
+        self._registrar_compra(solicitud['id'], self.inventario, monto='500.00')
+
+        resp = self._actualizar_compra(solicitud['id'], self.inventario, monto_total='650.00')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data['monto_total'], '650.00')
+
+        compra = Compra.objects.get(solicitud_id=solicitud['id'])
+        self.assertEqual(str(compra.monto_total), '650.00')
+
+    def test_campo_no_puede_editar_compra(self):
+        solicitud = self._crear_solicitud_autorizada()
+        self._registrar_compra(solicitud['id'], self.inventario)
+
+        resp = self._actualizar_compra(solicitud['id'], self.campo, monto_total='999.00')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_no_se_puede_editar_compra_sin_registrar(self):
+        solicitud = self._crear_solicitud_autorizada()
+        resp = self._actualizar_compra(solicitud['id'], self.inventario, monto_total='999.00')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_se_puede_editar_compra_despues_de_registrar_envio(self):
+        solicitud = self._crear_solicitud_autorizada()
+        self._registrar_compra(solicitud['id'], self.inventario)
+
+        item_id = solicitud['items'][0]['id']
+        self._auth(self.operaciones)
+        data = {
+            'items': json.dumps([{'item_solicitud': item_id, 'cantidad_enviada': '5.00'}]),
+            'vehiculo': 'Sierra',
+            'fotos': [_fake_foto()],
+        }
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/enviar/', data, format='multipart',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+
+        resp = self._actualizar_compra(solicitud['id'], self.inventario, monto_total='999.00')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_se_puede_comprar_una_solicitud_en_borrador(self):
         self._auth(self.campo)
         payload = {
             'area': 'campo',
             'descripcion_necesidad': 'Material para bebederos',
-            'estado': 'enviada',
+            'estado': 'borrador',
             'items': [{'producto': self.producto.id, 'cantidad_solicitada': '5.00', 'unidad': 'pieza'}],
         }
         resp = self.client.post('/api/v1/inventario/solicitudes/', payload, format='json')
         solicitud = resp.data
+        self.assertEqual(solicitud['estado'], 'borrador')
 
         resp = self._registrar_compra(solicitud['id'], self.inventario)
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
@@ -682,10 +836,6 @@ class CompraDesdeMovimientoAPITest(APITestCase):
         }
         resp = self.client.post('/api/v1/inventario/solicitudes/', payload, format='json')
         solicitud_id = resp.data['id']
-
-        admin = crear_usuario('abigail_mov', 'administrador')
-        self._auth(admin)
-        self.client.post(f'/api/v1/inventario/solicitudes/{solicitud_id}/autorizar/', {}, format='json')
 
         self._auth(self.inventario)
         self.client.post(f'/api/v1/inventario/solicitudes/{solicitud_id}/compra/', {

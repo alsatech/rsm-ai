@@ -4,6 +4,7 @@ import { crearRecepcion } from '../../../../api/inventario'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useToast } from '../../../../hooks/useToast'
 import { ESTADO_ITEM_CONFIG } from '../../constants'
+import GrabadorAudio from './GrabadorAudio'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -31,6 +32,7 @@ export default function ChecklistRecepcion({ solicitud, onCancelar, onRecibido }
   )
   const [estadoGeneral, setEstadoGeneral] = useState('completo')
   const [fotosLlegada, setFotosLlegada] = useState([])
+  const [audio, setAudio] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const inputRef = useRef(null)
 
@@ -64,6 +66,7 @@ export default function ChecklistRecepcion({ solicitud, onCancelar, onRecibido }
         if (foto) fd.append(`foto_item_${item.id}`, foto)
       })
       fotosLlegada.forEach((foto) => fd.append('fotos_llegada', foto))
+      if (audio) fd.append('audio', audio)
 
       await crearRecepcion(solicitud.id, fd)
       showToast('✅ Recepción confirmada — productos actualizados en inventario', 'exito')
@@ -79,7 +82,12 @@ export default function ChecklistRecepcion({ solicitud, onCancelar, onRecibido }
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
       <h2 className="mb-1 text-xl font-bold text-text">Recepción de material — {solicitud.folio}</h2>
-      <p className="mb-4 text-sm text-text-secondary">Recibido por: {user?.nombre || user?.username}</p>
+      <div className="mb-4 flex items-center gap-2 rounded-xl border border-highlight/40 bg-highlight/10 px-4 py-3">
+        <span className="text-xl">✅</span>
+        <p className="text-sm font-bold text-highlight">
+          Tú vas a recibir este material — {user?.nombre || user?.username}
+        </p>
+      </div>
 
       <div className="flex flex-col gap-4">
         {itemsEnviados.map((item) => {
@@ -203,6 +211,26 @@ export default function ChecklistRecepcion({ solicitud, onCancelar, onRecibido }
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        <div>
+          <p className="mb-2 text-sm font-medium text-text-secondary">
+            🎙️ Nota de voz (opcional) — cuenta cómo llegó el material
+          </p>
+          {audio ? (
+            <div className="flex items-center gap-3 rounded-xl border border-highlight/40 bg-highlight/10 p-3">
+              <audio controls src={URL.createObjectURL(audio)} className="h-10 flex-1" />
+              <button
+                type="button"
+                onClick={() => setAudio(null)}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-bg text-error"
+              >
+                ✕
+              </button>
+            </div>
+          ) : (
+            <GrabadorAudio onAudioListo={(archivo) => setAudio(archivo)} />
           )}
         </div>
       </div>

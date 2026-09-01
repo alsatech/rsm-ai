@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.utils import timezone
 
-from .models import AlertaFlota, ChecklistVehiculo, Vehiculo
+from .models import AlertaFlota, CambioAceite, ChecklistVehiculo, Vehiculo
 
 DIAS_AVISO_VENCIMIENTO = 30
 
@@ -49,3 +49,19 @@ def crear_alertas_vencimiento(sender, instance, **kwargs):
             descripcion=f'La {etiqueta} de {instance.nombre} vence el {fecha_vencimiento:%Y-%m-%d}.',
             fecha_alerta=fecha_vencimiento,
         )
+
+
+@receiver(post_save, sender=CambioAceite)
+def resolver_alerta_al_registrar_cambio_aceite(sender, instance, created, **kwargs):
+    """Al registrar un cambio de aceite REALIZADO, resuelve la alerta activa del vehículo."""
+    if not created or instance.estado != CambioAceite.Estado.REALIZADO:
+        return
+
+    AlertaFlota.objects.filter(
+        vehiculo=instance.vehiculo, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE, activa=True, resuelta=False,
+    ).update(
+        resuelta=True,
+        activa=False,
+        resuelta_por=instance.registrado_por,
+        resuelta_en=timezone.now(),
+    )

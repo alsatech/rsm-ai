@@ -5,6 +5,9 @@ from apps.users.models import User
 ROLES_ADMIN = (User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_GESTION_VEHICULO = (User.Rol.OPERACIONES, User.Rol.SUPERADMIN)
 ROLES_CREAN_CHECKLIST = (User.Rol.CAMPO, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
+# Abigail (Administrador) valida mantenimiento y Erik (Operaciones) supervisa la flota —
+# ambos registran cambios de aceite en la bitácora.
+ROLES_CAMBIO_ACEITE = (User.Rol.ADMINISTRADOR, User.Rol.OPERACIONES, User.Rol.SUPERADMIN)
 
 
 def _rol_en(request, roles):
@@ -41,3 +44,8 @@ class PuedeVerIncidencias(BasePermission):
 
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_ADMIN)
+
+
+class PuedeRegistrarCambioAceite(BasePermission):
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_CAMBIO_ACEITE)

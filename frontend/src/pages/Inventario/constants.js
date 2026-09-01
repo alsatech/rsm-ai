@@ -60,7 +60,7 @@ export const AREA_LABELS = {
 export const ESTADO_SOLICITUD_CONFIG = {
   borrador: { label: 'Borrador', badge: 'bg-border/40 text-text-secondary border-border' },
   enviada: { label: 'Enviada', badge: 'bg-highlight/10 text-highlight border-highlight/40' },
-  autorizada: { label: 'Autorizada', badge: 'bg-highlight/20 text-highlight border-highlight' },
+  autorizada: { label: 'Lista para compra', badge: 'bg-highlight/20 text-highlight border-highlight' },
   rechazada: { label: 'Rechazada', badge: 'bg-error/10 text-error border-error/40' },
   en_compra: { label: 'En compra', badge: 'bg-warning/10 text-warning border-warning/40' },
   enviada_rancho: { label: 'Enviada al rancho', badge: 'bg-[#f97316]/10 text-[#f97316] border-[#f97316]/40' },
@@ -71,9 +71,9 @@ export const ESTADO_SOLICITUD_CONFIG = {
 export const TABS_SOLICITUDES = [
   { value: '', label: 'Todas' },
   { value: 'borrador', label: 'Borrador' },
-  { value: 'autorizada', label: 'Autorizadas' },
+  { value: 'autorizada', label: 'Listas para compra' },
   { value: 'enviada_rancho', label: 'En tránsito' },
-  { value: 'recibida_completa', label: 'Recibidas' },
+  { value: 'recibida_completa,recibida_parcial', label: 'Recibidas' },
 ]
 
 export const TIPO_REPORTE_CONFIG = {

@@ -89,7 +89,7 @@ export default function ListaSolicitudes({ recargar, onVerSolicitud, onNuevaSoli
                   <span>{s.solicitante_detalle?.nombre}</span>
                   <span>
                     {s.items?.length ?? 0} ítem{(s.items?.length ?? 0) !== 1 ? 's' : ''}
-                    {s.fecha_requerida ? ` · requerido ${formatFecha(s.fecha_requerida)}` : ''}
+                    {s.created_at ? ` · solicitado ${formatFecha(s.created_at)}` : ''}
                   </span>
                 </div>
               </button>

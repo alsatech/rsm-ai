@@ -2,7 +2,15 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
-from .models import AdvertenciaChecklist, AlertaFlota, AudioChecklist, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import (
+    AdvertenciaChecklist,
+    AlertaFlota,
+    AudioChecklist,
+    CambioAceite,
+    ChecklistVehiculo,
+    FotoChecklist,
+    Vehiculo,
+)
 
 User = get_user_model()
 
@@ -360,3 +368,17 @@ class ResolverAlertaSerializer(serializers.ModelSerializer):
             instance.descripcion = f'{instance.descripcion}\n\nResuelta: {notas}'
         instance.save()
         return instance
+
+
+class CambioAceiteSerializer(serializers.ModelSerializer):
+    estado_display = serializers.CharField(source='get_estado_display', read_only=True)
+    unidad = serializers.CharField(read_only=True)
+    registrado_por_detalle = UsuarioResumenSerializer(source='registrado_por', read_only=True)
+
+    class Meta:
+        model = CambioAceite
+        fields = (
+            'id', 'vehiculo', 'fecha', 'estado', 'estado_display', 'km_horas', 'unidad',
+            'observaciones', 'registrado_por', 'registrado_por_detalle', 'created_at',
+        )
+        read_only_fields = ('id', 'registrado_por', 'created_at')

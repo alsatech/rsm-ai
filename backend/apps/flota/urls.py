@@ -5,6 +5,7 @@ from .views import (
     AlertaFlotaListView,
     AudioChecklistDeleteView,
     AudioChecklistListView,
+    CambioAceiteListCreateView,
     ChecklistDetailView,
     ChecklistListCreateView,
     FotoChecklistDeleteView,
@@ -48,6 +49,7 @@ urlpatterns = [
     ),
     path('alertas/', AlertaFlotaListView.as_view(), name='alerta-list'),
     path('alertas/<int:pk>/resolver/', ResolverAlertaView.as_view(), name='alerta-resolver'),
+    path('cambios-aceite/', CambioAceiteListCreateView.as_view(), name='cambio-aceite-list-create'),
     path('resumen/', ResumenFlotaView.as_view(), name='flota-resumen'),
     path('incidencias/', IncidenciaListView.as_view(), name='incidencia-list'),
 ]

@@ -151,7 +151,6 @@ export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, 
   const [descripcionNecesidad, setDescripcionNecesidad] = useState(
     prefill ? `Reponer stock bajo de ${prefill.descripcion}` : ''
   )
-  const [fechaRequerida, setFechaRequerida] = useState('')
   const [items, setItems] = useState(() => {
     const item = itemDesdePrefill(prefill)
     return item ? [item] : []
@@ -176,11 +175,11 @@ export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, 
 
   const guardar = async (estado) => {
     const confirmado = await confirm({
-      titulo: estado === 'borrador' ? '¿Guardar como borrador?' : '¿Enviar para autorización?',
+      titulo: estado === 'borrador' ? '¿Guardar como borrador?' : '¿Crear la solicitud?',
       mensaje:
         estado === 'borrador'
           ? 'Podrás editarla y enviarla más tarde.'
-          : `Se enviará con ${items.length} material${items.length !== 1 ? 'es' : ''} para que la autorice un administrador.`,
+          : `Se creará con ${items.length} material${items.length !== 1 ? 'es' : ''} y quedará lista para compra.`,
       confirmText: 'Sí, continuar',
       cancelText: 'Revisar',
       variante: 'pregunta',
@@ -190,7 +189,6 @@ export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, 
     const payload = {
       area,
       descripcion_necesidad: descripcionNecesidad,
-      fecha_requerida: fechaRequerida || null,
       estado,
       items: items.map((item) => ({
         producto: item.producto,
@@ -263,16 +261,6 @@ export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, 
                 onChange={(e) => setDescripcionNecesidad(e.target.value)}
                 className={inputClass}
                 placeholder="Ej. Reparación de cerca en Corraleta 4, se necesita alambre y grapas"
-              />
-            </div>
-            <div>
-              <Label htmlFor="fecha_requerida">Fecha requerida (opcional)</Label>
-              <input
-                id="fecha_requerida"
-                type="date"
-                value={fechaRequerida}
-                onChange={(e) => setFechaRequerida(e.target.value)}
-                className={inputClass}
               />
             </div>
           </Seccion>
@@ -383,11 +371,6 @@ export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, 
               Área: <span className="font-semibold text-text">{AREA_LABELS[area]}</span>
             </p>
             <p className="text-sm text-text-secondary">{descripcionNecesidad}</p>
-            {fechaRequerida && (
-              <p className="text-sm text-text-secondary">
-                Fecha requerida: <span className="text-text">{fechaRequerida}</span>
-              </p>
-            )}
           </Seccion>
           <Seccion titulo={`${items.length} material${items.length !== 1 ? 'es' : ''}`}>
             <div className="flex flex-col gap-2">
@@ -444,7 +427,7 @@ export default function FormularioSolicitud({ onGuardar, onCancelar, guardando, 
               style={{ minHeight: '56px' }}
               className="flex-1 rounded-xl bg-accent text-sm font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
             >
-              {guardando ? 'Enviando…' : 'Enviar para autorización'}
+              {guardando ? 'Creando…' : 'Crear solicitud'}
             </button>
           </div>
         )}

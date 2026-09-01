@@ -6,11 +6,12 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AlertaFlota, AudioChecklist, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AlertaFlota, AudioChecklist, CambioAceite, ChecklistVehiculo, FotoChecklist, Vehiculo
 from .permissions import (
     PuedeCrearChecklist,
     PuedeEliminarVehiculo,
     PuedeGestionarVehiculo,
+    PuedeRegistrarCambioAceite,
     PuedeValidarChecklist,
     PuedeVerAlertas,
     PuedeVerIncidencias,
@@ -19,6 +20,7 @@ from .serializers import (
     AdvertenciaChecklistSerializer,
     AlertaFlotaSerializer,
     AudioChecklistSerializer,
+    CambioAceiteSerializer,
     ChecklistVehiculoSerializer,
     FotoChecklistSerializer,
     ResolverAlertaSerializer,
@@ -276,6 +278,26 @@ class ResolverAlertaView(APIView):
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         return Response(AlertaFlotaSerializer(alerta, context={'request': request}).data)
+
+
+class CambioAceiteListCreateView(generics.ListCreateAPIView):
+    """GET/POST /cambios-aceite/ — bitácora manual de cambios de aceite por vehículo."""
+    serializer_class = CambioAceiteSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), PuedeRegistrarCambioAceite()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = CambioAceite.objects.select_related('vehiculo', 'registrado_por')
+        vehiculo = self.request.query_params.get('vehiculo')
+        if vehiculo:
+            qs = qs.filter(vehiculo_id=vehiculo)
+        return qs
+
+    def perform_create(self, serializer):
+        serializer.save(registrado_por=self.request.user)
 
 
 class ResumenFlotaView(APIView):

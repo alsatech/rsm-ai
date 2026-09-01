@@ -1,4 +1,4 @@
-import { ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, esOffRoad, esTraila } from '../constants'
+import { ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, esTraila, unidadMedicion } from '../constants'
 
 function formatFechaHora(fechaHora) {
   if (!fechaHora) return ''
@@ -7,12 +7,12 @@ function formatFechaHora(fechaHora) {
   return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short' })
 }
 
-// Vista en lista — solo texto. La foto y los detalles grandes se muestran al
-// entrar al detalle del vehículo.
+// Vista en lista — thumbnail pequeño (mismo tamaño que el ícono de respaldo).
+// La foto grande se muestra al entrar al detalle del vehículo.
 export default function TarjetaVehiculo({ vehiculo, onVerDetalle, onNuevoChecklist, puedeCrearChecklist }) {
   const estadoConfig = ESTADO_VEHICULO_CONFIG[vehiculo.estado] ?? ESTADO_VEHICULO_CONFIG.activo
   const ultimo = vehiculo.ultimo_checklist
-  const unidad = esOffRoad(vehiculo.tipo) ? 'hrs' : 'km'
+  const unidad = unidadMedicion(vehiculo.tipo)
   const tipoLabel = TIPO_ICONOS[vehiculo.tipo] ? vehiculo.tipo : 'vehículo'
   const tipoLabelCapitalizado = tipoLabel.charAt(0).toUpperCase() + tipoLabel.slice(1)
 
@@ -23,9 +23,17 @@ export default function TarjetaVehiculo({ vehiculo, onVerDetalle, onNuevoCheckli
         onClick={onVerDetalle}
         className="flex flex-1 items-center gap-3 text-left"
       >
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-flotabg/70 text-2xl">
-          {TIPO_ICONOS[vehiculo.tipo] ?? '🚗'}
-        </span>
+        {vehiculo.foto ? (
+          <img
+            src={vehiculo.foto}
+            alt={vehiculo.nombre}
+            className="h-12 w-12 shrink-0 rounded-xl object-cover"
+          />
+        ) : (
+          <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-flotabg/70 text-2xl">
+            {TIPO_ICONOS[vehiculo.tipo] ?? '🚗'}
+          </span>
+        )}
 
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

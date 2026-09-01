@@ -2,8 +2,10 @@ import json
 from decimal import Decimal, InvalidOperation
 
 from django.db import models
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.utils.dateparse import parse_date
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -26,6 +28,7 @@ from .models import (
 from .permissions import (
     PuedeAutorizarSolicitud,
     PuedeCrearSolicitud,
+    PuedeDarEntradaRecepcion,
     PuedeEditarSolicitud,
     PuedeGestionarCatalogo,
     PuedeGestionarRelacionCompras,
@@ -40,6 +43,7 @@ from .permissions import (
     PuedeVerReportesCompletos,
     ROLES_REPORTES_COMPLETOS,
 )
+from .reportes import generar_pdf_reporte_diario
 from .serializers import (
     AutorizarSolicitudSerializer,
     CategoriaInventarioSerializer,
@@ -222,6 +226,24 @@ class ResumenInventarioView(APIView):
         })
 
 
+class ReporteDiarioView(APIView):
+    """GET /reporte-diario/?fecha=YYYY-MM-DD — genera el PDF del corte del día (por comprar,
+    entradas, salidas, inventario actualizado) para que Yajaira lo descargue y lo reenvíe por
+    correo manualmente a DG/GP/GDA. Sin envío automático: es un flujo manual a propósito."""
+    permission_classes = [IsAuthenticated, PuedeVerReportesCompletos]
+
+    def get(self, request):
+        fecha_str = request.query_params.get('fecha')
+        fecha = parse_date(fecha_str) if fecha_str else timezone.localdate()
+        if fecha_str and fecha is None:
+            return Response({'fecha': 'Fecha inválida, usa formato YYYY-MM-DD.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        pdf_bytes = generar_pdf_reporte_diario(fecha, request)
+        response = HttpResponse(pdf_bytes, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="reporte_inventario_{fecha.isoformat()}.pdf"'
+        return response
+
+
 def _parse_items_json(raw):
     """Convierte el campo 'items' (string JSON en multipart, o lista en JSON) a una lista de dicts."""
     if raw is None:
@@ -246,6 +268,21 @@ def _to_decimal(value, campo):
     return decimal_value
 
 
+# Mismo tope/formatos que AudioChecklistSerializer.validate_audio de apps.flota — la nota de
+# voz de recepción usa el mismo componente de grabación en el frontend.
+_AUDIO_MAX_BYTES = 5 * 1024 * 1024
+_AUDIO_EXTS = ('.webm', '.ogg', '.mp3', '.m4a', '.wav', '.mp4')
+
+
+def _validar_audio(archivo):
+    if archivo.size > _AUDIO_MAX_BYTES:
+        return f'El audio pesa {archivo.size / 1024 / 1024:.1f} MB; el máximo permitido es 5 MB.'
+    nombre = (archivo.name or '').lower()
+    if not nombre.endswith(_AUDIO_EXTS):
+        return f'Formato de audio no soportado ({nombre}). Usa webm, ogg, mp3, m4a, wav o mp4.'
+    return None
+
+
 class SolicitudListCreateView(generics.ListCreateAPIView):
     serializer_class = SolicitudMaterialSerializer
 
@@ -265,7 +302,9 @@ class SolicitudListCreateView(generics.ListCreateAPIView):
         solicitante = p.get('solicitante')
 
         if estado:
-            qs = qs.filter(estado=estado)
+            # Acepta uno o varios estados separados por coma (ej. "enviada_rancho,recibida_parcial"
+            # para la pantalla de recepción de Campo, que necesita ambos a la vez).
+            qs = qs.filter(estado__in=[e for e in estado.split(',') if e])
         if area:
             qs = qs.filter(area=area)
         if solicitante:
@@ -384,7 +423,10 @@ class EnviarSolicitudView(APIView):
 
 
 class RegistrarCompraView(APIView):
-    """POST /solicitudes/{id}/compra/ — registra la compra realizada (Yajaira/Erik)."""
+    """POST /solicitudes/{id}/compra/ — registra la compra realizada (Yajaira/Erik).
+    PATCH /solicitudes/{id}/compra/ — corrige la compra ya registrada (monto, proveedor, foto,
+    notas, quién compró), mientras la solicitud siga 'en_compra' — es decir, antes de registrar
+    el envío al rancho. Una vez enviada, el monto queda fijo."""
 
     permission_classes = [IsAuthenticated, PuedeRegistrarCompra]
 
@@ -409,6 +451,25 @@ class RegistrarCompraView(APIView):
         solicitud.save(update_fields=['estado', 'updated_at'])
 
         return Response(CompraSerializer(compra).data, status=status.HTTP_201_CREATED)
+
+    def patch(self, request, pk):
+        solicitud = get_object_or_404(SolicitudMaterial, pk=pk)
+        if not hasattr(solicitud, 'compra'):
+            return Response(
+                {'detail': 'Esta solicitud todavía no tiene una compra registrada.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if solicitud.estado != SolicitudMaterial.Estado.EN_COMPRA:
+            return Response(
+                {'detail': 'Solo se puede corregir la compra mientras la solicitud está en compra, antes de registrar el envío.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        serializer = CompraSerializer(solicitud.compra, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        compra = serializer.save()
+
+        return Response(CompraSerializer(compra).data)
 
 
 class RecepcionesSolicitudView(APIView):
@@ -454,6 +515,12 @@ class RecepcionesSolicitudView(APIView):
         if error:
             return Response({'items': error}, status=status.HTTP_400_BAD_REQUEST)
 
+        audio = request.FILES.get('audio')
+        if audio:
+            error_audio = _validar_audio(audio)
+            if error_audio:
+                return Response({'audio': error_audio}, status=status.HTTP_400_BAD_REQUEST)
+
         items_por_id = {item.id: item for item in solicitud.items.all()}
         preparados = []
         for item_data in items:
@@ -483,6 +550,7 @@ class RecepcionesSolicitudView(APIView):
             recibido_por=request.user,
             estado_general=estado_general,
             notas=request.data.get('notas', ''),
+            audio=audio,
         )
         recepcion.full_clean()
         recepcion.save()
@@ -514,6 +582,57 @@ class RecepcionesSolicitudView(APIView):
             RecepcionMaterialSerializer(recepcion, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class DarEntradaRecepcionView(APIView):
+    """POST /solicitudes/{id}/recepciones/{recepcion_id}/dar-entrada/ — Yajaira revisa lo que
+    reportó Campo (fotos, audio, cantidades) contra la compra y confirma: aquí (y no en la
+    recepción de Campo) es donde se genera el MovimientoInventario real y sube el stock."""
+
+    permission_classes = [IsAuthenticated, PuedeDarEntradaRecepcion]
+
+    def post(self, request, pk, recepcion_id):
+        solicitud = get_object_or_404(SolicitudMaterial, pk=pk)
+        recepcion = get_object_or_404(
+            RecepcionMaterial.objects.prefetch_related('items__item_solicitud__producto'),
+            pk=recepcion_id, envio__solicitud=solicitud,
+        )
+        if recepcion.entrada_confirmada:
+            return Response(
+                {'detail': 'Ya se le dio entrada a esta recepción.'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        for item_recepcion in recepcion.items.all():
+            item_solicitud = item_recepcion.item_solicitud
+            producto = item_solicitud.producto
+            if not producto or item_recepcion.cantidad_recibida <= 0:
+                continue
+
+            stock_anterior = producto.stock_actual
+            stock_resultante = stock_anterior + item_recepcion.cantidad_recibida
+            producto.stock_actual = stock_resultante
+            producto.save(update_fields=['stock_actual', 'updated_at'])
+
+            MovimientoInventario.objects.create(
+                producto=producto,
+                tipo=MovimientoInventario.Tipo.ENTRADA,
+                cantidad=item_recepcion.cantidad_recibida,
+                stock_anterior=stock_anterior,
+                stock_resultante=stock_resultante,
+                responsable=request.user,
+                solicitud=solicitud,
+                uso_descripcion=f'Entrada confirmada por recepción de la solicitud {solicitud.folio}',
+                fecha_movimiento=timezone.localdate(),
+                validado=True,
+                validado_por=request.user,
+            )
+
+        recepcion.entrada_confirmada = True
+        recepcion.entrada_confirmada_por = request.user
+        recepcion.entrada_confirmada_en = timezone.now()
+        recepcion.save(update_fields=['entrada_confirmada', 'entrada_confirmada_por', 'entrada_confirmada_en'])
+
+        return Response(RecepcionMaterialSerializer(recepcion, context={'request': request}).data)
 
 
 class ComparativoSolicitudView(APIView):

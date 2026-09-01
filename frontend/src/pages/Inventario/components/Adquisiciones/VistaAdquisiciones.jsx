@@ -38,7 +38,7 @@ export default function VistaAdquisiciones({ onVolver, prefill }) {
       showToast(
         payload.estado === 'borrador'
           ? `✅ Solicitud ${data.folio} guardada como borrador`
-          : `✅ Solicitud ${data.folio} enviada para autorización`,
+          : `✅ Solicitud ${data.folio} creada y lista para compra`,
         'exito',
       )
       irALista()

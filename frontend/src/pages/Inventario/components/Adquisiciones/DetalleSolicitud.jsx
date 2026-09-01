@@ -1,24 +1,37 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { autorizarSolicitud, getComparativoSolicitud, getSolicitud, rechazarSolicitud } from '../../../../api/inventario'
+import {
+  autorizarSolicitud,
+  darEntradaRecepcion,
+  getComparativoSolicitud,
+  getRecepciones,
+  getSolicitud,
+  rechazarSolicitud,
+} from '../../../../api/inventario'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useConfirm } from '../../../../hooks/useConfirm'
 import { useToast } from '../../../../hooks/useToast'
-import { AREA_LABELS, ESTADO_SOLICITUD_CONFIG } from '../../constants'
+import { AREA_LABELS, ESTADO_ITEM_CONFIG, ESTADO_SOLICITUD_CONFIG } from '../../constants'
 
 const ROLES_AUTORIZAN = ['administrador', 'superadmin']
 const ROLES_COMPRAN = ['operaciones', 'inventario', 'administrador', 'superadmin']
 const ROLES_ENVIAN = ['operaciones', 'administrador', 'superadmin']
 const ROLES_RECIBEN = ['campo', 'inventario', 'administrador', 'superadmin']
+// Mismos roles que ven el comparativo, dan entrada de inventario y revisan lo que reportó Campo.
 const ROLES_COMPARATIVO = ['inventario', 'administrador', 'superadmin']
 
 const TIMELINE = [
   { estados: ['borrador', 'enviada', 'autorizada', 'rechazada', 'en_compra', 'enviada_rancho', 'recibida_parcial', 'recibida_completa'], label: 'Solicitud' },
-  { estados: ['autorizada', 'en_compra', 'enviada_rancho', 'recibida_parcial', 'recibida_completa'], label: 'Autorización' },
+  { estados: ['autorizada', 'en_compra', 'enviada_rancho', 'recibida_parcial', 'recibida_completa'], label: 'Lista para compra' },
   { estados: ['en_compra', 'enviada_rancho', 'recibida_parcial', 'recibida_completa'], label: 'Compra' },
   { estados: ['enviada_rancho', 'recibida_parcial', 'recibida_completa'], label: 'Envío' },
   { estados: ['recibida_parcial', 'recibida_completa'], label: 'Recepción' },
 ]
+
+function formatFecha(fecha) {
+  if (!fecha) return ''
+  return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })
+}
 
 export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra, onAbrirEnvio, onAbrirRecepcion }) {
   const { user } = useAuth()
@@ -26,6 +39,7 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
   const confirm = useConfirm()
   const [solicitud, setSolicitud] = useState(null)
   const [comparativo, setComparativo] = useState(null)
+  const [recepciones, setRecepciones] = useState([])
   const [loading, setLoading] = useState(true)
   const [notas, setNotas] = useState('')
   const [procesando, setProcesando] = useState(false)
@@ -41,6 +55,12 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
           setComparativo(comp)
         } catch {
           setComparativo(null)
+        }
+        try {
+          const { data: reps } = await getRecepciones(solicitudId)
+          setRecepciones(reps)
+        } catch {
+          setRecepciones([])
         }
       }
     } finally {
@@ -105,6 +125,27 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
     }
   }
 
+  const handleDarEntrada = async (recepcionId) => {
+    const confirmado = await confirm({
+      titulo: '¿Dar entrada a este material?',
+      mensaje: 'El stock del inventario subirá con las cantidades que reportó quien recibió.',
+      confirmText: 'Sí, dar entrada',
+      cancelText: 'Cancelar',
+      variante: 'pregunta',
+    })
+    if (!confirmado) return
+    setProcesando(true)
+    try {
+      await darEntradaRecepcion(solicitud.id, recepcionId)
+      showToast('✅ Entrada confirmada — el stock se actualizó', 'exito')
+      cargar()
+    } catch {
+      showToast('No se pudo dar entrada.', 'error')
+    } finally {
+      setProcesando(false)
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -118,7 +159,7 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
         <p className="mt-3 text-sm text-text-secondary">{solicitud.descripcion_necesidad}</p>
         <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-text-secondary">
           <span>Solicitó: {solicitud.solicitante_detalle?.nombre}</span>
-          {solicitud.fecha_requerida && <span>Requerido: {solicitud.fecha_requerida}</span>}
+          <span>Fecha de solicitud: {formatFecha(solicitud.created_at)}</span>
           {solicitud.autorizado_por_detalle && <span>Autorizó: {solicitud.autorizado_por_detalle.nombre}</span>}
         </div>
         {solicitud.notas_autorizacion && (
@@ -190,6 +231,89 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
               {solicitud.compra.notas && <p className="text-text-secondary">📝 {solicitud.compra.notas}</p>}
             </div>
           </div>
+          {solicitud.estado === 'en_compra' && ROLES_COMPRAN.includes(user?.rol) && (
+            <button
+              type="button"
+              onClick={() => onAbrirCompra(solicitud)}
+              className="mt-3 text-sm font-semibold text-highlight hover:underline"
+            >
+              ✏️ Editar compra
+            </button>
+          )}
+        </div>
+      )}
+
+      {recepciones.length > 0 && (
+        <div className="flex flex-col gap-4">
+          {recepciones.map((rec) => (
+            <div key={rec.id} className="rounded-2xl border border-border bg-card p-5">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">
+                    Recepción — {formatFecha(rec.fecha_recepcion)}
+                  </p>
+                  <p className="text-sm text-text-secondary">
+                    Recibió: {rec.recibido_por_detalle?.nombre}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-bold text-text-secondary">
+                  {rec.estado_general_display}
+                </span>
+              </div>
+
+              <div className="mt-3 flex flex-col gap-2">
+                {rec.items.map((item) => {
+                  const cfgItem = ESTADO_ITEM_CONFIG[item.estado_item] ?? ESTADO_ITEM_CONFIG.ok
+                  return (
+                    <div key={item.id} className="rounded-lg border border-border bg-bg px-3 py-2">
+                      <p className="text-sm text-text">
+                        {cfgItem.icon} {item.item_solicitud_detalle?.producto_detalle?.descripcion
+                          || item.item_solicitud_detalle?.descripcion_libre}
+                        <span className="text-text-secondary"> — {item.cantidad_recibida} {cfgItem.label}</span>
+                      </p>
+                      {item.notas && <p className="mt-1 text-xs text-text-secondary">📝 {item.notas}</p>}
+                      {item.foto && (
+                        <img
+                          src={item.foto}
+                          alt="Evidencia del ítem"
+                          className="mt-2 h-16 w-16 rounded-lg border border-border object-cover"
+                        />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {rec.audio && (
+                <div className="mt-3">
+                  <p className="mb-1 text-xs font-semibold text-text-secondary">🎙️ Nota de voz</p>
+                  <audio controls src={rec.audio} className="h-10 w-full" />
+                </div>
+              )}
+
+              {rec.notas && (
+                <p className="mt-3 rounded-lg bg-bg px-3 py-2 text-xs text-text-secondary">📝 {rec.notas}</p>
+              )}
+
+              {rec.entrada_confirmada ? (
+                <p className="mt-3 rounded-lg border border-highlight/40 bg-highlight/10 px-3 py-2 text-xs font-semibold text-highlight">
+                  ✅ Entrada confirmada por {rec.entrada_confirmada_por_detalle?.nombre} — {formatFecha(rec.entrada_confirmada_en)}
+                </p>
+              ) : (
+                ROLES_COMPARATIVO.includes(user?.rol) && (
+                  <button
+                    type="button"
+                    onClick={() => handleDarEntrada(rec.id)}
+                    disabled={procesando}
+                    style={{ minHeight: '52px' }}
+                    className="mt-3 w-full rounded-xl bg-accent text-sm font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
+                  >
+                    📥 Dar entrada
+                  </button>
+                )
+              )}
+            </div>
+          ))}
         </div>
       )}
 

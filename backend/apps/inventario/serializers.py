@@ -90,6 +90,7 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         allow_null=True,
     )
     compra = serializers.SerializerMethodField()
+    solicitud_folio = serializers.SerializerMethodField()
     # Escritura únicamente: si vienen, la entrada también genera una Compra ligada a este
     # movimiento (ver create()) para que aparezca en la Relación de compras semanal.
     monto_compra = serializers.DecimalField(
@@ -105,14 +106,17 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
             'id', 'producto', 'producto_detalle', 'tipo', 'tipo_display', 'cantidad',
             'stock_anterior', 'stock_resultante', 'responsable', 'responsable_detalle',
             'uso_descripcion', 'vehiculo_codigo', 'vehiculo',
-            'proyecto_referencia', 'fecha_movimiento',
+            'proyecto_referencia', 'solicitud', 'solicitud_folio', 'fecha_movimiento',
             'fecha_hora_registro', 'validado', 'validado_por', 'validado_por_detalle',
             'rechazado', 'notas', 'foto_evidencia', 'compra', 'monto_compra', 'comprado_por',
         )
         read_only_fields = (
-            'id', 'stock_anterior', 'stock_resultante', 'validado', 'validado_por',
+            'id', 'stock_anterior', 'stock_resultante', 'solicitud', 'validado', 'validado_por',
             'rechazado', 'fecha_hora_registro',
         )
+
+    def get_solicitud_folio(self, obj):
+        return obj.solicitud.folio if obj.solicitud_id else None
 
     def get_compra(self, obj):
         compra = getattr(obj, 'compra', None)
@@ -306,7 +310,7 @@ class SolicitudMaterialSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'folio', 'solicitante', 'solicitante_detalle', 'area', 'area_display',
             'descripcion_necesidad', 'estado', 'estado_display', 'autorizado_por', 'autorizado_por_detalle',
-            'autorizado_en', 'notas_autorizacion', 'fecha_requerida', 'created_by', 'created_by_detalle',
+            'autorizado_en', 'notas_autorizacion', 'created_by', 'created_by_detalle',
             'created_at', 'updated_at', 'items', 'compra',
         )
         read_only_fields = (
@@ -333,6 +337,12 @@ class SolicitudMaterialSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         items_data = validated_data.pop('items')
         request = self.context['request']
+        if validated_data.get('estado') == SolicitudMaterial.Estado.ENVIADA:
+            # Las solicitudes de material ya no requieren autorización manual: la coordinación
+            # (qué material, para qué proyecto) es comunicación directa entre solicitante y
+            # quien captura, así que queda lista para compra de inmediato. La autorización
+            # manual (autorizar/rechazar) queda reservada para cotizaciones de proyectos.
+            validated_data['estado'] = SolicitudMaterial.Estado.AUTORIZADA
         solicitud = SolicitudMaterial.objects.create(
             solicitante=request.user, created_by=request.user, **validated_data,
         )
@@ -416,14 +426,20 @@ class RecepcionMaterialSerializer(serializers.ModelSerializer):
     recibido_por_detalle = UsuarioResumenSerializer(source='recibido_por', read_only=True)
     items = ItemRecepcionSerializer(many=True, read_only=True)
     estado_general_display = serializers.CharField(source='get_estado_general_display', read_only=True)
+    entrada_confirmada_por_detalle = UsuarioResumenSerializer(source='entrada_confirmada_por', read_only=True)
 
     class Meta:
         model = RecepcionMaterial
         fields = (
             'id', 'envio', 'recibido_por', 'recibido_por_detalle', 'fecha_recepcion', 'hora_recepcion',
-            'estado_general', 'estado_general_display', 'notas', 'created_at', 'items',
+            'estado_general', 'estado_general_display', 'notas', 'audio',
+            'entrada_confirmada', 'entrada_confirmada_por', 'entrada_confirmada_por_detalle',
+            'entrada_confirmada_en', 'created_at', 'items',
         )
-        read_only_fields = ('id', 'envio', 'recibido_por', 'created_at')
+        read_only_fields = (
+            'id', 'envio', 'recibido_por', 'entrada_confirmada', 'entrada_confirmada_por',
+            'entrada_confirmada_en', 'created_at',
+        )
 
 
 class ReporteFaltanteDanioSerializer(serializers.ModelSerializer):

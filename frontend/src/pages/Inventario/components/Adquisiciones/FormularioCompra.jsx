@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import { getUsuarios, registrarCompra } from '../../../../api/inventario'
+import { actualizarCompra, getUsuarios, registrarCompra } from '../../../../api/inventario'
 import { useToast } from '../../../../hooks/useToast'
 
 const inputClass =
@@ -10,11 +10,13 @@ const ROLES_COMPRAN = ['operaciones', 'inventario', 'administrador', 'superadmin
 
 export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }) {
   const { showToast } = useToast()
+  const compraExistente = solicitud.compra
+  const esEdicion = Boolean(compraExistente)
   const [usuarios, setUsuarios] = useState([])
-  const [compradoPor, setCompradoPor] = useState('')
-  const [montoTotal, setMontoTotal] = useState('')
-  const [proveedor, setProveedor] = useState('')
-  const [notas, setNotas] = useState('')
+  const [compradoPor, setCompradoPor] = useState(compraExistente?.comprado_por ?? '')
+  const [montoTotal, setMontoTotal] = useState(compraExistente?.monto_total ?? '')
+  const [proveedor, setProveedor] = useState(compraExistente?.proveedor ?? '')
+  const [notas, setNotas] = useState(compraExistente?.notas ?? '')
   const [foto, setFoto] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const inputRef = useRef(null)
@@ -31,7 +33,9 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
     e.target.value = ''
   }
 
-  const puedeGuardar = Boolean(compradoPor) && Number(montoTotal) > 0 && Boolean(foto)
+  // Al editar, la foto ya registrada cuenta como válida aunque no se suba una nueva.
+  const puedeGuardar =
+    Boolean(compradoPor) && Number(montoTotal) > 0 && (Boolean(foto) || (esEdicion && Boolean(compraExistente?.foto_factura)))
 
   const handleGuardar = async () => {
     setGuardando(true)
@@ -41,13 +45,18 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
       fd.append('monto_total', montoTotal)
       fd.append('proveedor', proveedor)
       fd.append('notas', notas)
-      fd.append('foto_factura', foto)
+      if (foto) fd.append('foto_factura', foto)
 
-      await registrarCompra(solicitud.id, fd)
-      showToast('✅ Compra registrada — la solicitud pasó a "En compra"', 'exito')
+      if (esEdicion) {
+        await actualizarCompra(solicitud.id, fd)
+        showToast('✅ Compra actualizada', 'exito')
+      } else {
+        await registrarCompra(solicitud.id, fd)
+        showToast('✅ Compra registrada — la solicitud pasó a "En compra"', 'exito')
+      }
       onRegistrada?.()
     } catch (err) {
-      const mensaje = Object.values(err?.response?.data ?? {})[0] || 'No se pudo registrar la compra.'
+      const mensaje = Object.values(err?.response?.data ?? {})[0] || 'No se pudo guardar la compra.'
       showToast(Array.isArray(mensaje) ? mensaje[0] : mensaje, 'error')
     } finally {
       setGuardando(false)
@@ -56,7 +65,9 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
 
   return (
     <div className="rounded-2xl border border-border bg-card p-5">
-      <h2 className="mb-4 text-xl font-bold text-text">Registrar compra — {solicitud.folio}</h2>
+      <h2 className="mb-4 text-xl font-bold text-text">
+        {esEdicion ? 'Editar compra' : 'Registrar compra'} — {solicitud.folio}
+      </h2>
 
       <div className="flex flex-col gap-4">
         <div>
@@ -96,7 +107,9 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
         </div>
 
         <div>
-          <p className="mb-2 text-sm font-medium text-text-secondary">Foto de factura o ticket *</p>
+          <p className="mb-2 text-sm font-medium text-text-secondary">
+            Foto de factura o ticket {esEdicion ? '' : '*'}
+          </p>
           {!foto && (
             <>
               <input
@@ -107,6 +120,16 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
                 className="hidden"
                 onChange={handleFile}
               />
+              {esEdicion && compraExistente?.foto_factura && (
+                <div className="mb-2 flex items-center gap-3 rounded-xl border border-border bg-bg p-2">
+                  <img
+                    src={compraExistente.foto_factura}
+                    alt="Factura actual"
+                    className="h-16 w-16 shrink-0 rounded-lg object-cover"
+                  />
+                  <p className="text-xs text-text-secondary">Factura actual — toca "Tomar foto" para reemplazarla</p>
+                </div>
+              )}
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
@@ -174,7 +197,7 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
           style={{ minHeight: '56px' }}
           className="flex-1 rounded-xl bg-accent text-base font-bold text-highlight transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {guardando ? 'Guardando…' : '💰 Registrar compra'}
+          {guardando ? 'Guardando…' : esEdicion ? '💾 Guardar cambios' : '💰 Registrar compra'}
         </button>
       </div>
     </div>

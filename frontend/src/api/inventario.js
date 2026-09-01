@@ -18,6 +18,8 @@ export const getCategorias = () => api.get('/api/v1/inventario/categorias/')
 export const getUbicaciones = () => api.get('/api/v1/inventario/ubicaciones/')
 export const getAlertasStock = () => api.get('/api/v1/inventario/alertas-stock/')
 export const getResumenInventario = () => api.get('/api/v1/inventario/resumen/')
+export const getReporteDiario = (params) =>
+  api.get('/api/v1/inventario/reporte-diario/', { params, responseType: 'blob' })
 
 // Adquisiciones — Protocolo de Adquisición, Recepción y Envío de Material (RSM, junio 2026)
 export const getSolicitudes = (params) => api.get('/api/v1/inventario/solicitudes/', { params })
@@ -38,9 +40,15 @@ export const crearRecepcion = (solicitudId, formData) =>
   api.post(`/api/v1/inventario/solicitudes/${solicitudId}/recepciones/`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+export const darEntradaRecepcion = (solicitudId, recepcionId) =>
+  api.post(`/api/v1/inventario/solicitudes/${solicitudId}/recepciones/${recepcionId}/dar-entrada/`)
 export const getComparativoSolicitud = (id) => api.get(`/api/v1/inventario/solicitudes/${id}/comparativo/`)
 export const registrarCompra = (solicitudId, formData) =>
   api.post(`/api/v1/inventario/solicitudes/${solicitudId}/compra/`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+export const actualizarCompra = (solicitudId, formData) =>
+  api.patch(`/api/v1/inventario/solicitudes/${solicitudId}/compra/`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 export const getUsuarios = () => api.get('/api/v1/auth/usuarios/')

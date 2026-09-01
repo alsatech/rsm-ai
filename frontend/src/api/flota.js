@@ -44,6 +44,9 @@ export const getAlertasFlota = (params) => api.get('/api/v1/flota/alertas/', { p
 export const resolverAlertaFlota = (id, data) =>
   api.patch(`/api/v1/flota/alertas/${id}/resolver/`, data)
 
+export const getCambiosAceite = (params) => api.get('/api/v1/flota/cambios-aceite/', { params })
+export const crearCambioAceite = (data) => api.post('/api/v1/flota/cambios-aceite/', data)
+
 export const getIncidencias = (params) => api.get('/api/v1/flota/incidencias/', { params })
 
 export const getResumenFlota = () => api.get('/api/v1/flota/resumen/')

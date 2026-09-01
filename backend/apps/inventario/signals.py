@@ -1,9 +1,8 @@
 from django.core.exceptions import ValidationError
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.utils import timezone
 
-from .models import MovimientoInventario, RecepcionMaterial, ReporteFaltanteDanio, SolicitudMaterial
+from .models import MovimientoInventario, RecepcionMaterial, ReporteFaltanteDanio
 
 
 @receiver(post_save, sender=MovimientoInventario)
@@ -26,41 +25,9 @@ def validar_recibido_distinto_de_enviado(sender, instance, **kwargs):
         raise ValidationError('Quien recibe el material debe ser distinto de quien lo envió.')
 
 
-@receiver(pre_save, sender=SolicitudMaterial)
-def _cachear_estado_anterior_solicitud(sender, instance, **kwargs):
-    if instance.pk:
-        instance._estado_anterior = (
-            SolicitudMaterial.objects.filter(pk=instance.pk).values_list('estado', flat=True).first()
-        )
-    else:
-        instance._estado_anterior = None
-
-
-@receiver(post_save, sender=SolicitudMaterial)
-def generar_entradas_por_recepcion_completa(sender, instance, created, **kwargs):
-    """Al marcar una solicitud como recibida_completa, genera entradas de inventario por cada ítem."""
-    if created or instance.estado != SolicitudMaterial.Estado.RECIBIDA_COMPLETA:
-        return
-    if getattr(instance, '_estado_anterior', None) == SolicitudMaterial.Estado.RECIBIDA_COMPLETA:
-        return  # ya se generaron las entradas antes, evita duplicarlas
-
-    for item in instance.items.filter(producto__isnull=False, cantidad_recibida__gt=0):
-        producto = item.producto
-        stock_anterior = producto.stock_actual
-        stock_resultante = stock_anterior + item.cantidad_recibida
-        producto.stock_actual = stock_resultante
-        producto.save(update_fields=['stock_actual', 'updated_at'])
-
-        MovimientoInventario.objects.create(
-            producto=producto,
-            tipo=MovimientoInventario.Tipo.ENTRADA,
-            cantidad=item.cantidad_recibida,
-            stock_anterior=stock_anterior,
-            stock_resultante=stock_resultante,
-            responsable=instance.autorizado_por or instance.created_by,
-            uso_descripcion=f'Entrada automática por recepción de la solicitud {instance.folio}',
-            fecha_movimiento=timezone.localdate(),
-        )
+# Nota: la recepción de Campo YA NO genera movimientos/stock automáticamente. Lo que Campo
+# reporta (fotos, audio, cantidades) queda pendiente hasta que Yajaira lo revisa contra la
+# compra y da clic en "Dar entrada" — ver DarEntradaRecepcionView en views.py.
 
 
 @receiver(post_save, sender=ReporteFaltanteDanio)

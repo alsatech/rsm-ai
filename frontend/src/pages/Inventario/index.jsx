@@ -2,16 +2,22 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
+import RecepcionMaterialCampo from './components/Adquisiciones/RecepcionMaterialCampo'
 import VistaAdquisiciones from './components/Adquisiciones/VistaAdquisiciones'
 import DashboardInventario from './components/DashboardInventario'
 import HistorialMovimientos from './components/HistorialMovimientos'
 import ListaProductos from './components/ListaProductos'
+import SalidaFacil from './components/SalidaFacil'
 import VistaValidacion from './components/VistaValidacion'
 import WizardMovimiento from './components/WizardMovimiento'
 
+// Campo solo recibe material y registra lo que usa (+ Movimiento) — nada de dashboard de
+// stock, historial, validación ni crear solicitudes: eso lo coordina Yajaira directamente.
 export default function Inventario() {
   const { user } = useAuth()
-  const [vista, setVista] = useState('dashboard')
+  const esCampo = user?.rol === 'campo'
+  const vistaInicio = esCampo ? 'recepcion-campo' : 'dashboard'
+  const [vista, setVista] = useState(vistaInicio)
   const [categoriaFiltro, setCategoriaFiltro] = useState(null)
   const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
   const [productoParaSolicitud, setProductoParaSolicitud] = useState(null)
@@ -26,12 +32,19 @@ export default function Inventario() {
   }
 
   const handleNuevoMovimiento = (producto = null) => {
+    // Campo usa la versión "fácil" (escanear/escribir código, cantidad, destino) en vez del
+    // wizard completo — nunca registra entradas ni necesita las opciones de compra/combustible
+    // avanzadas, así que ni siquiera llega a ListaProductos para preseleccionar un producto.
+    if (esCampo) {
+      setVista('salida-facil')
+      return
+    }
     setProductoPreseleccionado(producto)
     setVista('movimiento')
   }
 
   const handleVolver = () => {
-    setVista('dashboard')
+    setVista(vistaInicio)
     setCategoriaFiltro(null)
     setProductoPreseleccionado(null)
     setProductoParaSolicitud(null)
@@ -43,7 +56,7 @@ export default function Inventario() {
   }
 
   const handleGuardado = () => {
-    setVista('dashboard')
+    setVista(vistaInicio)
     setProductoPreseleccionado(null)
     setRecargar((r) => r + 1)
   }
@@ -52,10 +65,14 @@ export default function Inventario() {
     return (
       <WizardMovimiento
         productoPreseleccionado={productoPreseleccionado}
-        onVolver={() => setVista(productoPreseleccionado ? 'lista' : 'dashboard')}
+        onVolver={() => setVista(productoPreseleccionado ? 'lista' : vistaInicio)}
         onGuardado={handleGuardado}
       />
     )
+  }
+
+  if (vista === 'salida-facil') {
+    return <SalidaFacil onVolver={handleVolver} onGuardado={handleGuardado} />
   }
 
   if (vista === 'validacion' && puedeValidar) {
@@ -115,19 +132,25 @@ export default function Inventario() {
               ←
             </Link>
             <div>
-              <h1 className="font-bold text-highlight">Inventario</h1>
-              <p className="text-xs text-text-secondary">Materiales, alimento, herramienta y combustibles</p>
+              <h1 className="font-bold text-highlight">
+                {esCampo ? 'Recepción de material' : 'Inventario'}
+              </h1>
+              <p className="text-xs text-text-secondary">
+                {esCampo ? 'Confirma lo que llegó al rancho' : 'Materiales, alimento, herramienta y combustibles'}
+              </p>
             </div>
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={() => setVista('adquisiciones')}
-              className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
-            >
-              📦 Adquisiciones
-            </button>
+            {!esCampo && (
+              <button
+                type="button"
+                onClick={() => setVista('adquisiciones')}
+                className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              >
+                📦 Adquisiciones
+              </button>
+            )}
             {puedeValidar && (
               <button
                 type="button"
@@ -158,11 +181,17 @@ export default function Inventario() {
         </div>
       </header>
 
-      <DashboardInventario
-        recargar={recargar}
-        onVerProductos={handleVerProductos}
-        onSolicitarMaterial={handleSolicitarMaterial}
-      />
+      {esCampo ? (
+        <div className="px-4 py-5">
+          <RecepcionMaterialCampo />
+        </div>
+      ) : (
+        <DashboardInventario
+          recargar={recargar}
+          onVerProductos={handleVerProductos}
+          onSolicitarMaterial={handleSolicitarMaterial}
+        />
+      )}
     </div>
   )
 }

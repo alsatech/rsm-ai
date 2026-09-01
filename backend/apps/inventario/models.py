@@ -98,6 +98,13 @@ class MovimientoInventario(models.Model):
         related_name='movimientos_combustible',
     )  # obligatorio cuando producto.categoria == 'Combustibles' y tipo == 'salida'
     proyecto_referencia = models.CharField(max_length=200, blank=True)
+    solicitud = models.ForeignKey(
+        'SolicitudMaterial',
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='movimientos_entrada',
+    )  # liga la entrada a la adquisición que la originó (Yajaira "da entrada" desde ahí)
     fecha_movimiento = models.DateField(default=timezone.localdate)
     fecha_hora_registro = models.DateTimeField(auto_now_add=True)
     validado = models.BooleanField(default=False)
@@ -151,7 +158,6 @@ class SolicitudMaterial(models.Model):
     )
     autorizado_en = models.DateTimeField(null=True, blank=True)
     notas_autorizacion = models.TextField(blank=True)
-    fecha_requerida = models.DateField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='solicitudes_creadas'
     )
@@ -260,6 +266,21 @@ class RecepcionMaterial(models.Model):
     hora_recepcion = models.TimeField(null=True, blank=True)
     estado_general = models.CharField(max_length=15, choices=EstadoGeneral.choices)
     notas = models.TextField(blank=True)
+    # Nota de voz general de la recepción (opcional) — la gente de campo suele reportar
+    # mejor hablando que escribiendo, igual que los audios de checklist de Flota.
+    audio = models.FileField(upload_to='inventario/recepciones/audios/%Y/%m/', null=True, blank=True)
+    # Lo que reporta Campo no mueve el stock solo: Yajaira revisa fotos/audio/cantidades contra
+    # la compra y da clic en "Dar entrada" — ese es el momento en que se genera el
+    # MovimientoInventario real y sube el stock (ver DarEntradaRecepcionView).
+    entrada_confirmada = models.BooleanField(default=False)
+    entrada_confirmada_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='entradas_confirmadas',
+    )
+    entrada_confirmada_en = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

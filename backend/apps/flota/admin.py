@@ -4,6 +4,7 @@ from .models import (
     AdvertenciaChecklist,
     AlertaFlota,
     AudioChecklist,
+    CambioAceite,
     ChecklistVehiculo,
     FotoChecklist,
     Vehiculo,
@@ -49,3 +50,11 @@ class AlertaFlotaAdmin(admin.ModelAdmin):
     list_filter = ('tipo', 'activa', 'resuelta')
     search_fields = ('vehiculo__nombre',)
     raw_id_fields = ('vehiculo', 'resuelta_por')
+
+
+@admin.register(CambioAceite)
+class CambioAceiteAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'fecha', 'estado', 'km_horas', 'registrado_por')
+    list_filter = ('estado', 'vehiculo')
+    search_fields = ('vehiculo__nombre',)
+    raw_id_fields = ('vehiculo', 'registrado_por')
