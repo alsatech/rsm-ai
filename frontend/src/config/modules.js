@@ -76,6 +76,7 @@ export const MODULOS = [
     descripcion: 'Facturas, comprobantes de gasto y concentrado mensual',
     icono: '🧾',
     roles: ['administrador', 'superadmin'],
+    ruta: '/facturacion',
   },
   {
     id: 'proyectos',

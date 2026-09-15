@@ -12,6 +12,7 @@ urlpatterns = [
     path('api/v1/flota/', include('apps.flota.urls')),
     path('api/v1/inventario/', include('apps.inventario.urls')),
     path('api/v1/proyectos/', include('apps.proyectos.urls')),
+    path('api/v1/facturacion/', include('apps.facturacion.urls')),
 ]
 
 if settings.DEBUG:

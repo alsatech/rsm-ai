@@ -13,9 +13,9 @@ import { useConfirm } from '../../../../hooks/useConfirm'
 import { useToast } from '../../../../hooks/useToast'
 import { AREA_LABELS, ESTADO_ITEM_CONFIG, ESTADO_SOLICITUD_CONFIG } from '../../constants'
 
-const ROLES_AUTORIZAN = ['administrador', 'superadmin']
+const ROLES_AUTORIZAN = ['inventario', 'administrador', 'superadmin']
 const ROLES_COMPRAN = ['operaciones', 'inventario', 'administrador', 'superadmin']
-const ROLES_ENVIAN = ['operaciones', 'administrador', 'superadmin']
+const ROLES_ENVIAN = ['inventario', 'operaciones', 'administrador', 'superadmin']
 const ROLES_RECIBEN = ['campo', 'inventario', 'administrador', 'superadmin']
 // Mismos roles que ven el comparativo, dan entrada de inventario y revisan lo que reportó Campo.
 const ROLES_COMPARATIVO = ['inventario', 'administrador', 'superadmin']

@@ -4,3 +4,4 @@
 | Fecha | Archivo | Propuestas nuevas | Mejoras |
 |-------|---------|--------------------|---------|
 | 2026-08-13 | 13-08-2026 Junta AM  7.00-7.50 AM.docx | 33 propuestas nuevas | 0 mejoras |
+| 2026-09-01 | 01-09-2026 MINUTA.docx | 36 propuestas nuevas | 0 mejoras |

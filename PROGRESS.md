@@ -7,7 +7,7 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 7 / 12  
+**Módulos completados:** 8 / 12  
 **Fase actual:** Mes 3
 
 ---
@@ -29,7 +29,7 @@
 - [ ] **Módulo 8** — Sanidad animal
 - [ ] **Módulo 9** — Personal
 - [ ] **Módulo 10** — Minuta automática
-- [ ] **Módulo 11** — Facturación
+- [x] **Módulo 11** — Facturación
 - [x] **Módulo 12** — Proyectos
 
 ---
@@ -254,3 +254,14 @@ Se reemplazó la lógica de "último cambio de aceite" (antes inferida indirecta
 ---
 
 _Los pushes se registran aquí cronológicamente conforme se completan los módulos._
+
+---
+
+### 🟢 Push #18
+**Módulo:** Módulo 11 — Facturación
+**Fecha:** 2026-09-14
+**Branch:** main
+**Commit:** `[FACTURACIÓN] feat: módulo completo de facturación con relación mensual en Excel formato contadora RSM`
+**Descripción:** App `apps/facturacion` completa. 2 modelos: `Factura` (folio interno autogenerado `FAC<año>-NNN` igual que el patrón de `Proyecto.folio`; `numero_factura` es el folio del proveedor tal cual llega, texto libre; `archivo` PDF/imagen opcional; `modulo_origen` con 9 opciones — inventario/proyectos/flota/sanidad/personal/nomina/combustible/impuestos/otro; `referencia_id`/`referencia_descripcion` libres para apuntar a otro módulo; `mes_reporte` calculado por señal `pre_save` desde `fecha` — nunca se captura a mano, así el filtro por mes es consistente aunque se edite la fecha después) y `RelacionMensual` (mes único, total, número de facturas, archivo Excel). Generación del Excel (`apps/facturacion/excel.py`, `openpyxl` agregado a requirements) que replica exactamente el formato que Minerva manda a la contadora: fila 1 vacía, fila 2 encabezados FECHA/FACTURA/CONCEPTO/IMPORTE con fondo azul marino y texto blanco, datos por fecha ascendente con fecha en texto fijo `DD-Mon-YY` en inglés (no depende del locale de Excel al abrirlo), importe `$#,##0.00`, fila de SUMA en negritas al final, columnas 15/45/35/15. Regenerar la relación de un mes ya existente actualiza el registro (`update_or_create` por `mes`) en vez de duplicarlo. Endpoints: `facturas/` (CRUD), `facturas/por-mes/`, `resumen/` (total y desglose por módulo del mes actual), `relaciones/generar/`, `relaciones/` (historial), y `importar/` — no estaba en el listado original de endpoints pero es necesario para la Vista 4 del prompt ("Jalar facturas de otros módulos"): GET lista las compras con factura adjunta de Inventarios (`apps.inventario.models.Compra`, siempre tiene `foto_factura`) o Proyectos (`apps.proyectos.models.CompraProyecto`, solo si tiene al menos una `FotoCompra`) que aún no están en Facturación (`ya_importada` comparando `modulo_origen`+`referencia_id`), POST copia el archivo (no lo enlaza, para no depender de que el registro de origen siga existiendo) y crea las facturas. Permisos: CRUD de facturas y ver relaciones — administrador/superadmin (Minerva/Alexia); ver resumen — además operaciones (Erik, para el widget del dashboard); generar relación e importar de otros módulos — solo superadmin.
+**Frontend:** `src/pages/Facturacion/` con 3 pestañas — Dashboard (selector `<input type="month">`, cards de total/número de facturas, desglose por módulo con barras horizontales, botón "Generar relación Excel" que descarga automáticamente vía blob, historial de las últimas 12 relaciones con descarga), Facturas (filtros mes/módulo/búsqueda por concepto o número, tabla con total al fondo, alta/edición/eliminación, empty state), e Importar desde módulos (solo superadmin: selector Inventarios/Proyectos, checklist de compras con enlace a la factura original, badge "Ya importada" en las ya jaladas). Widget `ResumenFacturacion` wireado en el Dashboard principal (administrador/superadmin) con total del mes y botón rápido de generar relación para superadmin. Ruta `/facturacion` protegida por rol y `modules.js` actualizado con la `ruta` (el módulo ya existía como card sin ruta).
+**Notas:** 8 tests nuevos en `apps.facturacion` (folio autogenerado, `mes_reporte` autocalculado, formato exacto del Excel verificado celda por celda, suma total correcta, solo superadmin genera relación, campo/operaciones sin acceso a facturas, resumen visible para operaciones, regenerar relación actualiza totales sin duplicar). Suite completa del backend corrida (205 tests): los 7 fallos son preexistentes en `apps.flota` de otra sesión en curso, no relacionados con este módulo y no se tocaron. Verificado con llamadas HTTP reales contra el servidor de desarrollo con usuarios reales (`minerva`/`alexia`/`erik`): alta de facturas, filtro por mes, resumen visible para Erik, generar relación (bloqueado 403 para Alexia, permitido para Minerva) y descarga del Excel real confirmando formato celda por celda, importar desde Inventario usando las 2 compras reales que ya existían en la base de desarrollo (copia el archivo, marca `ya_importada` correctamente, bloqueado 403 para Alexia), eliminar factura como Alexia (administrador). Datos de prueba (facturas y relación de este smoke test) limpiados al terminar; no se tocaron compras/proyectos reales. `npm run build` y `npm run lint` sin errores nuevos (los 10 errores de lint reportados son preexistentes en Flota/Pendientes, en archivos no tocados aquí). No fue posible tomar screenshots de navegador real en este entorno (falta `libnspr4.so` para Chromium headless y no hay sudo) — verificado en su lugar con llamadas directas a los endpoints con los mismos payloads que envía cada componente del frontend.
