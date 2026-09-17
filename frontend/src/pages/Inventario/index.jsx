@@ -8,7 +8,7 @@ import DashboardInventario from './components/DashboardInventario'
 import HistorialMovimientos from './components/HistorialMovimientos'
 import ListaProductos from './components/ListaProductos'
 import SalidaFacil from './components/SalidaFacil'
-import VistaValidacion from './components/VistaValidacion'
+import VistaCancelacion from './components/VistaCancelacion'
 import WizardMovimiento from './components/WizardMovimiento'
 
 // Campo solo recibe material y registra lo que usa (+ Movimiento) — nada de dashboard de
@@ -23,7 +23,7 @@ export default function Inventario() {
   const [productoParaSolicitud, setProductoParaSolicitud] = useState(null)
   const [recargar, setRecargar] = useState(0)
 
-  const puedeValidar = ['inventario', 'superadmin'].includes(user?.rol)
+  const puedeCancelar = ['inventario', 'superadmin'].includes(user?.rol)
   const puedeVerHistorial = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
 
   const handleVerProductos = (categoriaId = null) => {
@@ -75,8 +75,8 @@ export default function Inventario() {
     return <SalidaFacil onVolver={handleVolver} onGuardado={handleGuardado} />
   }
 
-  if (vista === 'validacion' && puedeValidar) {
-    return <VistaValidacion onVolver={handleVolver} onCambio={() => setRecargar((r) => r + 1)} />
+  if (vista === 'cancelacion' && puedeCancelar) {
+    return <VistaCancelacion onVolver={handleVolver} onCambio={() => setRecargar((r) => r + 1)} />
   }
 
   if (vista === 'historial' && puedeVerHistorial) {
@@ -151,13 +151,13 @@ export default function Inventario() {
                 📦 Adquisiciones
               </button>
             )}
-            {puedeValidar && (
+            {puedeCancelar && (
               <button
                 type="button"
-                onClick={() => setVista('validacion')}
+                onClick={() => setVista('cancelacion')}
                 className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
               >
-                ✓ Validar
+                ✗ Cancelar
               </button>
             )}
             {puedeVerHistorial && (

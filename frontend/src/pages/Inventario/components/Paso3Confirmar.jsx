@@ -1,10 +1,10 @@
 import { UNIDAD_LABELS, esProductoCombustible } from '../constants'
 
 export default function Paso3Confirmar({
-  form, productoSeleccionado, stockResultante, guardando, onGuardar, vehiculos = [], usuarios = [],
+  form, productoSeleccionado, stockResultante, guardando, onGuardar, vehiculos = [],
 }) {
   const unidad = UNIDAD_LABELS[productoSeleccionado?.unidad_medida]
-  const dejaEnCero = form.tipo === 'salida' && stockResultante <= 0
+  const dejaEnCero = stockResultante <= 0
   const dejaEnMinimo =
     !dejaEnCero &&
     productoSeleccionado?.stock_minimo > 0 &&
@@ -13,11 +13,6 @@ export default function Paso3Confirmar({
   const esCombustible = esProductoCombustible(productoSeleccionado)
   const vehiculoSeleccionado = esCombustible
     ? vehiculos.find((v) => Number(v.id) === Number(form.vehiculo))
-    : null
-
-  const esCompra = form.tipo === 'entrada' && Number(form.monto_compra) > 0
-  const compradorSeleccionado = esCompra
-    ? usuarios.find((u) => Number(u.id) === Number(form.comprado_por))
     : null
 
   return (
@@ -32,7 +27,7 @@ export default function Paso3Confirmar({
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">Tipo</span>
-            <span className="font-semibold text-text">{form.tipo === 'entrada' ? '📥 Entrada' : '📤 Salida'}</span>
+            <span className="font-semibold text-text">📤 Salida</span>
           </div>
           <div className="flex justify-between">
             <span className="text-text-secondary">Cantidad</span>
@@ -43,14 +38,6 @@ export default function Paso3Confirmar({
               <span className="text-text-secondary">Vehículo</span>
               <span className="text-right font-semibold text-text">
                 {vehiculoSeleccionado.nombre} — {vehiculoSeleccionado.marca} {vehiculoSeleccionado.modelo}
-              </span>
-            </div>
-          )}
-          {esCompra && (
-            <div className="flex justify-between">
-              <span className="text-text-secondary">Compra</span>
-              <span className="text-right font-semibold text-text">
-                ${form.monto_compra} · {compradorSeleccionado?.nombre ?? 'sin comprador'}
               </span>
             </div>
           )}

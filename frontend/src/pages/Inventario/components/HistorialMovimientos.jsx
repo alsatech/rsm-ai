@@ -14,7 +14,7 @@ function formatFecha(fecha) {
 }
 
 function exportarCSV(movimientos) {
-  const encabezados = ['Fecha', 'Código', 'Descripción', 'Tipo', 'Cantidad', 'Responsable', 'Uso/Origen', 'Validado']
+  const encabezados = ['Fecha', 'Código', 'Descripción', 'Tipo', 'Cantidad', 'Responsable', 'Uso/Origen', 'Estado']
   const filas = movimientos.map((m) => [
     m.fecha_movimiento,
     m.producto_detalle?.codigo,
@@ -23,7 +23,7 @@ function exportarCSV(movimientos) {
     m.cantidad,
     m.responsable_detalle?.nombre,
     m.uso_descripcion?.replace(/\n/g, ' '),
-    m.validado ? 'Sí' : m.rechazado ? 'Rechazado' : 'No',
+    m.rechazado ? 'Cancelado' : m.validado ? 'Validado' : 'Vigente',
   ])
   const csv = [encabezados, ...filas].map((fila) => fila.map((v) => `"${v ?? ''}"`).join(',')).join('\n')
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
@@ -135,11 +135,11 @@ export default function HistorialMovimientos({ onVolver }) {
                     <td className="px-3 py-2 text-xs text-text-secondary">{m.responsable_detalle?.nombre}</td>
                     <td className="px-3 py-2 text-xs">
                       {m.rechazado ? (
-                        <span className="text-error">Rechazado</span>
+                        <span className="text-error">Cancelado</span>
                       ) : m.validado ? (
                         <span className="text-highlight">Validado</span>
                       ) : (
-                        <span className="text-warning">Sin validar</span>
+                        <span className="text-text-secondary">Vigente</span>
                       )}
                     </td>
                   </tr>

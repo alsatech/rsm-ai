@@ -76,14 +76,16 @@ class InventarioAPITest(APITestCase):
         self.assertEqual(resp.data['stock_anterior'], '10.00')
         self.assertEqual(resp.data['stock_resultante'], '8.00')
 
-    def test_entrada_aumenta_stock(self):
+    def test_entrada_por_movimiento_ya_no_se_permite(self):
+        # Las entradas solo se registran a través de una solicitud de material en Adquisiciones
+        # (ver DarEntradaRecepcionView) — ningún rol puede crear una 'entrada' desde +Movimiento.
         self._auth(self.inventario)
         resp = self.client.post(
             '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='entrada', cantidad='5.00'), format='json',
         )
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
         self.producto.refresh_from_db()
-        self.assertEqual(self.producto.stock_actual, 15)
+        self.assertEqual(self.producto.stock_actual, 10)
 
     def test_stock_no_puede_ser_negativo(self):
         self._auth(self.campo)
@@ -104,63 +106,116 @@ class InventarioAPITest(APITestCase):
         self.producto.refresh_from_db()
         self.assertTrue(self.producto.en_stock_bajo)
 
-    def test_yajaira_puede_validar(self):
-        self._auth(self.inventario)
+    def test_yajaira_puede_cancelar_salida(self):
+        self._auth(self.campo)
         resp = self.client.post(
-            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='entrada', cantidad='3.00'), format='json',
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='3.00'), format='json',
+        )
+        movimiento_id = resp.data['id']
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 7)
+
+        self._auth(self.inventario)
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cancelar/',
+            {'nota': 'Se capturó el producto equivocado'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(resp.data['rechazado'])
+        self.assertEqual(resp.data['validado_por'], self.inventario.id)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 10)
+
+    def test_campo_no_puede_cancelar_salida(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='3.00'), format='json',
         )
         movimiento_id = resp.data['id']
 
         resp = self.client.patch(
-            f'/api/v1/inventario/movimientos/{movimiento_id}/validar/', {'accion': 'validar'}, format='json',
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cancelar/', {'nota': 'Error mío'}, format='json',
         )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertTrue(resp.data['validado'])
-        self.assertEqual(resp.data['validado_por'], self.inventario.id)
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_admin_no_puede_validar(self):
-        self._auth(self.inventario)
+    def test_admin_no_puede_cancelar_salida(self):
+        self._auth(self.campo)
         resp = self.client.post(
-            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='entrada', cantidad='3.00'), format='json',
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='3.00'), format='json',
         )
         movimiento_id = resp.data['id']
 
         self._auth(self.admin)
         resp = self.client.patch(
-            f'/api/v1/inventario/movimientos/{movimiento_id}/validar/', {'accion': 'validar'}, format='json',
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cancelar/', {'nota': 'Error'}, format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
-    def test_rechazar_revierte_stock(self):
-        self._auth(self.inventario)
+    def test_cancelar_requiere_nota(self):
+        self._auth(self.campo)
         resp = self.client.post(
-            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='entrada', cantidad='5.00'), format='json',
-        )
-        movimiento_id = resp.data['id']
-        self.producto.refresh_from_db()
-        self.assertEqual(self.producto.stock_actual, 15)
-
-        resp = self.client.patch(
-            f'/api/v1/inventario/movimientos/{movimiento_id}/validar/',
-            {'accion': 'rechazar', 'nota': 'Factura no coincide'},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertTrue(resp.data['rechazado'])
-        self.producto.refresh_from_db()
-        self.assertEqual(self.producto.stock_actual, 10)
-
-    def test_rechazar_requiere_nota(self):
-        self._auth(self.inventario)
-        resp = self.client.post(
-            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='entrada', cantidad='5.00'), format='json',
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='3.00'), format='json',
         )
         movimiento_id = resp.data['id']
 
+        self._auth(self.inventario)
         resp = self.client.patch(
-            f'/api/v1/inventario/movimientos/{movimiento_id}/validar/', {'accion': 'rechazar'}, format='json',
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cancelar/', {}, format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_se_puede_cancelar_salida_dos_veces(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='3.00'), format='json',
+        )
+        movimiento_id = resp.data['id']
+
+        self._auth(self.inventario)
+        url = f'/api/v1/inventario/movimientos/{movimiento_id}/cancelar/'
+        resp = self.client.patch(url, {'nota': 'Error'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        resp = self.client.patch(url, {'nota': 'Otra vez'}, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_se_puede_cancelar_una_entrada(self):
+        # Las entradas (siempre vía Adquisiciones) no pasan por este flujo de cancelación.
+        entrada = MovimientoInventario.objects.create(
+            producto=self.producto,
+            tipo=MovimientoInventario.Tipo.ENTRADA,
+            cantidad=5,
+            stock_anterior=10,
+            stock_resultante=15,
+            responsable=self.inventario,
+            validado=True,
+            validado_por=self.inventario,
+        )
+
+        self._auth(self.inventario)
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{entrada.id}/cancelar/', {'nota': 'Error'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_yajaira_puede_agregar_observaciones_sin_afectar_stock(self):
+        # PATCH directo a /movimientos/{id}/ para agregar una nota — no debe revalidar el
+        # stock (que puede haber bajado por movimientos posteriores) porque no se toca 'cantidad'.
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='9.00'), format='json',
+        )
+        movimiento_id = resp.data['id']
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 1)
+
+        self._auth(self.inventario)
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/', {'notas': 'Revisado, todo en orden'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertEqual(resp.data['notas'], 'Revisado, todo en orden')
 
     def test_campo_puede_registrar_salida(self):
         self._auth(self.campo)
@@ -185,7 +240,7 @@ class InventarioAPITest(APITestCase):
 
         self._auth(self.inventario)
         self.client.post(
-            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='entrada', cantidad='1.00'), format='json',
+            '/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida', cantidad='1.00'), format='json',
         )
 
         self._auth(self.campo)
@@ -758,98 +813,3 @@ class ComprasYRelacionAPITest(APITestCase):
 
         resp = self.client.post(f'/api/v1/inventario/relaciones-compras/{relacion_id}/enviar/', {}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-
-
-class CompraDesdeMovimientoAPITest(APITestCase):
-    """La entrada directa por '+ Movimiento' también puede generar una Compra (sin pasar por
-    Solicitud/Autorización), para que alimente la Relación de compras semanal."""
-
-    def setUp(self):
-        self.inventario = crear_usuario('yajaira_mov', 'inventario')
-        self.operaciones = crear_usuario('erik_mov', 'operaciones')
-        self.campo = crear_usuario('chino_mov', 'campo')
-        self.producto = crear_producto(codigo='SM-MOV-001', stock_actual=10, stock_minimo=5)
-
-    def _auth(self, user):
-        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
-
-    def _entrada_compra(self, **overrides):
-        data = {
-            'producto': self.producto.id,
-            'tipo': 'entrada',
-            'cantidad': '5.00',
-            'monto_compra': '350.00',
-            'comprado_por': self.operaciones.id,
-            'foto_evidencia': _imagen_valida(),
-        }
-        data.update(overrides)
-        return self.client.post('/api/v1/inventario/movimientos/', data, format='multipart')
-
-    def test_entrada_con_monto_crea_compra_ligada_al_movimiento(self):
-        self._auth(self.inventario)
-        resp = self._entrada_compra()
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
-        self.assertIsNotNone(resp.data['compra'])
-        self.assertEqual(resp.data['compra']['monto_total'], '350.00')
-        self.assertIsNone(resp.data['compra']['solicitud'])
-
-        compra = Compra.objects.get(movimiento_id=resp.data['id'])
-        self.assertEqual(compra.comprado_por_id, self.operaciones.id)
-        self.assertEqual(compra.registrado_por_id, self.inventario.id)
-
-    def test_entrada_sin_monto_no_crea_compra(self):
-        self._auth(self.inventario)
-        resp = self.client.post('/api/v1/inventario/movimientos/', {
-            'producto': self.producto.id, 'tipo': 'entrada', 'cantidad': '5.00',
-        }, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
-        self.assertIsNone(resp.data['compra'])
-        self.assertFalse(Compra.objects.filter(movimiento_id=resp.data['id']).exists())
-
-    def test_entrada_con_monto_sin_foto_falla(self):
-        self._auth(self.inventario)
-        resp = self._entrada_compra(foto_evidencia='')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('foto_evidencia', resp.data)
-
-    def test_entrada_con_monto_sin_comprador_falla(self):
-        self._auth(self.inventario)
-        resp = self._entrada_compra(comprado_por='')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('comprado_por', resp.data)
-
-    def test_salida_con_monto_falla(self):
-        self._auth(self.campo)
-        resp = self.client.post('/api/v1/inventario/movimientos/', {
-            'producto': self.producto.id, 'tipo': 'salida', 'cantidad': '2.00', 'monto_compra': '100.00',
-            'comprado_por': self.operaciones.id, 'foto_evidencia': _imagen_valida(),
-        }, format='multipart')
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-        self.assertIn('monto_compra', resp.data)
-
-    def test_relacion_compras_junta_compras_de_solicitud_y_de_movimiento(self):
-        # una compra vía Adquisiciones
-        self._auth(self.campo)
-        payload = {
-            'area': 'campo', 'descripcion_necesidad': 'Material', 'estado': 'enviada',
-            'items': [{'producto': self.producto.id, 'cantidad_solicitada': '5.00', 'unidad': 'pieza'}],
-        }
-        resp = self.client.post('/api/v1/inventario/solicitudes/', payload, format='json')
-        solicitud_id = resp.data['id']
-
-        self._auth(self.inventario)
-        self.client.post(f'/api/v1/inventario/solicitudes/{solicitud_id}/compra/', {
-            'comprado_por': self.operaciones.id, 'monto_total': '200.00', 'foto_factura': _imagen_valida(),
-        }, format='multipart')
-
-        # una compra vía entrada directa
-        self._entrada_compra()
-
-        hoy = str(timezone.localdate())
-        resp = self.client.post('/api/v1/inventario/relaciones-compras/', {
-            'fecha_inicio': hoy, 'fecha_fin': hoy,
-        }, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
-        self.assertEqual(len(resp.data['compras']), 2)
-        origenes = {c['solicitud_folio'] for c in resp.data['compras']}
-        self.assertIn(None, origenes)  # la de movimiento no tiene folio de solicitud

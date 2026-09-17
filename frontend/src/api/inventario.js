@@ -12,7 +12,7 @@ export const createMovimiento = (data) =>
   api.post('/api/v1/inventario/movimientos/', data, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
-export const validarMovimiento = (id, data) => api.patch(`/api/v1/inventario/movimientos/${id}/validar/`, data)
+export const cancelarMovimiento = (id, data) => api.patch(`/api/v1/inventario/movimientos/${id}/cancelar/`, data)
 
 export const getCategorias = () => api.get('/api/v1/inventario/categorias/')
 export const getUbicaciones = () => api.get('/api/v1/inventario/ubicaciones/')

@@ -94,8 +94,8 @@ class PuedeGestionarRelacionCompras(BasePermission):
 
 
 class PuedeDarEntradaRecepcion(BasePermission):
-    """Mismos roles que registran entradas manuales — Yajaira revisa lo que reportó Campo y
-    da entrada, comparándolo contra la compra."""
+    """Yajaira (o Administrador/Superadmin) revisa lo que reportó Campo y da entrada,
+    comparándolo contra la compra — la única forma de dar entrada a un producto."""
 
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_REGISTRAN_ENTRADA)

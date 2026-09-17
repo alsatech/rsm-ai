@@ -19,7 +19,6 @@ from .models import (
     SolicitudMaterial,
     Ubicacion,
 )
-from .permissions import ROLES_REGISTRAN_ENTRADA
 
 User = get_user_model()
 
@@ -91,14 +90,6 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
     )
     compra = serializers.SerializerMethodField()
     solicitud_folio = serializers.SerializerMethodField()
-    # Escritura únicamente: si vienen, la entrada también genera una Compra ligada a este
-    # movimiento (ver create()) para que aparezca en la Relación de compras semanal.
-    monto_compra = serializers.DecimalField(
-        max_digits=10, decimal_places=2, required=False, allow_null=True, write_only=True,
-    )
-    comprado_por = serializers.PrimaryKeyRelatedField(
-        queryset=User.objects.filter(is_active=True), required=False, allow_null=True, write_only=True,
-    )
 
     class Meta:
         model = MovimientoInventario
@@ -108,7 +99,7 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
             'uso_descripcion', 'vehiculo_codigo', 'vehiculo',
             'proyecto_referencia', 'solicitud', 'solicitud_folio', 'fecha_movimiento',
             'fecha_hora_registro', 'validado', 'validado_por', 'validado_por_detalle',
-            'rechazado', 'notas', 'foto_evidencia', 'compra', 'monto_compra', 'comprado_por',
+            'rechazado', 'notas', 'foto_evidencia', 'compra',
         )
         read_only_fields = (
             'id', 'stock_anterior', 'stock_resultante', 'solicitud', 'validado', 'validado_por',
@@ -130,15 +121,20 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         if cantidad is not None and cantidad <= 0:
             raise serializers.ValidationError({'cantidad': 'La cantidad debe ser mayor a cero.'})
 
-        request = self.context.get('request')
-        if request and tipo == MovimientoInventario.Tipo.ENTRADA:
-            rol = getattr(request.user, 'rol', None)
-            if rol not in ROLES_REGISTRAN_ENTRADA:
-                raise serializers.ValidationError({
-                    'tipo': 'No tienes permiso para registrar entradas de inventario.'
-                })
+        # Las entradas de inventario ya no se registran por aquí: solo llegan a través de una
+        # solicitud de material en Adquisiciones (Solicitud → Envío → Recepción → Dar entrada),
+        # que ya no requiere un paso de validación aparte — ver DarEntradaRecepcionView.
+        if self.instance is None and tipo == MovimientoInventario.Tipo.ENTRADA:
+            raise serializers.ValidationError({
+                'tipo': 'Las entradas de inventario solo se registran a través de una solicitud de material en Adquisiciones.'
+            })
 
-        if producto and tipo == MovimientoInventario.Tipo.SALIDA and cantidad is not None:
+        # El chequeo de stock/vehículo solo aplica cuando se crea el movimiento o cuando
+        # explícitamente se está cambiando la cantidad — así un PATCH que solo agrega
+        # observaciones (notas) no vuelve a disparar estas validaciones contra el stock
+        # actual, que puede haber bajado por movimientos posteriores.
+        revisando_cantidad = self.instance is None or 'cantidad' in data
+        if producto and tipo == MovimientoInventario.Tipo.SALIDA and cantidad is not None and revisando_cantidad:
             if cantidad > producto.stock_actual:
                 raise serializers.ValidationError({
                     'cantidad': f'No hay suficiente stock. Stock actual: {producto.stock_actual} {producto.get_unidad_medida_display()}.'
@@ -157,33 +153,14 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
                         'vehiculo': 'Debes seleccionar el vehículo al que se le carga el combustible.'
                     })
 
-        monto_compra = data.get('monto_compra')
-        if monto_compra is not None:
-            if tipo != MovimientoInventario.Tipo.ENTRADA:
-                raise serializers.ValidationError({'monto_compra': 'Solo las entradas pueden marcarse como compra.'})
-            if not data.get('comprado_por'):
-                raise serializers.ValidationError({'comprado_por': 'Indica quién hizo la compra.'})
-            foto = data.get('foto_evidencia') or getattr(self.instance, 'foto_evidencia', None)
-            if not foto:
-                raise serializers.ValidationError({
-                    'foto_evidencia': 'La foto de evidencia es obligatoria para registrar una compra.'
-                })
-
         return data
 
     def create(self, validated_data):
-        monto_compra = validated_data.pop('monto_compra', None)
-        comprado_por = validated_data.pop('comprado_por', None)
-
         producto = validated_data['producto']
-        tipo = validated_data['tipo']
         cantidad = validated_data['cantidad']
 
         stock_anterior = producto.stock_actual
-        if tipo == MovimientoInventario.Tipo.SALIDA:
-            stock_resultante = stock_anterior - cantidad
-        else:
-            stock_resultante = stock_anterior + cantidad
+        stock_resultante = stock_anterior - cantidad
 
         if 'responsable' not in validated_data:
             validated_data['responsable'] = self.context['request'].user
@@ -200,53 +177,43 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
 
         # El producto se actualiza antes de crear el movimiento porque la señal
         # post_save (alerta de stock mínimo) lee producto.stock_actual desde la BD.
-        movimiento = MovimientoInventario.objects.create(
+        return MovimientoInventario.objects.create(
             stock_anterior=stock_anterior, stock_resultante=stock_resultante, **validated_data,
         )
 
-        if monto_compra is not None:
-            Compra.objects.create(
-                movimiento=movimiento,
-                comprado_por=comprado_por,
-                registrado_por=self.context['request'].user,
-                monto_total=monto_compra,
-                foto_factura=movimiento.foto_evidencia,
-                fecha_compra=movimiento.fecha_movimiento,
-            )
 
-        return movimiento
+class CancelarMovimientoSerializer(serializers.Serializer):
+    """Yajaira (o Superadmin) cancela una salida capturada mal — nunca Campo. Revierte el
+    stock al valor previo al movimiento; no hay paso de 'aprobar' porque el stock ya se
+    aplicó de inmediato al registrar la salida."""
 
+    nota = serializers.CharField()
 
-class ValidarMovimientoSerializer(serializers.Serializer):
-    ACCION_CHOICES = ('validar', 'rechazar')
-
-    accion = serializers.ChoiceField(choices=ACCION_CHOICES)
-    nota = serializers.CharField(required=False, allow_blank=True)
+    def validate_nota(self, value):
+        if not value.strip():
+            raise serializers.ValidationError('Indica el motivo de la cancelación.')
+        return value
 
     def validate(self, data):
-        if data['accion'] == 'rechazar' and not data.get('nota'):
-            raise serializers.ValidationError({'nota': 'El rechazo requiere una nota explicando el motivo.'})
+        movimiento = self.instance
+        if movimiento.tipo != MovimientoInventario.Tipo.SALIDA:
+            raise serializers.ValidationError('Solo se pueden cancelar salidas.')
+        if movimiento.rechazado:
+            raise serializers.ValidationError('Esta salida ya fue cancelada.')
         return data
 
     def save(self):
         movimiento = self.instance
         request = self.context['request']
-        accion = self.validated_data['accion']
-        nota = self.validated_data.get('nota', '')
+        nota = self.validated_data['nota']
 
-        if accion == 'validar':
-            movimiento.validado = True
-            movimiento.validado_por = request.user
-            if nota:
-                movimiento.notas = f'{movimiento.notas}\n\nValidado: {nota}'.strip()
-        else:
-            movimiento.rechazado = True
-            movimiento.validado_por = request.user
-            movimiento.notas = f'{movimiento.notas}\n\nRechazado: {nota}'.strip()
+        movimiento.rechazado = True
+        movimiento.validado_por = request.user
+        movimiento.notas = f'{movimiento.notas}\n\nCancelado: {nota}'.strip()
 
-            producto = movimiento.producto
-            producto.stock_actual = movimiento.stock_anterior
-            producto.save(update_fields=['stock_actual', 'updated_at'])
+        producto = movimiento.producto
+        producto.stock_actual = movimiento.stock_anterior
+        producto.save(update_fields=['stock_actual', 'updated_at'])
 
         movimiento.save()
         return movimiento

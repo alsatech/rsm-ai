@@ -46,6 +46,7 @@ from .permissions import (
 from .reportes import generar_pdf_reporte_diario
 from .serializers import (
     AutorizarSolicitudSerializer,
+    CancelarMovimientoSerializer,
     CategoriaInventarioSerializer,
     CompraSerializer,
     EnvioMaterialSerializer,
@@ -58,7 +59,6 @@ from .serializers import (
     ResolverReporteSerializer,
     SolicitudMaterialSerializer,
     UbicacionSerializer,
-    ValidarMovimientoSerializer,
 )
 
 
@@ -177,12 +177,15 @@ class MovimientoDetailView(generics.RetrieveUpdateAPIView):
         return [IsAuthenticated()]
 
 
-class ValidarMovimientoView(APIView):
+class CancelarMovimientoView(APIView):
+    """PATCH /movimientos/{id}/cancelar/ — Yajaira/Superadmin cancelan una salida mal
+    capturada por Campo (o por ellos mismos); revierte el stock al valor anterior."""
+
     permission_classes = [IsAuthenticated, PuedeValidarMovimiento]
 
     def patch(self, request, pk):
         movimiento = get_object_or_404(MovimientoInventario, pk=pk)
-        serializer = ValidarMovimientoSerializer(
+        serializer = CancelarMovimientoSerializer(
             movimiento, data=request.data, context={'request': request},
         )
         if not serializer.is_valid():
@@ -203,7 +206,7 @@ class AlertasStockView(generics.ListAPIView):
 
 
 class ResumenInventarioView(APIView):
-    """GET /resumen/ — para dashboard: total productos, alertas activas, movimientos del día, sin validar."""
+    """GET /resumen/ — para dashboard: total productos, alertas activas, movimientos del día."""
     permission_classes = [IsAuthenticated, PuedeVerReportesCompletos]
 
     def get(self, request):
@@ -214,15 +217,11 @@ class ResumenInventarioView(APIView):
             activo=True, stock_minimo__gt=0, stock_actual__lte=models.F('stock_minimo'),
         ).count()
         movimientos_hoy = MovimientoInventario.objects.filter(fecha_movimiento=hoy).count()
-        entradas_sin_validar = MovimientoInventario.objects.filter(
-            tipo=MovimientoInventario.Tipo.ENTRADA, validado=False, rechazado=False,
-        ).count()
 
         return Response({
             'total_productos': total_productos,
             'alertas_stock': alertas_stock,
             'movimientos_hoy': movimientos_hoy,
-            'entradas_sin_validar': entradas_sin_validar,
         })
 
 
