@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 
 import { getProductos } from '../../../api/inventario'
+import { useToast } from '../../../hooks/useToast'
 import { UBICACION_LABELS, UNIDAD_LABELS } from '../constants'
 
 const inputClass =
@@ -9,6 +10,7 @@ const inputClass =
 // "+ Movimiento" solo registra salidas de productos existentes — para dar de alta un
 // producto nuevo se usa el catálogo (Lista de productos), que ya tiene su propio formulario.
 export default function Paso1Producto({ setForm, productoSeleccionado, setProductoSeleccionado }) {
+  const { showToast } = useToast()
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState([])
   const [buscando, setBuscando] = useState(false)
@@ -39,6 +41,23 @@ export default function Paso1Producto({ setForm, productoSeleccionado, setProduc
     setForm((prev) => ({ ...prev, producto: null }))
   }
 
+  // Lector físico tipo teclado: al escanear "escribe" el código + Enter en este input.
+  const handleCodigoEscaneado = async (texto) => {
+    const codigo = texto.trim()
+    if (!codigo) return
+    try {
+      const { data } = await getProductos({ q: codigo, activo: true })
+      const exacto = data.find((p) => p.codigo === codigo)
+      if (exacto) {
+        elegirProducto(exacto)
+      } else {
+        showToast(`No encontramos el código "${codigo}" en el catálogo.`, 'error')
+      }
+    } catch {
+      showToast('No se pudo buscar ese código.', 'error')
+    }
+  }
+
   return (
     <div className="flex flex-col gap-5">
       <div>
@@ -50,7 +69,8 @@ export default function Paso1Producto({ setForm, productoSeleccionado, setProduc
               type="search"
               value={busqueda}
               onChange={(e) => setBusqueda(e.target.value)}
-              placeholder="Buscar por código o descripción…"
+              onKeyDown={(e) => e.key === 'Enter' && handleCodigoEscaneado(busqueda)}
+              placeholder="Buscar por código o descripción… (o usa la pistola)"
               className={inputClass}
               autoFocus
             />

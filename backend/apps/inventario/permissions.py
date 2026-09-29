@@ -20,6 +20,9 @@ ROLES_REGISTRAN_COMPRA = (
     User.Rol.INVENTARIO, User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN,
 )
 ROLES_GESTIONAN_RELACION_COMPRAS = (User.Rol.INVENTARIO, User.Rol.SUPERADMIN)
+ROLES_CLASIFICACION_ABC = (
+    User.Rol.INVENTARIO, User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN,
+)
 
 
 def _rol_en(request, roles):
@@ -99,6 +102,13 @@ class PuedeDarEntradaRecepcion(BasePermission):
 
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_REGISTRAN_ENTRADA)
+
+
+class PuedeGestionarClasificacionABC(BasePermission):
+    """Inventario/Operaciones editan costo_unitario y criticidad, y disparan el recálculo."""
+
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_CLASIFICACION_ABC)
 
 
 class PuedeEditarSolicitud(BasePermission):

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 
-import { UBICACION_LABELS, UNIDAD_LABELS } from '../constants'
+import { CRITICIDAD_LABELS, UBICACION_LABELS, UNIDAD_LABELS } from '../constants'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -14,6 +14,8 @@ export default function FormularioProducto({ categorias, ubicaciones, onGuardar,
     ubicacion: ubicaciones[0]?.id ?? '',
     unidad_medida: 'pieza',
     stock_minimo: '',
+    costo_unitario: '',
+    criticidad: 'media',
     notas: '',
   })
 
@@ -21,7 +23,7 @@ export default function FormularioProducto({ categorias, ubicaciones, onGuardar,
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    onGuardar({ ...form, stock_minimo: form.stock_minimo || 0 })
+    onGuardar({ ...form, stock_minimo: form.stock_minimo || 0, costo_unitario: form.costo_unitario || 0 })
   }
 
   return (
@@ -77,6 +79,21 @@ export default function FormularioProducto({ categorias, ubicaciones, onGuardar,
             <div>
               <label className={labelClass} htmlFor="stock_minimo">Stock mínimo</label>
               <input id="stock_minimo" type="number" step="0.01" min="0" value={form.stock_minimo} onChange={handleChange('stock_minimo')} className={inputClass} placeholder="0" />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelClass} htmlFor="costo_unitario">Costo unitario (MXN)</label>
+              <input id="costo_unitario" type="number" step="0.01" min="0" value={form.costo_unitario} onChange={handleChange('costo_unitario')} className={inputClass} placeholder="0.00" />
+            </div>
+            <div>
+              <label className={labelClass} htmlFor="criticidad">Criticidad</label>
+              <select id="criticidad" value={form.criticidad} onChange={handleChange('criticidad')} className={inputClass}>
+                {Object.entries(CRITICIDAD_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>{label}</option>
+                ))}
+              </select>
             </div>
           </div>
 

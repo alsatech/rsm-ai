@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import RecepcionMaterialCampo from './components/Adquisiciones/RecepcionMaterialCampo'
 import VistaAdquisiciones from './components/Adquisiciones/VistaAdquisiciones'
+import ClasificacionABC from './components/ClasificacionABC'
 import DashboardInventario from './components/DashboardInventario'
 import HistorialMovimientos from './components/HistorialMovimientos'
 import ListaProductos from './components/ListaProductos'
@@ -18,7 +19,7 @@ export default function Inventario() {
   const esCampo = user?.rol === 'campo'
   const vistaInicio = esCampo ? 'recepcion-campo' : 'dashboard'
   const [vista, setVista] = useState(vistaInicio)
-  const [categoriaFiltro, setCategoriaFiltro] = useState(null)
+  const [ubicacionFiltro, setUbicacionFiltro] = useState(null)
   const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
   const [productoParaSolicitud, setProductoParaSolicitud] = useState(null)
   const [recargar, setRecargar] = useState(0)
@@ -26,8 +27,8 @@ export default function Inventario() {
   const puedeCancelar = ['inventario', 'superadmin'].includes(user?.rol)
   const puedeVerHistorial = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
 
-  const handleVerProductos = (categoriaId = null) => {
-    setCategoriaFiltro(categoriaId)
+  const handleVerUbicacion = (ubicacionId) => {
+    setUbicacionFiltro(ubicacionId)
     setVista('lista')
   }
 
@@ -45,7 +46,7 @@ export default function Inventario() {
 
   const handleVolver = () => {
     setVista(vistaInicio)
-    setCategoriaFiltro(null)
+    setUbicacionFiltro(null)
     setProductoPreseleccionado(null)
     setProductoParaSolicitud(null)
   }
@@ -83,6 +84,10 @@ export default function Inventario() {
     return <HistorialMovimientos onVolver={handleVolver} />
   }
 
+  if (vista === 'clasificacion-abc' && !esCampo) {
+    return <ClasificacionABC onVolver={handleVolver} />
+  }
+
   if (vista === 'adquisiciones') {
     return (
       <div className="min-h-svh bg-bg pb-10">
@@ -111,7 +116,7 @@ export default function Inventario() {
   if (vista === 'lista') {
     return (
       <ListaProductos
-        categoriaInicial={categoriaFiltro}
+        ubicacionInicial={ubicacionFiltro}
         recargar={recargar}
         onVolver={handleVolver}
         onNuevoMovimiento={handleNuevoMovimiento}
@@ -169,6 +174,15 @@ export default function Inventario() {
                 📜 Historial
               </button>
             )}
+            {!esCampo && (
+              <button
+                type="button"
+                onClick={() => setVista('clasificacion-abc')}
+                className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              >
+                🎯 Clasificación ABC
+              </button>
+            )}
             <button
               type="button"
               onClick={() => handleNuevoMovimiento(null)}
@@ -188,7 +202,7 @@ export default function Inventario() {
       ) : (
         <DashboardInventario
           recargar={recargar}
-          onVerProductos={handleVerProductos}
+          onVerUbicacion={handleVerUbicacion}
           onSolicitarMaterial={handleSolicitarMaterial}
         />
       )}

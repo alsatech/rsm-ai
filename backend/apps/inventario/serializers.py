@@ -59,15 +59,24 @@ class ProductoSerializer(serializers.ModelSerializer):
     ubicacion_detalle = UbicacionSerializer(source='ubicacion', read_only=True)
     unidad_medida_display = serializers.CharField(source='get_unidad_medida_display', read_only=True)
     estado_stock = serializers.SerializerMethodField()
+    criticidad_display = serializers.CharField(source='get_criticidad_display', read_only=True)
+    valor_stock = serializers.SerializerMethodField()
 
     class Meta:
         model = Producto
         fields = (
             'id', 'codigo', 'descripcion', 'categoria', 'categoria_detalle', 'ubicacion', 'ubicacion_detalle',
             'unidad_medida', 'unidad_medida_display', 'stock_actual', 'stock_minimo', 'estado_stock',
+            'costo_unitario', 'criticidad', 'criticidad_display', 'valor_stock',
+            'clase_abc', 'score_abc', 'clasificado_en',
             'notas', 'activo', 'created_at', 'updated_at',
         )
-        read_only_fields = ('id', 'stock_actual', 'created_at', 'updated_at')
+        read_only_fields = (
+            'id', 'stock_actual', 'created_at', 'updated_at', 'clase_abc', 'score_abc', 'clasificado_en',
+        )
+
+    def get_valor_stock(self, obj):
+        return obj.stock_actual * obj.costo_unitario
 
     def get_estado_stock(self, obj):
         if obj.stock_actual <= 0:

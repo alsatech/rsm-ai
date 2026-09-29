@@ -2,6 +2,15 @@ import html2canvas from 'html2canvas'
 import QRCode from 'qrcode'
 import { useEffect, useRef, useState } from 'react'
 
+import { imprimirEtiquetaT50M, soportaImpresionBluetooth } from '../../../lib/supvanPrinter'
+import { UBICACION_ICONS, UBICACION_LABELS } from '../constants'
+
+const ESTADO_LABELS = {
+  conectando: 'Conectando…',
+  generando_etiqueta: 'Generando etiqueta…',
+  imprimiendo: 'Imprimiendo…',
+}
+
 // Genera una etiqueta con el código QR del producto (a partir de su código actual, ej. SM-001)
 // para imprimir y pegar en el bote/anaquel — sin esto, el escáner de SalidaFacil.jsx no tiene
 // nada físico que leer todavía.
@@ -9,6 +18,8 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
   const [qrDataUrl, setQrDataUrl] = useState(null)
   const etiquetaRef = useRef(null)
   const [descargando, setDescargando] = useState(false)
+  const [estadoImpresionBt, setEstadoImpresionBt] = useState(null) // null | 'conectando' | ... | 'error'
+  const [errorImpresionBt, setErrorImpresionBt] = useState('')
 
   useEffect(() => {
     let cancelado = false
@@ -17,6 +28,23 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
       .catch(() => {})
     return () => { cancelado = true }
   }, [producto.codigo])
+
+  const ubicacionNombre = producto.ubicacion_detalle?.nombre
+  const ubicacionLabel = ubicacionNombre ? UBICACION_LABELS[ubicacionNombre] ?? producto.ubicacion_detalle?.nombre_display : ''
+
+  const imprimirEnT50M = async () => {
+    setErrorImpresionBt('')
+    try {
+      await imprimirEtiquetaT50M(
+        { codigo: producto.codigo, descripcion: producto.descripcion, ubicacion: ubicacionLabel },
+        (estado) => setEstadoImpresionBt(estado),
+      )
+      setTimeout(() => setEstadoImpresionBt(null), 2000)
+    } catch (err) {
+      setEstadoImpresionBt('error')
+      setErrorImpresionBt(err?.message || 'No se pudo imprimir en el T50M.')
+    }
+  }
 
   const descargar = async () => {
     if (!etiquetaRef.current) return
@@ -51,6 +79,11 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
           )}
           <p className="font-mono text-2xl font-bold text-black">{producto.codigo}</p>
           <p className="text-center text-sm text-black/70">{producto.descripcion}</p>
+          {ubicacionLabel && (
+            <p className="text-center text-xs font-semibold text-black/60">
+              {UBICACION_ICONS[ubicacionNombre] ?? '📍'} {ubicacionLabel}
+            </p>
+          )}
         </div>
 
         <div className="mt-5 flex gap-3">
@@ -72,6 +105,25 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
             {descargando ? 'Descargando…' : '⬇️ Descargar etiqueta'}
           </button>
         </div>
+
+        {soportaImpresionBluetooth() && (
+          <>
+            <button
+              type="button"
+              onClick={imprimirEnT50M}
+              disabled={Boolean(estadoImpresionBt) && estadoImpresionBt !== 'error'}
+              style={{ minHeight: '48px' }}
+              className="mt-3 w-full rounded-xl border border-dashed border-accent text-sm font-semibold text-highlight transition hover:bg-bg disabled:opacity-50"
+            >
+              {estadoImpresionBt && estadoImpresionBt !== 'error'
+                ? ESTADO_LABELS[estadoImpresionBt]
+                : '🖨️ Imprimir en T50M (Bluetooth) — experimental'}
+            </button>
+            {estadoImpresionBt === 'error' && (
+              <p className="mt-2 text-center text-xs text-error">{errorImpresionBt}</p>
+            )}
+          </>
+        )}
       </div>
     </div>
   )

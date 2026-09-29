@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import { crearRecepcion } from '../../../../api/inventario'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useToast } from '../../../../hooks/useToast'
+import { UBICACION_LABELS, UBICACION_PILOTO_ESCANEO } from '../../constants'
 import GrabadorAudio from './GrabadorAudio'
 
 const MAX_FOTOS = 4
@@ -31,7 +32,38 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
   const [fotosLlegada, setFotosLlegada] = useState([])
   const [audio, setAudio] = useState(null)
   const [guardando, setGuardando] = useState(false)
+  const [mostrarEscaner, setMostrarEscaner] = useState(false)
+  const [codigoEscaneado, setCodigoEscaneado] = useState('')
   const inputFotoRef = useRef(null)
+
+  // Prueba piloto: lector físico tipo teclado (USB/Bluetooth) — al escanear "escribe" el
+  // código + Enter en el input enfocado, sin cámara ni librería nueva.
+  const buscarPorCodigoEscaneado = (texto) => {
+    const codigo = texto.trim()
+    if (!codigo) return
+    const index = itemsEnviados.findIndex((item) => item.producto_detalle?.codigo === codigo)
+    if (index === -1) {
+      showToast(`El código "${codigo}" no está en esta recepción.`, 'error')
+      return
+    }
+    const item = itemsEnviados[index]
+    const ubicacionProducto = item.producto_detalle?.ubicacion_detalle?.nombre
+    if (ubicacionProducto && ubicacionProducto !== UBICACION_PILOTO_ESCANEO) {
+      showToast(
+        `Este producto pertenece a ${UBICACION_LABELS[ubicacionProducto] ?? ubicacionProducto}, no a ${UBICACION_LABELS[UBICACION_PILOTO_ESCANEO]}.`,
+        'error',
+      )
+      return
+    }
+    showToast(
+      `✅ ${item.producto_detalle?.descripcion || item.descripcion_libre} — pertenece a ${UBICACION_LABELS[ubicacionProducto] ?? ubicacionProducto ?? 'sin ubicación'}.`,
+      'exito',
+    )
+    setCodigoEscaneado('')
+    setMostrarEscaner(false)
+    setItemIndex(index)
+    setPantalla('items')
+  }
 
   const actualizarCheck = (itemId, campo, valor) => {
     setChecks((prev) => ({ ...prev, [itemId]: { ...prev[itemId], [campo]: valor } }))
@@ -142,9 +174,37 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
             <p key={item.id} className="text-base text-text">
               📦 {item.producto_detalle?.descripcion || item.descripcion_libre}
               <span className="text-text-secondary"> — {item.cantidad_enviada} {item.unidad}</span>
+              {item.producto_detalle?.ubicacion_detalle?.nombre && (
+                <span className="text-text-secondary">
+                  {' '}· 📍 {UBICACION_LABELS[item.producto_detalle.ubicacion_detalle.nombre] ?? item.producto_detalle.ubicacion_detalle.nombre_display}
+                </span>
+              )}
             </p>
           ))}
         </div>
+
+        {mostrarEscaner ? (
+          <input
+            type="text"
+            value={codigoEscaneado}
+            onChange={(e) => setCodigoEscaneado(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && buscarPorCodigoEscaneado(codigoEscaneado)}
+            onBlur={() => setMostrarEscaner(false)}
+            placeholder="Escanea el código…"
+            autoFocus
+            style={{ minHeight: '56px' }}
+            className="mb-4 w-full rounded-xl border-2 border-highlight bg-bg px-4 text-lg text-text outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMostrarEscaner(true)}
+            style={{ minHeight: '56px' }}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-accent text-sm font-semibold text-highlight transition hover:bg-card"
+          >
+            🔫 Escanear producto
+          </button>
+        )}
 
         <p className="mb-4 text-center text-2xl font-bold text-text">¿Llegó todo bien?</p>
 
@@ -200,6 +260,29 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
           ))}
         </div>
 
+        {mostrarEscaner ? (
+          <input
+            type="text"
+            value={codigoEscaneado}
+            onChange={(e) => setCodigoEscaneado(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && buscarPorCodigoEscaneado(codigoEscaneado)}
+            onBlur={() => setMostrarEscaner(false)}
+            placeholder="Escanea el siguiente producto…"
+            autoFocus
+            style={{ minHeight: '48px' }}
+            className="mb-4 w-full rounded-xl border-2 border-highlight bg-bg px-4 text-base text-text outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={() => setMostrarEscaner(true)}
+            style={{ minHeight: '48px' }}
+            className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-accent text-xs font-semibold text-highlight transition hover:bg-card"
+          >
+            🔫 Escanear otro producto
+          </button>
+        )}
+
         <div className="mb-5 rounded-xl border border-border bg-bg p-4 text-center">
           <p className="text-2xl font-bold text-text">
             {item.producto_detalle?.descripcion || item.descripcion_libre}
@@ -207,6 +290,11 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
           <p className="mt-1 text-base text-text-secondary">
             Se mandaron: {item.cantidad_enviada} {item.unidad}
           </p>
+          {item.producto_detalle?.ubicacion_detalle?.nombre && (
+            <p className="mt-2 inline-block rounded-full border border-highlight/40 bg-highlight/10 px-3 py-1 text-xs font-bold text-highlight">
+              📍 {UBICACION_LABELS[item.producto_detalle.ubicacion_detalle.nombre] ?? item.producto_detalle.ubicacion_detalle.nombre_display}
+            </p>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">

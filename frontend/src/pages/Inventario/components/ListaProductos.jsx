@@ -3,14 +3,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { createProducto, getCategorias, getProductos, getUbicaciones } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { ESTADO_STOCK_CONFIG, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
+import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
 import EtiquetaProducto from './EtiquetaProducto'
+import EtiquetasUbicacion from './EtiquetasUbicacion'
 import FormularioProducto from './FormularioProducto'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
 
-export default function ListaProductos({ categoriaInicial, recargar, onVolver, onNuevoMovimiento, onProductoCreado }) {
+export default function ListaProductos({ ubicacionInicial, recargar, onVolver, onNuevoMovimiento, onProductoCreado }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [productos, setProductos] = useState([])
@@ -18,12 +19,13 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
   const [ubicaciones, setUbicaciones] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
-  const [categoria, setCategoria] = useState(categoriaInicial ?? '')
-  const [ubicacion, setUbicacion] = useState('')
+  const [categoria, setCategoria] = useState('')
+  const [ubicacion, setUbicacion] = useState(ubicacionInicial ?? '')
   const [estadoFiltro, setEstadoFiltro] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [productoParaEtiqueta, setProductoParaEtiqueta] = useState(null)
+  const [mostrarEtiquetasUbicacion, setMostrarEtiquetasUbicacion] = useState(false)
 
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeRegistrarMovimiento = user?.rol !== 'operaciones'
@@ -55,6 +57,8 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
     ? productos.filter((p) => estadoStock(p) === estadoFiltro)
     : productos
 
+  const ubicacionActiva = ubicacionInicial ? ubicaciones.find((u) => String(u.id) === String(ubicacionInicial)) : null
+
   const handleCrearProducto = async (data) => {
     setGuardando(true)
     try {
@@ -83,7 +87,11 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
             ←
           </button>
           <div>
-            <h1 className="font-bold text-highlight">Productos</h1>
+            <h1 className="font-bold text-highlight">
+              {ubicacionActiva
+                ? `${UBICACION_ICONS[ubicacionActiva.nombre] ?? '📍'} ${UBICACION_LABELS[ubicacionActiva.nombre] ?? ubicacionActiva.nombre_display}`
+                : 'Productos'}
+            </h1>
             <p className="text-xs text-text-secondary">{productosFiltrados.length} resultado{productosFiltrados.length !== 1 ? 's' : ''}</p>
           </div>
         </div>
@@ -120,14 +128,26 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
         </div>
 
         {puedeGestionarCatalogo && (
-          <button
-            type="button"
-            onClick={() => setMostrarFormulario(true)}
-            style={{ minHeight: '52px' }}
-            className="mb-4 w-full rounded-xl border-2 border-dashed border-accent text-sm font-semibold text-highlight transition hover:bg-card sm:w-auto sm:px-6"
-          >
-            + Nuevo producto
-          </button>
+          <div className="mb-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setMostrarFormulario(true)}
+              style={{ minHeight: '52px' }}
+              className="flex-1 rounded-xl border-2 border-dashed border-accent px-6 text-sm font-semibold text-highlight transition hover:bg-card sm:flex-none"
+            >
+              + Nuevo producto
+            </button>
+            {ubicacionActiva && productosFiltrados.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMostrarEtiquetasUbicacion(true)}
+                style={{ minHeight: '52px' }}
+                className="flex-1 rounded-xl border border-border px-6 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text sm:flex-none"
+              >
+                🖨️ Imprimir etiquetas de esta ubicación
+              </button>
+            )}
+          </div>
         )}
 
         {loading && <p className="text-center text-sm text-text-secondary">Cargando productos…</p>}
@@ -210,6 +230,14 @@ export default function ListaProductos({ categoriaInicial, recargar, onVolver, o
 
       {productoParaEtiqueta && (
         <EtiquetaProducto producto={productoParaEtiqueta} onCerrar={() => setProductoParaEtiqueta(null)} />
+      )}
+
+      {mostrarEtiquetasUbicacion && ubicacionActiva && (
+        <EtiquetasUbicacion
+          productos={productosFiltrados}
+          ubicacionNombre={UBICACION_LABELS[ubicacionActiva.nombre] ?? ubicacionActiva.nombre_display}
+          onCerrar={() => setMostrarEtiquetasUbicacion(false)}
+        />
       )}
     </div>
   )

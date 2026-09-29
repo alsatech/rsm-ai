@@ -14,6 +14,7 @@ from .views import (
     ProductoDetailView,
     ProductoListCreateView,
     ProductoMovimientosView,
+    RecalcularClasificacionABCView,
     RechazarSolicitudView,
     RecepcionesSolicitudView,
     RegistrarCompraView,
@@ -30,6 +31,11 @@ from .views import (
 
 urlpatterns = [
     path('productos/', ProductoListCreateView.as_view(), name='producto-list-create'),
+    path(
+        'productos/clasificacion-abc/recalcular/',
+        RecalcularClasificacionABCView.as_view(),
+        name='producto-clasificacion-abc-recalcular',
+    ),
     path('productos/<int:pk>/', ProductoDetailView.as_view(), name='producto-detail'),
     path('productos/<int:pk>/movimientos/', ProductoMovimientosView.as_view(), name='producto-movimientos'),
     path('movimientos/', MovimientoListCreateView.as_view(), name='movimiento-list-create'),

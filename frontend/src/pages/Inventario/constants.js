@@ -12,15 +12,71 @@ export const UNIDAD_LABELS = {
 }
 
 export const UBICACION_LABELS = {
+  alacena: 'Alacena',
+  almacen: 'Almacén',
   bodega: 'Bodega',
+  bodega_nueva: 'Bodega Nueva',
   granero: 'Granero',
   hangar: 'Hangar',
+  oficina_ca: 'Oficina CA',
+  oficina_reserva: 'Oficina Reserva',
+  taller: 'Taller',
+  patio_yarda: 'Patio/Yarda',
 }
+
+export const UBICACION_ICONS = {
+  alacena: '🥫',
+  almacen: '📦',
+  bodega: '🏬',
+  bodega_nueva: '🏭',
+  granero: '🌾',
+  hangar: '✈️',
+  oficina_ca: '🏢',
+  oficina_reserva: '🏞️',
+  taller: '🔧',
+  patio_yarda: '🚜',
+}
+
+// Prueba piloto de escaneo físico (pistola USB/Bluetooth): mientras solo se pruebe en Granero,
+// un producto escaneado en recepción debe pertenecer a esta ubicación o se bloquea con aviso.
+// Cuando se extienda a más ubicaciones, esto debe volverse un selector en vez de una constante fija.
+export const UBICACION_PILOTO_ESCANEO = 'granero'
 
 export const ESTADO_STOCK_CONFIG = {
   critico: { icon: '🔴', label: 'Crítico', border: 'border-error', text: 'text-error', bg: 'bg-error/10' },
   bajo: { icon: '🟡', label: 'Bajo', border: 'border-warning', text: 'text-warning', bg: 'bg-warning/10' },
   normal: { icon: '🟢', label: 'Normal', border: 'border-highlight', text: 'text-highlight', bg: 'bg-highlight/10' },
+}
+
+export const CRITICIDAD_LABELS = {
+  alta: 'Alta',
+  media: 'Media',
+  baja: 'Baja',
+}
+
+// Clasificación ABC Multicriterio — ver backend/media/inventario/ABC_Multicriterio_RSM.pdf
+export const CLASE_ABC_CONFIG = {
+  A: {
+    label: 'Clase A',
+    desc: 'Control máximo · revisión semanal',
+    border: 'border-highlight',
+    text: 'text-highlight',
+    bg: 'bg-highlight/10',
+  },
+  B: {
+    label: 'Clase B',
+    desc: 'Control moderado · revisión quincenal',
+    border: 'border-warning',
+    text: 'text-warning',
+    bg: 'bg-warning/10',
+  },
+  C: {
+    label: 'Clase C',
+    desc: 'Control básico · revisión mensual',
+    border: 'border-border',
+    text: 'text-text-secondary',
+    bg: 'bg-border/20',
+  },
 }
 
 // Sugerencias rápidas para agilizar la captura de "¿para qué se usó?" en campo.

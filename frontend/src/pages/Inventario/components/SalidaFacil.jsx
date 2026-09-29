@@ -138,7 +138,8 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
           type="search"
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
-          placeholder="Código o nombre del material…"
+          onKeyDown={(e) => e.key === 'Enter' && handleDetectado(busqueda)}
+          placeholder="Código o nombre del material… (o usa la pistola)"
           style={{ minHeight: '56px' }}
           className="w-full rounded-xl border border-border bg-bg px-4 text-lg text-text outline-none focus:border-highlight"
         />

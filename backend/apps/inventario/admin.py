@@ -30,8 +30,11 @@ class UbicacionAdmin(admin.ModelAdmin):
 
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
-    list_display = ('codigo', 'descripcion', 'categoria', 'ubicacion', 'stock_actual', 'stock_minimo', 'activo')
-    list_filter = ('categoria', 'ubicacion', 'activo')
+    list_display = (
+        'codigo', 'descripcion', 'categoria', 'ubicacion', 'stock_actual', 'stock_minimo',
+        'costo_unitario', 'criticidad', 'clase_abc', 'activo',
+    )
+    list_filter = ('categoria', 'ubicacion', 'activo', 'criticidad', 'clase_abc')
     search_fields = ('codigo', 'descripcion')
 
 

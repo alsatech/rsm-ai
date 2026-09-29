@@ -11,6 +11,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from .clasificacion_abc import calcular_clasificacion_abc
 from .models import (
     CategoriaInventario,
     Compra,
@@ -31,6 +32,7 @@ from .permissions import (
     PuedeDarEntradaRecepcion,
     PuedeEditarSolicitud,
     PuedeGestionarCatalogo,
+    PuedeGestionarClasificacionABC,
     PuedeGestionarRelacionCompras,
     PuedeRegistrarCompra,
     PuedeRegistrarEnvio,
@@ -106,14 +108,36 @@ class ProductoListCreateView(generics.ListCreateAPIView):
         return qs
 
 
+CAMPOS_CLASIFICACION_ABC = {'costo_unitario', 'criticidad'}
+
+
 class ProductoDetailView(generics.RetrieveUpdateAPIView):
     queryset = Producto.objects.select_related('categoria', 'ubicacion')
     serializer_class = ProductoSerializer
 
     def get_permissions(self):
         if self.request.method == 'PATCH':
+            campos_enviados = set(self.request.data.keys())
+            if campos_enviados and campos_enviados.issubset(CAMPOS_CLASIFICACION_ABC):
+                return [IsAuthenticated(), PuedeGestionarClasificacionABC()]
             return [IsAuthenticated(), PuedeGestionarCatalogo()]
         return [IsAuthenticated()]
+
+
+class RecalcularClasificacionABCView(APIView):
+    """POST /productos/clasificacion-abc/recalcular/ — recalcula clase/score ABC de
+    todos los productos activos y los persiste."""
+
+    permission_classes = [IsAuthenticated, PuedeGestionarClasificacionABC]
+
+    def post(self, request):
+        productos = calcular_clasificacion_abc()
+        serializer = ProductoSerializer(productos, many=True, context={'request': request})
+        return Response({
+            'total_productos': len(productos),
+            'calculado_en': timezone.now(),
+            'productos': serializer.data,
+        })
 
 
 class ProductoMovimientosView(APIView):

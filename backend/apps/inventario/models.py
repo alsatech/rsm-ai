@@ -21,9 +21,16 @@ class CategoriaInventario(models.Model):
 
 class Ubicacion(models.Model):
     class Nombre(models.TextChoices):
+        ALACENA = 'alacena', 'Alacena'
+        ALMACEN = 'almacen', 'Almacén'
         BODEGA = 'bodega', 'Bodega'
+        BODEGA_NUEVA = 'bodega_nueva', 'Bodega Nueva'
         GRANERO = 'granero', 'Granero'
         HANGAR = 'hangar', 'Hangar'
+        OFICINA_CA = 'oficina_ca', 'Oficina CA'
+        OFICINA_RESERVA = 'oficina_reserva', 'Oficina Reserva'
+        TALLER = 'taller', 'Taller'
+        PATIO_YARDA = 'patio_yarda', 'Patio/Yarda'
 
     nombre = models.CharField(max_length=20, choices=Nombre.choices, unique=True)
     descripcion = models.TextField(blank=True)
@@ -50,6 +57,16 @@ class Producto(models.Model):
         JUEGO = 'juego', 'Juego'
         OTRO = 'otro', 'Otro'
 
+    class Criticidad(models.TextChoices):
+        ALTA = 'alta', 'Alta'
+        MEDIA = 'media', 'Media'
+        BAJA = 'baja', 'Baja'
+
+    class ClaseABC(models.TextChoices):
+        A = 'A', 'A'
+        B = 'B', 'B'
+        C = 'C', 'C'
+
     codigo = models.CharField(max_length=20, unique=True)
     descripcion = models.CharField(max_length=200)
     categoria = models.ForeignKey(CategoriaInventario, on_delete=models.PROTECT, related_name='productos')
@@ -57,6 +74,13 @@ class Producto(models.Model):
     unidad_medida = models.CharField(max_length=15, choices=UnidadMedida.choices, default=UnidadMedida.PIEZA)
     stock_actual = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock_minimo = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True)
+    costo_unitario = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    criticidad = models.CharField(max_length=10, choices=Criticidad.choices, default=Criticidad.MEDIA)
+    # Clasificación ABC Multicriterio (valor económico 40% + frecuencia de uso 40% + criticidad 20%).
+    # Se persiste porque el recálculo es manual (botón), no se recalcula en cada GET.
+    clase_abc = models.CharField(max_length=1, choices=ClaseABC.choices, null=True, blank=True)
+    score_abc = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    clasificado_en = models.DateTimeField(null=True, blank=True)
     notas = models.TextField(blank=True)
     activo = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

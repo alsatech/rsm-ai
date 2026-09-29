@@ -1,25 +1,25 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { getAlertasStock, getCategorias, getProductos } from '../../../api/inventario'
+import { getAlertasStock, getProductos, getUbicaciones } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
+import { UBICACION_ICONS, UBICACION_LABELS } from '../constants'
 import PanelAlertasStock from './PanelAlertasStock'
 import ResumenInventario from './ResumenInventario'
 
-export default function DashboardInventario({ recargar, onVerProductos, onSolicitarMaterial }) {
+export default function DashboardInventario({ recargar, onVerUbicacion, onSolicitarMaterial }) {
   const { user } = useAuth()
-  const [categorias, setCategorias] = useState([])
+  const [ubicaciones, setUbicaciones] = useState([])
   const [productos, setProductos] = useState([])
   const [alertas, setAlertas] = useState([])
   const [loading, setLoading] = useState(true)
-  const [tabActiva, setTabActiva] = useState(null) // null = "Todos"
 
   const puedeVerAlertas = ['operaciones', 'inventario', 'administrador', 'superadmin'].includes(user?.rol)
 
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
-      const [cats, prods] = await Promise.all([getCategorias(), getProductos({ activo: true })])
-      setCategorias(cats.data)
+      const [ubis, prods] = await Promise.all([getUbicaciones(), getProductos({ activo: true })])
+      setUbicaciones(ubis.data)
       setProductos(prods.data)
     } finally {
       setLoading(false)
@@ -39,61 +39,28 @@ export default function DashboardInventario({ recargar, onVerProductos, onSolici
   useEffect(() => { cargar() }, [cargar, recargar])
   useEffect(() => { cargarAlertas() }, [cargarAlertas, recargar])
 
-  const categoriasVisibles = tabActiva
-    ? categorias.filter((c) => c.id === tabActiva)
-    : categorias
-
-  const contarProductos = (categoriaId) => productos.filter((p) => p.categoria === categoriaId).length
-  const contarAlertas = (categoriaId) => alertas.filter((p) => p.categoria === categoriaId).length
+  const contarProductos = (ubicacionId) => productos.filter((p) => p.ubicacion === ubicacionId).length
+  const contarAlertas = (ubicacionId) => alertas.filter((p) => p.ubicacion === ubicacionId).length
 
   return (
     <div className="grid grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-[1fr_320px]">
       <div>
-        <div className="mb-5 flex gap-2 overflow-x-auto pb-1">
-          <button
-            type="button"
-            onClick={() => setTabActiva(null)}
-            className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-              tabActiva === null
-                ? 'border-highlight bg-highlight/10 text-highlight'
-                : 'border-border text-text-secondary hover:border-accent hover:text-text'
-            }`}
-          >
-            Todos
-          </button>
-          {categorias.map((cat) => (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setTabActiva(cat.id)}
-              className={`shrink-0 rounded-full border px-4 py-2 text-sm font-semibold transition ${
-                tabActiva === cat.id
-                  ? 'border-highlight bg-highlight/10 text-highlight'
-                  : 'border-border text-text-secondary hover:border-accent hover:text-text'
-              }`}
-            >
-              {cat.icono} {cat.nombre}
-            </button>
-          ))}
-        </div>
-
         {loading && <p className="text-center text-sm text-text-secondary">Cargando inventario…</p>}
 
         {!loading && (
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {categoriasVisibles.map((cat) => {
-              const total = contarProductos(cat.id)
-              const enAlerta = contarAlertas(cat.id)
+            {ubicaciones.map((u) => {
+              const total = contarProductos(u.id)
+              const enAlerta = contarAlertas(u.id)
               return (
                 <div
-                  key={cat.id}
+                  key={u.id}
                   className="rounded-2xl border-2 border-border bg-card p-5 transition hover:border-accent"
-                  style={{ borderLeftColor: cat.color, borderLeftWidth: '4px' }}
                 >
                   <div className="mb-3 flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-3xl">{cat.icono}</p>
-                      <p className="mt-1 font-bold text-text">{cat.nombre}</p>
+                      <p className="text-3xl">{UBICACION_ICONS[u.nombre] ?? '📍'}</p>
+                      <p className="mt-1 font-bold text-text">{UBICACION_LABELS[u.nombre] ?? u.nombre_display}</p>
                     </div>
                     {enAlerta > 0 && (
                       <span className="flex h-7 min-w-7 shrink-0 items-center justify-center rounded-full bg-error px-2 text-xs font-bold text-white">
@@ -108,7 +75,7 @@ export default function DashboardInventario({ recargar, onVerProductos, onSolici
 
                   <button
                     type="button"
-                    onClick={() => onVerProductos(cat.id)}
+                    onClick={() => onVerUbicacion(u.id)}
                     style={{ minHeight: '48px' }}
                     className="w-full rounded-xl border border-accent text-sm font-bold text-highlight transition hover:bg-accent"
                   >

@@ -1,5 +1,6 @@
 import datetime
 import json
+from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
@@ -9,6 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.models import User
 
+from .clasificacion_abc import calcular_clasificacion_abc
 from .models import (
     CategoriaInventario,
     Compra,
@@ -44,6 +46,20 @@ def crear_producto(codigo='SM-TEST-001', stock_actual=10, stock_minimo=5):
         ubicacion=ubicacion,
         stock_actual=stock_actual,
         stock_minimo=stock_minimo,
+    )
+
+
+def crear_movimiento_salida(producto, responsable, fecha=None, validado=True, rechazado=False):
+    return MovimientoInventario.objects.create(
+        producto=producto,
+        tipo=MovimientoInventario.Tipo.SALIDA,
+        cantidad='1.00',
+        stock_anterior=producto.stock_actual,
+        stock_resultante=producto.stock_actual,
+        responsable=responsable,
+        fecha_movimiento=fecha or timezone.localdate(),
+        validado=validado,
+        rechazado=rechazado,
     )
 
 
@@ -813,3 +829,148 @@ class ComprasYRelacionAPITest(APITestCase):
 
         resp = self.client.post(f'/api/v1/inventario/relaciones-compras/{relacion_id}/enviar/', {}, format='json')
         self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+
+class ClasificacionABCCalculoTest(TestCase):
+    """Prueba la función de cálculo directamente, aislando el catálogo precargado
+    (121 productos, ver migración 0003) con querysets explícitos por código."""
+
+    def setUp(self):
+        self.usuario = crear_usuario('yajaira_abc_calc_test', 'inventario')
+
+    def test_score_y_clase_con_valores_conocidos(self):
+        # Sin salidas registradas -> frecuencia normalizada = 0 para los 3, el score
+        # depende solo de valor económico (40%) y criticidad (20%).
+        p1 = crear_producto(codigo='SM-ABC-001', stock_actual=100, stock_minimo=0)
+        p1.costo_unitario = Decimal('1000.00')
+        p1.criticidad = Producto.Criticidad.ALTA
+        p1.save()
+
+        p2 = crear_producto(codigo='SM-ABC-002', stock_actual=10, stock_minimo=0)
+        p2.costo_unitario = Decimal('100.00')
+        p2.criticidad = Producto.Criticidad.MEDIA
+        p2.save()
+
+        p3 = crear_producto(codigo='SM-ABC-003', stock_actual=1, stock_minimo=0)
+        p3.costo_unitario = Decimal('1.00')
+        p3.criticidad = Producto.Criticidad.BAJA
+        p3.save()
+
+        qs = Producto.objects.filter(codigo__in=['SM-ABC-001', 'SM-ABC-002', 'SM-ABC-003'])
+        resultado = calcular_clasificacion_abc(productos_qs=qs)
+        self.assertEqual(len(resultado), 3)
+
+        p1.refresh_from_db()
+        p2.refresh_from_db()
+        p3.refresh_from_db()
+
+        # Cumulativo esperado: P1 78.5% (<=80 -> A), P1+P2 94.8% (<=95 -> B), total 100% (-> C)
+        self.assertEqual(p1.clase_abc, 'A')
+        self.assertEqual(p1.score_abc, Decimal('60.00'))
+        self.assertEqual(p2.clase_abc, 'B')
+        self.assertEqual(p2.score_abc, Decimal('12.40'))
+        self.assertEqual(p3.clase_abc, 'C')
+        self.assertEqual(p3.score_abc, Decimal('4.00'))
+        self.assertIsNotNone(p1.clasificado_en)
+
+    def test_catalogo_vacio_no_falla(self):
+        resultado = calcular_clasificacion_abc(productos_qs=Producto.objects.none())
+        self.assertEqual(resultado, [])
+
+    def test_sin_variacion_de_valor_no_causa_division_por_cero(self):
+        # Todo el catalogo (aislado) en costo_unitario=0 y stock_actual=0 -> maximo_valor
+        # del catalogo es 0, y sin movimientos maximo_frecuencia tambien es 0.
+        crear_producto(codigo='SM-ABC-010', stock_actual=0, stock_minimo=0)
+        crear_producto(codigo='SM-ABC-011', stock_actual=0, stock_minimo=0)
+
+        qs = Producto.objects.filter(codigo__in=['SM-ABC-010', 'SM-ABC-011'])
+        resultado = calcular_clasificacion_abc(productos_qs=qs)
+
+        self.assertEqual(len(resultado), 2)
+        for producto in resultado:
+            self.assertIn(producto.clase_abc, ['A', 'B', 'C'])
+            self.assertIsNotNone(producto.score_abc)
+
+    def test_frecuencia_solo_cuenta_salidas_validadas_no_rechazadas_ultimos_30_dias(self):
+        p_dentro = crear_producto(codigo='SM-ABC-020', stock_actual=5, stock_minimo=0)
+        p_fuera = crear_producto(codigo='SM-ABC-021', stock_actual=5, stock_minimo=0)
+        hoy = timezone.localdate()
+
+        for _ in range(5):
+            crear_movimiento_salida(p_dentro, self.usuario, fecha=hoy)
+        crear_movimiento_salida(p_dentro, self.usuario, fecha=hoy - datetime.timedelta(days=31))  # fuera de ventana
+        crear_movimiento_salida(p_dentro, self.usuario, fecha=hoy, validado=False)  # no validada
+        crear_movimiento_salida(p_dentro, self.usuario, fecha=hoy, rechazado=True)  # rechazada
+
+        qs = Producto.objects.filter(codigo__in=['SM-ABC-020', 'SM-ABC-021'])
+        calcular_clasificacion_abc(productos_qs=qs)
+
+        p_dentro.refresh_from_db()
+        p_fuera.refresh_from_db()
+        self.assertGreater(p_dentro.score_abc, p_fuera.score_abc)
+
+
+class ClasificacionABCAPITest(APITestCase):
+    def setUp(self):
+        self.campo = crear_usuario('chino_abc_api_test', 'campo')
+        self.inventario = crear_usuario('yajaira_abc_api_test', 'inventario')
+        self.operaciones = crear_usuario('erik_abc_api_test', 'operaciones')
+        self.producto = crear_producto(codigo='SM-ABC-100')
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def test_operaciones_puede_recalcular(self):
+        self._auth(self.operaciones)
+        resp = self.client.post('/api/v1/inventario/productos/clasificacion-abc/recalcular/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+    def test_campo_no_puede_recalcular(self):
+        self._auth(self.campo)
+        resp = self.client.post('/api/v1/inventario/productos/clasificacion-abc/recalcular/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_recalculo_persiste_clase_score_y_fecha_sin_recalcular_en_cada_get(self):
+        self._auth(self.inventario)
+        resp = self.client.post('/api/v1/inventario/productos/clasificacion-abc/recalcular/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+
+        self.producto.refresh_from_db()
+        self.assertIsNotNone(self.producto.clase_abc)
+        self.assertIsNotNone(self.producto.score_abc)
+        self.assertIsNotNone(self.producto.clasificado_en)
+
+        resp = self.client.get(f'/api/v1/inventario/productos/{self.producto.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['clase_abc'], self.producto.clase_abc)
+        self.assertEqual(resp.data['score_abc'], str(self.producto.score_abc))
+
+    def test_operaciones_puede_editar_costo_y_criticidad(self):
+        self._auth(self.operaciones)
+        resp = self.client.patch(
+            f'/api/v1/inventario/productos/{self.producto.id}/',
+            {'costo_unitario': '50.00', 'criticidad': 'alta'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.costo_unitario, Decimal('50.00'))
+        self.assertEqual(self.producto.criticidad, 'alta')
+
+    def test_operaciones_no_puede_editar_otros_campos_del_catalogo(self):
+        self._auth(self.operaciones)
+        resp = self.client.patch(
+            f'/api/v1/inventario/productos/{self.producto.id}/',
+            {'descripcion': 'Cambiado por operaciones'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_operaciones_no_puede_mezclar_campos_abc_con_catalogo_general(self):
+        self._auth(self.operaciones)
+        resp = self.client.patch(
+            f'/api/v1/inventario/productos/{self.producto.id}/',
+            {'costo_unitario': '50.00', 'descripcion': 'Cambiado'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
