@@ -1,3 +1,4 @@
+import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 
@@ -15,6 +16,7 @@ const ESTADO_LABELS = {
 // varias etiquetas en una hoja, no una sola imagen.
 export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerrar }) {
   const [qrs, setQrs] = useState({})
+  const [barcodes, setBarcodes] = useState({})
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null)
   const [progresoBt, setProgresoBt] = useState(null) // { indice, total, producto }
   const [errorImpresionBt, setErrorImpresionBt] = useState('')
@@ -25,6 +27,19 @@ export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerra
       productos.map((p) => QRCode.toDataURL(p.codigo, { width: 220, margin: 1 }).then((url) => [p.id, url])),
     ).then((pares) => { if (!cancelado) setQrs(Object.fromEntries(pares)) })
     return () => { cancelado = true }
+  }, [productos])
+
+  useEffect(() => {
+    const pares = productos.map((p) => {
+      const canvas = document.createElement('canvas')
+      try {
+        JsBarcode(canvas, p.codigo, { format: 'CODE128', displayValue: false, width: 2, height: 45, margin: 0 })
+        return [p.id, canvas.toDataURL('image/png')]
+      } catch {
+        return [p.id, null]
+      }
+    })
+    setBarcodes(Object.fromEntries(pares))
   }, [productos])
 
   const listo = productos.every((p) => qrs[p.id])
@@ -103,6 +118,9 @@ export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerra
                 className="flex flex-col items-center gap-2 rounded-xl border border-black/10 p-4 print:break-inside-avoid print:border"
               >
                 <img src={qrs[p.id]} alt={`Código QR de ${p.codigo}`} className="h-28 w-28" />
+                {barcodes[p.id] && (
+                  <img src={barcodes[p.id]} alt={`Código de barras de ${p.codigo}`} className="h-10 w-full max-w-[180px]" />
+                )}
                 <p className="font-mono text-lg font-bold text-black">{p.codigo}</p>
                 <p className="text-center text-xs text-black/70">{p.descripcion}</p>
                 <p className="text-center text-xs font-semibold text-black/60">📍 {ubicacionNombre}</p>

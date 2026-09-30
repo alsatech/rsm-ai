@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createProducto, getCategorias, getProductos, getUbicaciones } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
+import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UBICACION_PILOTO_ESCANEO, UNIDAD_LABELS, estadoStock } from '../constants'
 import EtiquetaProducto from './EtiquetaProducto'
 import EtiquetasUbicacion from './EtiquetasUbicacion'
 import FormularioProducto from './FormularioProducto'
@@ -137,7 +137,7 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
             >
               + Nuevo producto
             </button>
-            {ubicacionActiva && productosFiltrados.length > 0 && (
+            {ubicacionActiva?.nombre === UBICACION_PILOTO_ESCANEO && productosFiltrados.length > 0 && (
               <button
                 type="button"
                 onClick={() => setMostrarEtiquetasUbicacion(true)}
@@ -188,7 +188,7 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
                       <span className="ml-1 text-xs font-normal text-text-secondary">{UNIDAD_LABELS[producto.unidad_medida]}</span>
                     </p>
                     <div className="flex items-center gap-2">
-                      {puedeGestionarCatalogo && (
+                      {puedeGestionarCatalogo && producto.ubicacion_detalle?.nombre === UBICACION_PILOTO_ESCANEO && (
                         <button
                           type="button"
                           onClick={() => setProductoParaEtiqueta(producto)}

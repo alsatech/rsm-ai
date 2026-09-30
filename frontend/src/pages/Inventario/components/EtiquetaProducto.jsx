@@ -1,4 +1,5 @@
 import html2canvas from 'html2canvas'
+import JsBarcode from 'jsbarcode'
 import QRCode from 'qrcode'
 import { useEffect, useRef, useState } from 'react'
 
@@ -16,6 +17,7 @@ const ESTADO_LABELS = {
 // nada físico que leer todavía.
 export default function EtiquetaProducto({ producto, onCerrar }) {
   const [qrDataUrl, setQrDataUrl] = useState(null)
+  const [barcodeDataUrl, setBarcodeDataUrl] = useState(null)
   const etiquetaRef = useRef(null)
   const [descargando, setDescargando] = useState(false)
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null) // null | 'conectando' | ... | 'error'
@@ -27,6 +29,16 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
       .then((url) => { if (!cancelado) setQrDataUrl(url) })
       .catch(() => {})
     return () => { cancelado = true }
+  }, [producto.codigo])
+
+  useEffect(() => {
+    const canvas = document.createElement('canvas')
+    try {
+      JsBarcode(canvas, producto.codigo, { format: 'CODE128', displayValue: false, width: 2, height: 60, margin: 0 })
+      setBarcodeDataUrl(canvas.toDataURL('image/png'))
+    } catch {
+      setBarcodeDataUrl(null)
+    }
   }, [producto.codigo])
 
   const ubicacionNombre = producto.ubicacion_detalle?.nombre
@@ -76,6 +88,9 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
             <img src={qrDataUrl} alt={`Código QR de ${producto.codigo}`} className="h-40 w-40" />
           ) : (
             <div className="flex h-40 w-40 items-center justify-center text-sm text-black/50">Generando…</div>
+          )}
+          {barcodeDataUrl && (
+            <img src={barcodeDataUrl} alt={`Código de barras de ${producto.codigo}`} className="h-14 w-full max-w-[260px]" />
           )}
           <p className="font-mono text-2xl font-bold text-black">{producto.codigo}</p>
           <p className="text-center text-sm text-black/70">{producto.descripcion}</p>
