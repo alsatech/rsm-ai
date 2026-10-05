@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 
 import { imprimirEtiquetaT50M, soportaImpresionBluetooth } from '../../../lib/supvanPrinter'
-import { UBICACION_ICONS, UBICACION_LABELS } from '../constants'
+import { UBICACION_ICONS, UBICACION_LABELS, construirPayloadQr } from '../constants'
 
 const ESTADO_LABELS = {
   conectando: 'Conectando…',
@@ -97,13 +97,19 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null) // null | 'conectando' | ... | 'error'
   const [errorImpresionBt, setErrorImpresionBt] = useState('')
 
+  const ubicacionNombre = producto.ubicacion_detalle?.nombre
+  const ubicacionLabel = ubicacionNombre ? UBICACION_LABELS[ubicacionNombre] ?? producto.ubicacion_detalle?.nombre_display : ''
+  const ubicacionTexto = ubicacionLabel ? `${UBICACION_ICONS[ubicacionNombre] ?? '📍'} ${ubicacionLabel}` : ''
+
   useEffect(() => {
     let cancelado = false
-    QRCode.toDataURL(producto.codigo, { width: 320, margin: 1 })
+    // El QR lleva código + descripción + ubicación empacados (ver construirPayloadQr) para que
+    // la app Katasymbol también imprima ese texto al "escanear código", no solo el símbolo.
+    QRCode.toDataURL(construirPayloadQr(producto, ubicacionLabel), { width: 320, margin: 1 })
       .then((url) => { if (!cancelado) setQrDataUrl(url) })
       .catch(() => {})
     return () => { cancelado = true }
-  }, [producto.codigo])
+  }, [producto, ubicacionLabel])
 
   useEffect(() => {
     const canvas = document.createElement('canvas')
@@ -114,10 +120,6 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
       setBarcodeDataUrl(null)
     }
   }, [producto.codigo])
-
-  const ubicacionNombre = producto.ubicacion_detalle?.nombre
-  const ubicacionLabel = ubicacionNombre ? UBICACION_LABELS[ubicacionNombre] ?? producto.ubicacion_detalle?.nombre_display : ''
-  const ubicacionTexto = ubicacionLabel ? `${UBICACION_ICONS[ubicacionNombre] ?? '📍'} ${ubicacionLabel}` : ''
 
   // Pre-renderiza el PNG en cuanto la etiqueta esté lista, en vez de esperarlo al dar clic en
   // "Descargar": en Safari/iOS un await antes de link.click() rompe el gesto del usuario y el

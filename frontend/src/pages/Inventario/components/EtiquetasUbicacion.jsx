@@ -3,6 +3,7 @@ import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 
 import { imprimirVariasEtiquetasT50M, soportaImpresionBluetooth } from '../../../lib/supvanPrinter'
+import { construirPayloadQr } from '../constants'
 
 const ESTADO_LABELS = {
   conectando: 'Conectando…',
@@ -25,10 +26,12 @@ export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerra
   useEffect(() => {
     let cancelado = false
     Promise.all(
-      productos.map((p) => QRCode.toDataURL(p.codigo, { width: 220, margin: 1 }).then((url) => [p.id, url])),
+      productos.map((p) =>
+        QRCode.toDataURL(construirPayloadQr(p, ubicacionNombre), { width: 220, margin: 1 }).then((url) => [p.id, url]),
+      ),
     ).then((pares) => { if (!cancelado) setQrs(Object.fromEntries(pares)) })
     return () => { cancelado = true }
-  }, [productos])
+  }, [productos, ubicacionNombre])
 
   useEffect(() => {
     const pares = productos.map((p) => {

@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { createMovimiento, getProductos } from '../../../api/inventario'
 import { getVehiculos } from '../../../api/flota'
 import { useToast } from '../../../hooks/useToast'
-import { SUGERENCIAS_USO, UNIDAD_LABELS, esProductoCombustible } from '../constants'
+import { SUGERENCIAS_USO, UNIDAD_LABELS, esProductoCombustible, extraerCodigoEscaneado } from '../constants'
 import EscanerCodigo from './EscanerCodigo'
 
 const TIPOS_SIN_COMBUSTIBLE = new Set(['traila', 'plataforma', 'remolque'])
@@ -57,8 +57,10 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
     setPantalla('cantidad')
   }
 
-  const handleDetectado = async (texto) => {
+  const handleDetectado = async (textoCrudo) => {
     setMostrarEscaner(false)
+    const texto = extraerCodigoEscaneado(textoCrudo)
+    if (!texto) return
     try {
       const { data } = await getProductos({ q: texto, activo: true })
       const exacto = data.find((p) => p.codigo === texto)

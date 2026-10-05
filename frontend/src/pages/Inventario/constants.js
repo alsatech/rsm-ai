@@ -1,3 +1,25 @@
+// Separador para empacar código + descripción + ubicación dentro del contenido del QR, para
+// que la app Katasymbol (al "escanear código" y reimprimir) muestre también esos datos como
+// texto y no solo el símbolo pelón. Los escáneres propios del sistema (RecepcionFacil,
+// SalidaFacil, Paso1Producto) solo necesitan el primer segmento — por eso usamos "|" y no un
+// salto de línea: una pistola de escaneo USB/Bluetooth emula un teclado y un "\n" se transmite
+// como tecla Enter, lo que cortaría la lectura a la mitad.
+const SEPARADOR_PAYLOAD_QR = '|'
+
+export function construirPayloadQr(producto, ubicacionTexto) {
+  const descripcion = (producto.descripcion || '').slice(0, 35)
+  return [producto.codigo, descripcion, ubicacionTexto || '']
+    .filter(Boolean)
+    .join(` ${SEPARADOR_PAYLOAD_QR} `)
+}
+
+// El código de barras CODE128 se queda solo con el código (sin este payload compuesto): meterle
+// más texto lo vuelve demasiado ancho/denso para una etiqueta de 48mm, y su línea de lectura
+// humana (abajo del símbolo) ya la agrega la app Katasymbol automáticamente.
+export function extraerCodigoEscaneado(texto) {
+  return (texto || '').split(SEPARADOR_PAYLOAD_QR)[0].trim()
+}
+
 export const UNIDAD_LABELS = {
   pieza: 'Pieza',
   saco: 'Saco',

@@ -4,7 +4,7 @@ import { crearRecepcion } from '../../../../api/inventario'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useToast } from '../../../../hooks/useToast'
 import EscanerCodigo from '../EscanerCodigo'
-import { UBICACION_LABELS, UBICACION_PILOTO_ESCANEO } from '../../constants'
+import { UBICACION_LABELS, UBICACION_PILOTO_ESCANEO, extraerCodigoEscaneado } from '../../constants'
 import GrabadorAudio from './GrabadorAudio'
 
 const MAX_FOTOS = 4
@@ -42,7 +42,7 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
   // Prueba piloto: lector físico tipo teclado (USB/Bluetooth) — al escanear "escribe" el
   // código + Enter en el input enfocado, sin cámara ni librería nueva.
   const buscarPorCodigoEscaneado = (texto) => {
-    const codigo = texto.trim()
+    const codigo = extraerCodigoEscaneado(texto)
     if (!codigo) return
     const index = itemsEnviados.findIndex((item) => item.producto_detalle?.codigo === codigo)
     if (index === -1) {

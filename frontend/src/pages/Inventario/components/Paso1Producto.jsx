@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 
 import { getProductos } from '../../../api/inventario'
 import { useToast } from '../../../hooks/useToast'
-import { UBICACION_LABELS, UNIDAD_LABELS } from '../constants'
+import { UBICACION_LABELS, UNIDAD_LABELS, extraerCodigoEscaneado } from '../constants'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -43,7 +43,7 @@ export default function Paso1Producto({ setForm, productoSeleccionado, setProduc
 
   // Lector físico tipo teclado: al escanear "escribe" el código + Enter en este input.
   const handleCodigoEscaneado = async (texto) => {
-    const codigo = texto.trim()
+    const codigo = extraerCodigoEscaneado(texto)
     if (!codigo) return
     try {
       const { data } = await getProductos({ q: codigo, activo: true })
