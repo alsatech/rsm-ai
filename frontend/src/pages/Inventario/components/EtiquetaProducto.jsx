@@ -20,7 +20,7 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
   const [barcodeDataUrl, setBarcodeDataUrl] = useState(null)
   const [vista, setVista] = useState('qr') // 'qr' | 'barras'
   const etiquetaRef = useRef(null)
-  const [descargando, setDescargando] = useState(false)
+  const [etiquetaPng, setEtiquetaPng] = useState(null)
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null) // null | 'conectando' | ... | 'error'
   const [errorImpresionBt, setErrorImpresionBt] = useState('')
 
@@ -45,6 +45,25 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
   const ubicacionNombre = producto.ubicacion_detalle?.nombre
   const ubicacionLabel = ubicacionNombre ? UBICACION_LABELS[ubicacionNombre] ?? producto.ubicacion_detalle?.nombre_display : ''
 
+  // Renderiza el PNG en cuanto la etiqueta esté lista, en vez de esperarlo al dar clic en
+  // "Descargar": en Safari/iOS un await antes de link.click() rompe el gesto del usuario y
+  // el navegador bloquea la descarga sin avisar nada.
+  useEffect(() => {
+    const listo = vista === 'qr' ? Boolean(qrDataUrl) : Boolean(barcodeDataUrl)
+    if (!listo || !etiquetaRef.current) {
+      setEtiquetaPng(null)
+      return
+    }
+    let cancelado = false
+    setEtiquetaPng(null)
+    const id = requestAnimationFrame(() => {
+      html2canvas(etiquetaRef.current, { backgroundColor: '#ffffff' })
+        .then((canvas) => { if (!cancelado) setEtiquetaPng(canvas.toDataURL('image/png')) })
+        .catch(() => { if (!cancelado) setEtiquetaPng(null) })
+    })
+    return () => { cancelado = true; cancelAnimationFrame(id) }
+  }, [vista, qrDataUrl, barcodeDataUrl])
+
   const imprimirEnT50M = async () => {
     setErrorImpresionBt('')
     try {
@@ -59,24 +78,16 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
     }
   }
 
-  const descargar = async () => {
-    if (!etiquetaRef.current) return
-    setDescargando(true)
-    try {
-      const canvas = await html2canvas(etiquetaRef.current, { backgroundColor: '#ffffff' })
-      const link = document.createElement('a')
-      link.download = `etiqueta-${vista}-${producto.codigo}.png`
-      link.href = canvas.toDataURL('image/png')
-      // Safari/iOS no dispara la descarga de forma confiable si el <a> no está en el DOM.
-      document.body.appendChild(link)
-      link.click()
-      link.remove()
-    } finally {
-      setDescargando(false)
-    }
+  const descargar = () => {
+    if (!etiquetaPng) return
+    const link = document.createElement('a')
+    link.download = `etiqueta-${vista}-${producto.codigo}.png`
+    link.href = etiquetaPng
+    // Safari/iOS no dispara la descarga de forma confiable si el <a> no está en el DOM.
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
   }
-
-  const listoParaDescargar = vista === 'qr' ? Boolean(qrDataUrl) : Boolean(barcodeDataUrl)
 
   return (
     <div
@@ -151,11 +162,11 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
           <button
             type="button"
             onClick={descargar}
-            disabled={!listoParaDescargar || descargando}
+            disabled={!etiquetaPng}
             style={{ minHeight: '52px' }}
             className="flex-1 rounded-xl bg-accent font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
           >
-            {descargando ? 'Descargando…' : '⬇️ Descargar etiqueta'}
+            {etiquetaPng ? '⬇️ Descargar etiqueta' : 'Preparando…'}
           </button>
         </div>
 
