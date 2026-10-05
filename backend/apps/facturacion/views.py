@@ -20,6 +20,7 @@ from .serializers import (
     ImportarFacturasSerializer,
     RelacionMensualSerializer,
 )
+from .services import archivo_nombre, crear_factura_desde_compra
 
 MODULOS_IMPORTABLES = ('inventario', 'proyectos')
 
@@ -116,13 +117,11 @@ class RelacionMensualListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated, PuedeVerFacturacion]
 
 
-def _archivo_nombre(campo_archivo):
-    return campo_archivo.name.rsplit('/', 1)[-1]
-
-
 class ImportarFacturasView(APIView):
     """Vista 4 del frontend: Minerva jala manualmente las compras con factura adjunta que Erik
-    ya subió en Inventarios/Proyectos, en vez de que lleguen automáticas — ver CLAUDE.md."""
+    ya subió en Inventarios/Proyectos. Las compras de Inventario que ya vinieron solas al
+    enviar una Relación de Compras (ver EnviarRelacionComprasView) aparecen con
+    ya_importada=True, así que esta vista sirve sobre todo para las que quedaron sueltas."""
 
     permission_classes = [IsAuthenticated, EsSuperadmin]
 
@@ -188,22 +187,7 @@ class ImportarFacturasView(APIView):
         creadas = []
         if modulo == 'inventario':
             for compra in Compra.objects.filter(id__in=ids_nuevas):
-                factura = Factura(
-                    numero_factura=f'INV-{compra.id}',
-                    fecha=compra.fecha_compra,
-                    concepto=compra.proveedor or f'Compra de inventario #{compra.id}',
-                    importe=compra.monto_total,
-                    modulo_origen=Factura.ModuloOrigen.INVENTARIO,
-                    referencia_id=compra.id,
-                    referencia_descripcion=f'Compra de inventario #{compra.id}',
-                    notas=compra.notas,
-                    registrado_por=request.user,
-                )
-                if compra.foto_factura:
-                    factura.archivo.save(
-                        _archivo_nombre(compra.foto_factura), ContentFile(compra.foto_factura.read()), save=False,
-                    )
-                factura.save()
+                factura, _creada = crear_factura_desde_compra(compra, request.user)
                 creadas.append(factura)
         else:
             compras = (
@@ -226,7 +210,7 @@ class ImportarFacturasView(APIView):
                     registrado_por=request.user,
                 )
                 if foto:
-                    factura.archivo.save(_archivo_nombre(foto.foto), ContentFile(foto.foto.read()), save=False)
+                    factura.archivo.save(archivo_nombre(foto.foto), ContentFile(foto.foto.read()), save=False)
                 factura.save()
                 creadas.append(factura)
 

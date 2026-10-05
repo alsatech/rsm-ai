@@ -408,7 +408,7 @@ class RecepcionMaterialSerializer(serializers.ModelSerializer):
         model = RecepcionMaterial
         fields = (
             'id', 'envio', 'recibido_por', 'recibido_por_detalle', 'fecha_recepcion', 'hora_recepcion',
-            'estado_general', 'estado_general_display', 'notas', 'audio',
+            'estado_general', 'estado_general_display', 'en_yarda', 'notas', 'audio',
             'entrada_confirmada', 'entrada_confirmada_por', 'entrada_confirmada_por_detalle',
             'entrada_confirmada_en', 'created_at', 'items',
         )

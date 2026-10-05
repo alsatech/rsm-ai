@@ -11,6 +11,8 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from apps.facturacion.services import crear_factura_desde_compra
+
 from .clasificacion_abc import calcular_clasificacion_abc
 from .models import (
     CategoriaInventario,
@@ -534,6 +536,9 @@ class RecepcionesSolicitudView(APIView):
         if estado_general not in RecepcionMaterial.EstadoGeneral.values:
             return Response({'estado_general': 'Estado general inválido.'}, status=status.HTTP_400_BAD_REQUEST)
 
+        en_yarda_raw = request.data.get('en_yarda')
+        en_yarda = None if en_yarda_raw is None else str(en_yarda_raw).strip().lower() in ('true', '1')
+
         items, error = _parse_items_json(request.data.get('items'))
         if error:
             return Response({'items': error}, status=status.HTTP_400_BAD_REQUEST)
@@ -572,6 +577,7 @@ class RecepcionesSolicitudView(APIView):
             envio=envio,
             recibido_por=request.user,
             estado_general=estado_general,
+            en_yarda=en_yarda,
             notas=request.data.get('notas', ''),
             audio=audio,
         )
@@ -681,7 +687,7 @@ class ComparativoSolicitudView(APIView):
 
 
 class RelacionComprasListCreateView(generics.ListCreateAPIView):
-    """GET: historial de relaciones (Yajaira, Alexia, Superadmin). POST: genera una relación en borrador
+    """GET: historial de relaciones (Yajaira, Minerva, Superadmin). POST: genera una relación en borrador
     con las compras sin asignar dentro del rango de fechas dado (Yajaira/Superadmin)."""
 
     serializer_class = RelacionComprasSerializer
@@ -728,7 +734,9 @@ class RelacionComprasDetailView(generics.RetrieveAPIView):
 
 
 class EnviarRelacionComprasView(APIView):
-    """POST /relaciones-compras/{id}/enviar/ — Yajaira marca la relación como enviada a Alexia."""
+    """POST /relaciones-compras/{id}/enviar/ — Yajaira marca la relación como enviada y el
+    sistema da de alta automáticamente una Factura en Facturación por cada compra incluida,
+    para que Minerva les dé seguimiento ahí sin tener que entrar a Inventario."""
 
     permission_classes = [IsAuthenticated, PuedeGestionarRelacionCompras]
 
@@ -741,6 +749,10 @@ class EnviarRelacionComprasView(APIView):
         relacion.estado = RelacionCompras.Estado.ENVIADA
         relacion.enviada_en = timezone.now()
         relacion.save(update_fields=['estado', 'enviada_en'])
+
+        for compra in relacion.compras.all():
+            crear_factura_desde_compra(compra, request.user)
+
         return Response(RelacionComprasSerializer(relacion).data)
 
 

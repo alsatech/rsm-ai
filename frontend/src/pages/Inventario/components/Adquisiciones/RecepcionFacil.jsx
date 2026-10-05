@@ -3,6 +3,7 @@ import { useRef, useState } from 'react'
 import { crearRecepcion } from '../../../../api/inventario'
 import { useAuth } from '../../../../hooks/useAuth'
 import { useToast } from '../../../../hooks/useToast'
+import EscanerCodigo from '../EscanerCodigo'
 import { UBICACION_LABELS, UBICACION_PILOTO_ESCANEO } from '../../constants'
 import GrabadorAudio from './GrabadorAudio'
 
@@ -33,7 +34,9 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
   const [audio, setAudio] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [mostrarEscaner, setMostrarEscaner] = useState(false)
+  const [mostrarCamara, setMostrarCamara] = useState(false)
   const [codigoEscaneado, setCodigoEscaneado] = useState('')
+  const [enYarda, setEnYarda] = useState(null) // null | true | false
   const inputFotoRef = useRef(null)
 
   // Prueba piloto: lector físico tipo teclado (USB/Bluetooth) — al escanear "escribe" el
@@ -63,6 +66,11 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
     setMostrarEscaner(false)
     setItemIndex(index)
     setPantalla('items')
+  }
+
+  const handleDetectadoCamara = (texto) => {
+    setMostrarCamara(false)
+    buscarPorCodigoEscaneado(texto)
   }
 
   const actualizarCheck = (itemId, campo, valor) => {
@@ -131,6 +139,7 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
     try {
       const fd = new FormData()
       fd.append('estado_general', derivarEstadoGeneral())
+      if (enYarda !== null) fd.append('en_yarda', enYarda)
       const items = itemsEnviados.map((item) => ({
         item_solicitud: item.id,
         cantidad_recibida: checks[item.id].cantidad_recibida,
@@ -183,6 +192,15 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={() => setMostrarCamara(true)}
+          style={{ minHeight: '56px' }}
+          className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-highlight text-base font-bold text-bg shadow-lg transition active:scale-95"
+        >
+          📷 Escanear con cámara
+        </button>
+
         {mostrarEscaner ? (
           <input
             type="text"
@@ -202,9 +220,43 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
             style={{ minHeight: '56px' }}
             className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-accent text-sm font-semibold text-highlight transition hover:bg-card"
           >
-            🔫 Escanear producto
+            🔫 O escríbelo / pistola USB
           </button>
         )}
+
+        {mostrarCamara && (
+          <EscanerCodigo onDetectado={handleDetectadoCamara} onCerrar={() => setMostrarCamara(false)} />
+        )}
+
+        <div className="mb-5 rounded-xl border border-border bg-bg p-4">
+          <p className="mb-3 text-center text-base font-bold text-text">📍 ¿Ya está el material en la yarda?</p>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setEnYarda(true)}
+              style={{ minHeight: '56px' }}
+              className={`flex-1 rounded-xl border-2 text-base font-bold transition active:scale-95 ${
+                enYarda === true
+                  ? 'border-highlight bg-highlight text-bg'
+                  : 'border-border text-text hover:border-highlight'
+              }`}
+            >
+              ✅ Sí
+            </button>
+            <button
+              type="button"
+              onClick={() => setEnYarda(false)}
+              style={{ minHeight: '56px' }}
+              className={`flex-1 rounded-xl border-2 text-base font-bold transition active:scale-95 ${
+                enYarda === false
+                  ? 'border-warning bg-warning/10 text-warning'
+                  : 'border-border text-text hover:border-warning'
+              }`}
+            >
+              ❌ No
+            </button>
+          </div>
+        </div>
 
         <p className="mb-4 text-center text-2xl font-bold text-text">¿Llegó todo bien?</p>
 
@@ -212,8 +264,9 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
           <button
             type="button"
             onClick={marcarTodoBien}
+            disabled={enYarda === null}
             style={{ minHeight: '96px' }}
-            className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-highlight text-bg shadow-xl transition active:scale-95"
+            className="flex flex-col items-center justify-center gap-1 rounded-2xl bg-highlight text-bg shadow-xl transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="text-4xl">😃</span>
             <span className="text-lg font-bold">Sí, llegó todo bien</span>
@@ -222,13 +275,20 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
           <button
             type="button"
             onClick={irARevisarItems}
+            disabled={enYarda === null}
             style={{ minHeight: '96px' }}
-            className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-warning bg-warning/10 text-warning shadow-xl transition active:scale-95"
+            className="flex flex-col items-center justify-center gap-1 rounded-2xl border-2 border-warning bg-warning/10 text-warning shadow-xl transition active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span className="text-4xl">😕</span>
             <span className="text-lg font-bold">No, algo faltó o se rompió</span>
           </button>
         </div>
+
+        {enYarda === null && (
+          <p className="mt-3 text-center text-xs text-text-secondary">
+            Responde si ya está en la yarda para continuar.
+          </p>
+        )}
 
         <button
           type="button"
@@ -260,6 +320,15 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
           ))}
         </div>
 
+        <button
+          type="button"
+          onClick={() => setMostrarCamara(true)}
+          style={{ minHeight: '48px' }}
+          className="mb-2 flex w-full items-center justify-center gap-2 rounded-xl bg-highlight text-sm font-bold text-bg shadow-lg transition active:scale-95"
+        >
+          📷 Escanear con cámara
+        </button>
+
         {mostrarEscaner ? (
           <input
             type="text"
@@ -279,8 +348,12 @@ export default function RecepcionFacil({ solicitud, onCancelar, onRecibido }) {
             style={{ minHeight: '48px' }}
             className="mb-4 flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-accent text-xs font-semibold text-highlight transition hover:bg-card"
           >
-            🔫 Escanear otro producto
+            🔫 O escríbelo / pistola USB
           </button>
+        )}
+
+        {mostrarCamara && (
+          <EscanerCodigo onDetectado={handleDetectadoCamara} onCerrar={() => setMostrarCamara(false)} />
         )}
 
         <div className="mb-5 rounded-xl border border-border bg-bg p-4 text-center">

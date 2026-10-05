@@ -18,6 +18,7 @@ const ESTADO_LABELS = {
 export default function EtiquetaProducto({ producto, onCerrar }) {
   const [qrDataUrl, setQrDataUrl] = useState(null)
   const [barcodeDataUrl, setBarcodeDataUrl] = useState(null)
+  const [vista, setVista] = useState('qr') // 'qr' | 'barras'
   const etiquetaRef = useRef(null)
   const [descargando, setDescargando] = useState(false)
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null) // null | 'conectando' | ... | 'error'
@@ -64,13 +65,18 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
     try {
       const canvas = await html2canvas(etiquetaRef.current, { backgroundColor: '#ffffff' })
       const link = document.createElement('a')
-      link.download = `etiqueta-${producto.codigo}.png`
+      link.download = `etiqueta-${vista}-${producto.codigo}.png`
       link.href = canvas.toDataURL('image/png')
+      // Safari/iOS no dispara la descarga de forma confiable si el <a> no está en el DOM.
+      document.body.appendChild(link)
       link.click()
+      link.remove()
     } finally {
       setDescargando(false)
     }
   }
+
+  const listoParaDescargar = vista === 'qr' ? Boolean(qrDataUrl) : Boolean(barcodeDataUrl)
 
   return (
     <div
@@ -81,16 +87,48 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-sm animate-[scaleIn_0.15s_ease-out] rounded-2xl border border-border bg-card p-5"
       >
-        <h2 className="mb-4 text-center text-lg font-bold text-text">Etiqueta para imprimir</h2>
+        <h2 className="mb-4 text-center text-lg font-bold text-text">
+          {vista === 'qr' ? 'Etiqueta QR' : 'Etiqueta de código de barras'} para imprimir
+        </h2>
+
+        <div className="mb-4 flex gap-2">
+          <button
+            type="button"
+            onClick={() => setVista('qr')}
+            style={{ minHeight: '44px' }}
+            className={`flex-1 rounded-xl border px-3 text-sm font-semibold transition ${
+              vista === 'qr'
+                ? 'border-accent bg-accent text-highlight'
+                : 'border-border text-text-secondary hover:border-text-secondary hover:text-text'
+            }`}
+          >
+            🔳 QR
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista('barras')}
+            style={{ minHeight: '44px' }}
+            className={`flex-1 rounded-xl border px-3 text-sm font-semibold transition ${
+              vista === 'barras'
+                ? 'border-accent bg-accent text-highlight'
+                : 'border-border text-text-secondary hover:border-text-secondary hover:text-text'
+            }`}
+          >
+            📊 Barras
+          </button>
+        </div>
 
         <div ref={etiquetaRef} className="flex flex-col items-center gap-3 rounded-xl bg-white p-6">
-          {qrDataUrl ? (
-            <img src={qrDataUrl} alt={`Código QR de ${producto.codigo}`} className="h-40 w-40" />
+          {vista === 'qr' ? (
+            qrDataUrl ? (
+              <img src={qrDataUrl} alt={`Código QR de ${producto.codigo}`} className="h-40 w-40" />
+            ) : (
+              <div className="flex h-40 w-40 items-center justify-center text-sm text-black/50">Generando…</div>
+            )
+          ) : barcodeDataUrl ? (
+            <img src={barcodeDataUrl} alt={`Código de barras de ${producto.codigo}`} className="h-20 w-full max-w-[260px]" />
           ) : (
-            <div className="flex h-40 w-40 items-center justify-center text-sm text-black/50">Generando…</div>
-          )}
-          {barcodeDataUrl && (
-            <img src={barcodeDataUrl} alt={`Código de barras de ${producto.codigo}`} className="h-14 w-full max-w-[260px]" />
+            <div className="flex h-20 w-full max-w-[260px] items-center justify-center text-sm text-black/50">Generando…</div>
           )}
           <p className="font-mono text-2xl font-bold text-black">{producto.codigo}</p>
           <p className="text-center text-sm text-black/70">{producto.descripcion}</p>
@@ -113,7 +151,7 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
           <button
             type="button"
             onClick={descargar}
-            disabled={!qrDataUrl || descargando}
+            disabled={!listoParaDescargar || descargando}
             style={{ minHeight: '52px' }}
             className="flex-1 rounded-xl bg-accent font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
           >

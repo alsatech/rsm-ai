@@ -17,6 +17,7 @@ const ESTADO_LABELS = {
 export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerrar }) {
   const [qrs, setQrs] = useState({})
   const [barcodes, setBarcodes] = useState({})
+  const [vista, setVista] = useState('qr') // 'qr' | 'barras'
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null)
   const [progresoBt, setProgresoBt] = useState(null) // { indice, total, producto }
   const [errorImpresionBt, setErrorImpresionBt] = useState('')
@@ -62,41 +63,69 @@ export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerra
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-black/70 print:static print:bg-white">
-      <div className="flex items-center justify-between border-b border-border bg-card px-4 py-4 print:hidden">
-        <div>
-          <h2 className="font-bold text-text">Etiquetas — {ubicacionNombre}</h2>
-          <p className="text-xs text-text-secondary">{productos.length} producto{productos.length !== 1 ? 's' : ''}</p>
-        </div>
-        <div className="flex gap-3">
-          <button
-            type="button"
-            onClick={onCerrar}
-            style={{ minHeight: '44px' }}
-            className="rounded-xl border border-border px-4 text-sm text-text-secondary transition hover:border-text-secondary hover:text-text"
-          >
-            Cerrar
-          </button>
-          {soportaImpresionBluetooth() && (
+      <div className="flex flex-col gap-3 border-b border-border bg-card px-4 py-4 print:hidden">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-text">Etiquetas — {ubicacionNombre}</h2>
+            <p className="text-xs text-text-secondary">{productos.length} producto{productos.length !== 1 ? 's' : ''}</p>
+          </div>
+          <div className="flex gap-3">
             <button
               type="button"
-              onClick={imprimirEnT50M}
-              disabled={!listo || imprimiendoBt}
+              onClick={onCerrar}
               style={{ minHeight: '44px' }}
-              className="rounded-xl border border-dashed border-accent px-4 text-sm font-semibold text-highlight transition hover:bg-bg disabled:opacity-50"
+              className="rounded-xl border border-border px-4 text-sm text-text-secondary transition hover:border-text-secondary hover:text-text"
             >
-              {imprimiendoBt
-                ? `${ESTADO_LABELS[estadoImpresionBt] ?? ''} ${progresoBt ? `(${progresoBt.indice + 1}/${progresoBt.total})` : ''}`
-                : '🖨️ Imprimir en T50M — experimental'}
+              Cerrar
             </button>
-          )}
+            {soportaImpresionBluetooth() && (
+              <button
+                type="button"
+                onClick={imprimirEnT50M}
+                disabled={!listo || imprimiendoBt}
+                style={{ minHeight: '44px' }}
+                className="rounded-xl border border-dashed border-accent px-4 text-sm font-semibold text-highlight transition hover:bg-bg disabled:opacity-50"
+              >
+                {imprimiendoBt
+                  ? `${ESTADO_LABELS[estadoImpresionBt] ?? ''} ${progresoBt ? `(${progresoBt.indice + 1}/${progresoBt.total})` : ''}`
+                  : '🖨️ Imprimir en T50M — experimental'}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => window.print()}
+              disabled={!listo}
+              style={{ minHeight: '44px' }}
+              className="rounded-xl bg-accent px-4 text-sm font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
+            >
+              🖨️ Imprimir en hoja
+            </button>
+          </div>
+        </div>
+        <div className="flex gap-2">
           <button
             type="button"
-            onClick={() => window.print()}
-            disabled={!listo}
-            style={{ minHeight: '44px' }}
-            className="rounded-xl bg-accent px-4 text-sm font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"
+            onClick={() => setVista('qr')}
+            style={{ minHeight: '40px' }}
+            className={`flex-1 rounded-xl border px-3 text-sm font-semibold transition sm:flex-none sm:px-6 ${
+              vista === 'qr'
+                ? 'border-accent bg-accent text-highlight'
+                : 'border-border text-text-secondary hover:border-text-secondary hover:text-text'
+            }`}
           >
-            🖨️ Imprimir en hoja
+            🔳 Etiquetas QR
+          </button>
+          <button
+            type="button"
+            onClick={() => setVista('barras')}
+            style={{ minHeight: '40px' }}
+            className={`flex-1 rounded-xl border px-3 text-sm font-semibold transition sm:flex-none sm:px-6 ${
+              vista === 'barras'
+                ? 'border-accent bg-accent text-highlight'
+                : 'border-border text-text-secondary hover:border-text-secondary hover:text-text'
+            }`}
+          >
+            📊 Etiquetas de barras
           </button>
         </div>
       </div>
@@ -117,9 +146,12 @@ export default function EtiquetasUbicacion({ productos, ubicacionNombre, onCerra
                 key={p.id}
                 className="flex flex-col items-center gap-2 rounded-xl border border-black/10 p-4 print:break-inside-avoid print:border"
               >
-                <img src={qrs[p.id]} alt={`Código QR de ${p.codigo}`} className="h-28 w-28" />
-                {barcodes[p.id] && (
-                  <img src={barcodes[p.id]} alt={`Código de barras de ${p.codigo}`} className="h-10 w-full max-w-[180px]" />
+                {vista === 'qr' ? (
+                  <img src={qrs[p.id]} alt={`Código QR de ${p.codigo}`} className="h-28 w-28" />
+                ) : (
+                  barcodes[p.id] && (
+                    <img src={barcodes[p.id]} alt={`Código de barras de ${p.codigo}`} className="h-16 w-full max-w-[200px]" />
+                  )
                 )}
                 <p className="font-mono text-lg font-bold text-black">{p.codigo}</p>
                 <p className="text-center text-xs text-black/70">{p.descripcion}</p>

@@ -256,9 +256,22 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                     Recibió: {rec.recibido_por_detalle?.nombre}
                   </p>
                 </div>
-                <span className="shrink-0 rounded-full border border-border px-2.5 py-1 text-xs font-bold text-text-secondary">
-                  {rec.estado_general_display}
-                </span>
+                <div className="flex shrink-0 flex-wrap justify-end gap-2">
+                  <span className="rounded-full border border-border px-2.5 py-1 text-xs font-bold text-text-secondary">
+                    {rec.estado_general_display}
+                  </span>
+                  {rec.en_yarda !== null && (
+                    <span
+                      className={`rounded-full border px-2.5 py-1 text-xs font-bold ${
+                        rec.en_yarda
+                          ? 'border-highlight/40 bg-highlight/10 text-highlight'
+                          : 'border-warning/40 bg-warning/10 text-warning'
+                      }`}
+                    >
+                      📍 {rec.en_yarda ? 'Ya está en la yarda' : 'Aún no está en la yarda'}
+                    </span>
+                  )}
+                </div>
               </div>
 
               <div className="mt-3 flex flex-col gap-2">

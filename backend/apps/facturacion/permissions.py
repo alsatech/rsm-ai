@@ -12,14 +12,16 @@ def _rol_en(request, roles):
 
 
 class PuedeVerFacturacion(BasePermission):
-    """Ver/crear/editar/borrar facturas y ver relaciones — Minerva (superadmin) y Alexia (administrador)."""
+    """Ver/crear/editar/borrar facturas y ver relaciones — rol administrador o superadmin.
+    Minerva (superadmin) quedó como encargada; Alexia (administrador) está fuera del
+    proyecto por el momento, su cuenta se desactivó pero no se borró."""
 
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_FACTURACION)
 
 
 class PuedeVerResumen(BasePermission):
-    """Widget de resumen — además de Minerva/Alexia, Erik (operaciones) lo ve en el dashboard."""
+    """Widget de resumen — además de Minerva, Erik (operaciones) lo ve en el dashboard."""
 
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_RESUMEN)

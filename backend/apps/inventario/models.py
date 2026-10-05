@@ -289,6 +289,9 @@ class RecepcionMaterial(models.Model):
     fecha_recepcion = models.DateField(default=timezone.localdate)
     hora_recepcion = models.TimeField(null=True, blank=True)
     estado_general = models.CharField(max_length=15, choices=EstadoGeneral.choices)
+    # null = recepción registrada antes de preguntar esto. La Yarda (patio_yarda) ahora es el
+    # punto físico de recepción de material, así que Campo confirma si ya lo dejó ahí.
+    en_yarda = models.BooleanField(null=True, blank=True)
     notas = models.TextField(blank=True)
     # Nota de voz general de la recepción (opcional) — la gente de campo suele reportar
     # mejor hablando que escribiendo, igual que los audios de checklist de Flota.
