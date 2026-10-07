@@ -6,7 +6,7 @@ import { UBICACION_ICONS, UBICACION_LABELS } from '../constants'
 import PanelAlertasStock from './PanelAlertasStock'
 import ResumenInventario from './ResumenInventario'
 
-export default function DashboardInventario({ recargar, onVerUbicacion, onSolicitarMaterial }) {
+export default function DashboardInventario({ recargar, onVerUbicacion, onSolicitarMaterial, onImprimirEtiquetas }) {
   const { user } = useAuth()
   const [ubicaciones, setUbicaciones] = useState([])
   const [productos, setProductos] = useState([])
@@ -14,6 +14,7 @@ export default function DashboardInventario({ recargar, onVerUbicacion, onSolici
   const [loading, setLoading] = useState(true)
 
   const puedeVerAlertas = ['operaciones', 'inventario', 'administrador', 'superadmin'].includes(user?.rol)
+  const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -88,10 +89,24 @@ export default function DashboardInventario({ recargar, onVerUbicacion, onSolici
         )}
       </div>
 
-      {puedeVerAlertas && (
+      {(puedeVerAlertas || puedeGestionarCatalogo) && (
         <div className="flex flex-col gap-4">
-          <ResumenInventario recargar={recargar} />
-          <PanelAlertasStock alertas={alertas} onSolicitar={onSolicitarMaterial} />
+          {puedeVerAlertas && (
+            <>
+              <ResumenInventario recargar={recargar} />
+              <PanelAlertasStock alertas={alertas} onSolicitar={onSolicitarMaterial} />
+            </>
+          )}
+          {puedeGestionarCatalogo && (
+            <button
+              type="button"
+              onClick={onImprimirEtiquetas}
+              style={{ minHeight: '48px' }}
+              className="w-full rounded-xl border border-dashed border-accent text-sm font-semibold text-highlight transition hover:bg-card"
+            >
+              🏷️ Etiquetas de ubicación
+            </button>
+          )}
         </div>
       )}
     </div>

@@ -20,6 +20,24 @@ export function extraerCodigoEscaneado(texto) {
   return (texto || '').split(SEPARADOR_PAYLOAD_QR)[0].trim()
 }
 
+// Prefijo que distingue la etiqueta de una UBICACIÓN (pegada en la puerta/anaquel) de la
+// etiqueta de un PRODUCTO: sin esto, "Escanear ubicación" no podría saber si lo que detectó la
+// cámara es un lugar o un producto, ya que ambos son texto plano dentro de un QR.
+const PREFIJO_UBICACION_QR = 'UBICACION:'
+
+export function construirPayloadQrUbicacion(ubicacionId, ubicacionTexto) {
+  return `${PREFIJO_UBICACION_QR}${ubicacionId}|${ubicacionTexto || ''}`
+}
+
+// Devuelve el id de la ubicación si el texto escaneado viene de una etiqueta de ubicación,
+// o null si es de otro tipo de código (producto, basura, etc.).
+export function extraerUbicacionIdEscaneada(texto) {
+  const limpio = (texto || '').trim()
+  if (!limpio.startsWith(PREFIJO_UBICACION_QR)) return null
+  const id = limpio.slice(PREFIJO_UBICACION_QR.length).split('|')[0].trim()
+  return id || null
+}
+
 export const UNIDAD_LABELS = {
   pieza: 'Pieza',
   saco: 'Saco',

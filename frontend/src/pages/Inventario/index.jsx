@@ -2,20 +2,25 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { useAuth } from '../../hooks/useAuth'
+import { useToast } from '../../hooks/useToast'
 import RecepcionMaterialCampo from './components/Adquisiciones/RecepcionMaterialCampo'
 import VistaAdquisiciones from './components/Adquisiciones/VistaAdquisiciones'
 import ClasificacionABC from './components/ClasificacionABC'
 import DashboardInventario from './components/DashboardInventario'
+import EscanerCodigo from './components/EscanerCodigo'
+import EtiquetasDeUbicaciones from './components/EtiquetasDeUbicaciones'
 import HistorialMovimientos from './components/HistorialMovimientos'
 import ListaProductos from './components/ListaProductos'
 import SalidaFacil from './components/SalidaFacil'
 import VistaCancelacion from './components/VistaCancelacion'
 import WizardMovimiento from './components/WizardMovimiento'
+import { extraerUbicacionIdEscaneada } from './constants'
 
 // Campo solo recibe material y registra lo que usa (+ Movimiento) — nada de dashboard de
 // stock, historial, validación ni crear solicitudes: eso lo coordina Yajaira directamente.
 export default function Inventario() {
   const { user } = useAuth()
+  const { showToast } = useToast()
   const esCampo = user?.rol === 'campo'
   const vistaInicio = esCampo ? 'recepcion-campo' : 'dashboard'
   const [vista, setVista] = useState(vistaInicio)
@@ -23,13 +28,26 @@ export default function Inventario() {
   const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
   const [productoParaSolicitud, setProductoParaSolicitud] = useState(null)
   const [recargar, setRecargar] = useState(0)
+  const [mostrarEscanerUbicacion, setMostrarEscanerUbicacion] = useState(false)
+  const [mostrarEtiquetasUbicaciones, setMostrarEtiquetasUbicaciones] = useState(false)
 
   const puedeCancelar = ['inventario', 'superadmin'].includes(user?.rol)
   const puedeVerHistorial = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
+  const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
 
   const handleVerUbicacion = (ubicacionId) => {
     setUbicacionFiltro(ubicacionId)
     setVista('lista')
+  }
+
+  const handleDetectadoUbicacion = (texto) => {
+    setMostrarEscanerUbicacion(false)
+    const ubicacionId = extraerUbicacionIdEscaneada(texto)
+    if (!ubicacionId) {
+      showToast('Ese código no es de una ubicación. ¿Escaneaste la etiqueta de un producto?', 'error')
+      return
+    }
+    handleVerUbicacion(ubicacionId)
   }
 
   const handleNuevoMovimiento = (producto = null) => {
@@ -174,6 +192,15 @@ export default function Inventario() {
                 📜 Historial
               </button>
             )}
+            {!esCampo && puedeGestionarCatalogo && (
+              <button
+                type="button"
+                onClick={() => setMostrarEscanerUbicacion(true)}
+                className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              >
+                📷 Escanear ubicación
+              </button>
+            )}
             {!esCampo && (
               <button
                 type="button"
@@ -204,7 +231,16 @@ export default function Inventario() {
           recargar={recargar}
           onVerUbicacion={handleVerUbicacion}
           onSolicitarMaterial={handleSolicitarMaterial}
+          onImprimirEtiquetas={() => setMostrarEtiquetasUbicaciones(true)}
         />
+      )}
+
+      {mostrarEscanerUbicacion && (
+        <EscanerCodigo onDetectado={handleDetectadoUbicacion} onCerrar={() => setMostrarEscanerUbicacion(false)} />
+      )}
+
+      {mostrarEtiquetasUbicaciones && (
+        <EtiquetasDeUbicaciones onCerrar={() => setMostrarEtiquetasUbicaciones(false)} />
       )}
     </div>
   )
