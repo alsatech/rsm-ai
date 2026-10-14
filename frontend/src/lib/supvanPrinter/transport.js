@@ -22,8 +22,17 @@ export async function conectar() {
     throw new Error('Este navegador no soporta Web Bluetooth (usa Chrome/Edge de escritorio o Chrome de Android).')
   }
 
+  // DIAGNÓSTICO TEMPORAL: se cambió de filters:[{services:[...]}] a acceptAllDevices porque en
+  // campo el selector de Chrome salía vacío ("User cancelled the requestDevice() chooser" sin
+  // que el usuario cancelara nada) — probable indicio de que la T50M Pro no anuncia ninguno de
+  // los 3 UUIDs de servicio esperados en su paquete de advertising BLE (o de que habla Bluetooth
+  // clásico/SPP, que Web Bluetooth no puede ver en absoluto). Con acceptAllDevices el selector
+  // muestra TODOS los dispositivos BLE cercanos — hay que confirmar si "T50M" aparece ahí antes
+  // de decidir el siguiente paso. optionalServices sigue listando los 3 esquemas conocidos para
+  // poder acceder a ellos ya conectado, aunque no se hayan anunciado en el advertising.
   const dispositivo = await navigator.bluetooth.requestDevice({
-    filters: ESQUEMAS_SERVICIO_BLE.map((esquema) => ({ services: [esquema.servicio] })),
+    acceptAllDevices: true,
+    optionalServices: ESQUEMAS_SERVICIO_BLE.map((esquema) => esquema.servicio),
   })
   const servidor = await dispositivo.gatt.connect()
 
