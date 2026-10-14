@@ -1,9 +1,12 @@
-// Separador para empacar código + descripción + ubicación dentro del contenido del QR, para
-// que la app Katasymbol (al "escanear código" y reimprimir) muestre también esos datos como
-// texto y no solo el símbolo pelón. Los escáneres propios del sistema (RecepcionFacil,
-// SalidaFacil, Paso1Producto) solo necesitan el primer segmento — por eso usamos "|" y no un
-// salto de línea: una pistola de escaneo USB/Bluetooth emula un teclado y un "\n" se transmite
-// como tecla Enter, lo que cortaría la lectura a la mitad.
+// Separador para empacar código + descripción + ubicación dentro del contenido del QR. A
+// diferencia de un código de barras 1D, un QR no tiene "línea de lectura humana": Katasymbol
+// NUNCA muestra este texto impreso solo por escanearlo dentro de un elemento QR (confirmado en
+// video de campo — sale el cuadro QR sin nada de texto debajo). Por eso además existe
+// construirTextoParaPegar: ese texto hay que pegarlo a mano en un elemento de Texto aparte
+// dentro de la app. Los escáneres propios del sistema (RecepcionFacil, SalidaFacil,
+// Paso1Producto) solo necesitan el primer segmento — por eso usamos "|" y no un salto de línea:
+// una pistola de escaneo USB/Bluetooth emula un teclado y un "\n" se transmite como tecla Enter,
+// lo que cortaría la lectura a la mitad.
 const SEPARADOR_PAYLOAD_QR = '|'
 
 export function construirPayloadQr(producto, ubicacionTexto) {
@@ -11,6 +14,14 @@ export function construirPayloadQr(producto, ubicacionTexto) {
   return [producto.codigo, descripcion, ubicacionTexto || '']
     .filter(Boolean)
     .join(` ${SEPARADOR_PAYLOAD_QR} `)
+}
+
+// Texto para copiar y pegar como elemento de Texto (aparte del QR) en Katasymbol, con un
+// salto de línea por dato en vez de "|" — en un elemento de Texto normal no hay riesgo de
+// Enter cortando una lectura de escáner, y así se ve igual de limpio que el PNG descargable.
+export function construirTextoParaPegar(producto, ubicacionTexto) {
+  const descripcion = (producto.descripcion || '').slice(0, 35)
+  return [producto.codigo, descripcion, ubicacionTexto || ''].filter(Boolean).join('\n')
 }
 
 // El código de barras CODE128 se queda solo con el código (sin este payload compuesto): meterle

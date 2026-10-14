@@ -3,7 +3,7 @@ import QRCode from 'qrcode'
 import { useEffect, useState } from 'react'
 
 import { imprimirEtiquetaT50M, soportaImpresionBluetooth } from '../../../lib/supvanPrinter'
-import { UBICACION_ICONS, UBICACION_LABELS, construirPayloadQr } from '../constants'
+import { UBICACION_ICONS, UBICACION_LABELS, construirPayloadQr, construirTextoParaPegar } from '../constants'
 
 const ESTADO_LABELS = {
   conectando: 'Conectando…',
@@ -96,6 +96,7 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
   const [etiquetaPng, setEtiquetaPng] = useState(null)
   const [estadoImpresionBt, setEstadoImpresionBt] = useState(null) // null | 'conectando' | ... | 'error'
   const [errorImpresionBt, setErrorImpresionBt] = useState('')
+  const [textoCopiado, setTextoCopiado] = useState(false)
 
   const ubicacionNombre = producto.ubicacion_detalle?.nombre
   const ubicacionLabel = ubicacionNombre ? UBICACION_LABELS[ubicacionNombre] ?? producto.ubicacion_detalle?.nombre_display : ''
@@ -149,6 +150,16 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
     } catch (err) {
       setEstadoImpresionBt('error')
       setErrorImpresionBt(err?.message || 'No se pudo imprimir en el T50M.')
+    }
+  }
+
+  const copiarTextoParaPegar = async () => {
+    try {
+      await navigator.clipboard.writeText(construirTextoParaPegar(producto, ubicacionLabel))
+      setTextoCopiado(true)
+      setTimeout(() => setTextoCopiado(false), 2000)
+    } catch {
+      // Sin permiso de portapapeles (ej. contexto no seguro) — no hay nada más que hacer aquí.
     }
   }
 
@@ -248,6 +259,23 @@ export default function EtiquetaProducto({ producto, onCerrar }) {
         >
           🖨️ Imprimir en hoja
         </button>
+
+        {vista === 'qr' && (
+          <>
+            <button
+              type="button"
+              onClick={copiarTextoParaPegar}
+              style={{ minHeight: '48px' }}
+              className="mt-3 w-full rounded-xl border border-border text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text print:hidden"
+            >
+              {textoCopiado ? '✅ Texto copiado' : '📋 Copiar texto para Katasymbol'}
+            </button>
+            <p className="mt-2 text-center text-xs text-text-secondary print:hidden">
+              El QR no muestra texto al imprimirse. Pega esto en un elemento de <strong>Texto</strong> aparte,
+              debajo del QR, dentro de la app.
+            </p>
+          </>
+        )}
 
         {soportaImpresionBluetooth() && (
           <>
