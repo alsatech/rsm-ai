@@ -6,8 +6,6 @@ from .views import (
     AutorizarProyectoView,
     AvanceProyectoListCreateView,
     CompraProyectoListCreateView,
-    ContratistaDetailView,
-    ContratistaListCreateView,
     CotizacionListCreateView,
     DevolverItemView,
     ItemProyectoListCreateView,
@@ -47,7 +45,5 @@ urlpatterns = [
         DevolverItemView.as_view(),
         name='item-proyecto-devolver',
     ),
-    path('contratistas/', ContratistaListCreateView.as_view(), name='contratista-list-create'),
-    path('contratistas/<int:pk>/', ContratistaDetailView.as_view(), name='contratista-detail'),
     path('resumen/', ResumenProyectosView.as_view(), name='proyectos-resumen'),
 ]

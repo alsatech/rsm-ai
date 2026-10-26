@@ -44,6 +44,22 @@ class Ubicacion(models.Model):
         return self.get_nombre_display()
 
 
+class GrupoMaterial(models.Model):
+    nombre = models.CharField(max_length=100)
+    ubicacion = models.ForeignKey(Ubicacion, on_delete=models.PROTECT, related_name='grupos_material')
+    creado_por = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='grupos_material_creados')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['nombre']
+        verbose_name = 'Grupo de material'
+        verbose_name_plural = 'Grupos de material'
+
+    def __str__(self):
+        return self.nombre
+
+
 class Producto(models.Model):
     class UnidadMedida(models.TextChoices):
         PIEZA = 'pieza', 'Pieza'
@@ -71,6 +87,10 @@ class Producto(models.Model):
     descripcion = models.CharField(max_length=200)
     categoria = models.ForeignKey(CategoriaInventario, on_delete=models.PROTECT, related_name='productos')
     ubicacion = models.ForeignKey(Ubicacion, on_delete=models.PROTECT, related_name='productos')
+    # Agrupación física opcional (ej. "Tornillos y tuercas" dentro de Hangar) con su propia
+    # etiqueta QR — un producto está en un solo grupo a la vez, y el grupo solo puede contener
+    # productos de la misma ubicación (ver GrupoMaterialSerializer.validate_producto_ids).
+    grupo = models.ForeignKey(GrupoMaterial, null=True, blank=True, on_delete=models.SET_NULL, related_name='productos')
     unidad_medida = models.CharField(max_length=15, choices=UnidadMedida.choices, default=UnidadMedida.PIEZA)
     stock_actual = models.DecimalField(max_digits=10, decimal_places=2, default=0)
     stock_minimo = models.DecimalField(max_digits=10, decimal_places=2, default=0, null=True, blank=True)
@@ -142,6 +162,29 @@ class MovimientoInventario(models.Model):
     rechazado = models.BooleanField(default=False)
     notas = models.TextField(blank=True)
     foto_evidencia = models.ImageField(upload_to='inventario/%Y/%m/', null=True, blank=True)
+
+    class ResguardoResolucion(models.TextChoices):
+        USADO = 'usado', 'Se usó por completo'
+        REGRESADO = 'regresado', 'Regresó a inventario'
+
+    # Salida que no se consume el mismo día — se queda en un vehículo o lugar para seguir
+    # operando al día siguiente. El stock ya bajó al registrar la salida (sigue siendo verdad
+    # que no está en su ubicación de catálogo); esto solo deja un rastro visible hasta que
+    # alguien confirma qué pasó con el material (ver CerrarResguardoSerializer).
+    en_resguardo = models.BooleanField(default=False)
+    resguardo_lugar = models.CharField(max_length=200, blank=True)
+    resguardo_cerrado = models.BooleanField(default=False)
+    resguardo_resolucion = models.CharField(
+        max_length=15, choices=ResguardoResolucion.choices, null=True, blank=True,
+    )
+    resguardo_cerrado_en = models.DateTimeField(null=True, blank=True)
+    resguardo_cerrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='resguardos_cerrados',
+    )
 
     class Meta:
         ordering = ['-fecha_hora_registro']
@@ -400,7 +443,10 @@ class Compra(models.Model):
     movimiento = models.OneToOneField(
         MovimientoInventario, null=True, blank=True, on_delete=models.PROTECT, related_name='compra'
     )
-    proveedor = models.CharField(max_length=200, blank=True)
+    proveedor_ref = models.ForeignKey(
+        'proveedores.Proveedor', null=True, blank=True, on_delete=models.SET_NULL, related_name='compras_inventario'
+    )
+    proveedor = models.CharField(max_length=200, blank=True)  # nombre libre si no está en el catálogo
     comprado_por = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='compras_realizadas'
     )  # quien hizo la compra en campo (casi siempre Erik), no necesariamente quien la captura

@@ -32,8 +32,6 @@ export const ESTADO_COMPRA_CONFIG = {
   completada: { label: 'Completada', badge: 'bg-highlight text-bg border-highlight' },
 }
 
-export const ESPECIALIDADES_SUGERIDAS = ['Albañilería', 'Electricidad', 'Plomería', 'Herrería', 'Carpintería', 'Pintura']
-
 export function formatFecha(fecha) {
   if (!fecha) return ''
   return new Date(fecha).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })

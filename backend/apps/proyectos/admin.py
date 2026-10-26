@@ -3,7 +3,6 @@ from django.contrib import admin
 from .models import (
     AvanceProyecto,
     CompraProyecto,
-    Contratista,
     CotizacionManoObra,
     DevolucionInventario,
     FotoAvance,
@@ -12,13 +11,6 @@ from .models import (
     MovimientoProyecto,
     Proyecto,
 )
-
-
-@admin.register(Contratista)
-class ContratistaAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'empresa', 'especialidad', 'telefono', 'activo')
-    list_filter = ('especialidad', 'activo')
-    search_fields = ('nombre', 'empresa', 'especialidad')
 
 
 class CotizacionInline(admin.TabularInline):

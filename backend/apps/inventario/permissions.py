@@ -46,6 +46,14 @@ class PuedeValidarMovimiento(BasePermission):
         return _rol_en(request, ROLES_VALIDAN)
 
 
+class PuedeCerrarResguardo(BasePermission):
+    """Mismos roles que registran salidas — el control de 'solo tu propio resguardo si eres
+    Campo' es a nivel de objeto, en la vista (CerrarResguardoView)."""
+
+    def has_permission(self, request, view):
+        return _rol_en(request, ROLES_REGISTRAN_SALIDA)
+
+
 class PuedeVerReportesCompletos(BasePermission):
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_REPORTES_COMPLETOS)

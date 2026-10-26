@@ -3,11 +3,11 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.inventario.models import Producto
+from apps.proveedores.serializers import ProveedorSerializer
 
 from .models import (
     AvanceProyecto,
     CompraProyecto,
-    Contratista,
     CotizacionManoObra,
     DevolucionInventario,
     FotoAvance,
@@ -32,16 +32,6 @@ class UsuarioResumenSerializer(serializers.ModelSerializer):
         return obj.get_full_name() or obj.username
 
 
-class ContratistaSerializer(serializers.ModelSerializer):
-    created_by_detalle = UsuarioResumenSerializer(source='created_by', read_only=True)
-
-    class Meta:
-        model = Contratista
-        fields = (
-            'id', 'nombre', 'empresa', 'especialidad', 'telefono', 'email', 'rfc', 'notas',
-            'activo', 'created_by', 'created_by_detalle', 'created_at', 'updated_at',
-        )
-        read_only_fields = ('id', 'created_by', 'created_at', 'updated_at')
 
     def create(self, validated_data):
         validated_data['created_by'] = self.context['request'].user
@@ -112,7 +102,7 @@ class RechazarProyectoSerializer(serializers.Serializer):
 
 
 class CotizacionManoObraSerializer(serializers.ModelSerializer):
-    contratista_detalle = ContratistaSerializer(source='contratista', read_only=True)
+    contratista_detalle = ProveedorSerializer(source='contratista', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     aprobada_por_detalle = UsuarioResumenSerializer(source='aprobada_por', read_only=True)
     created_by_detalle = UsuarioResumenSerializer(source='created_by', read_only=True)
@@ -280,7 +270,7 @@ class FotoCompraSerializer(serializers.ModelSerializer):
 
 
 class CompraProyectoSerializer(serializers.ModelSerializer):
-    contratista_proveedor_detalle = ContratistaSerializer(source='contratista_proveedor', read_only=True)
+    contratista_proveedor_detalle = ProveedorSerializer(source='contratista_proveedor', read_only=True)
     estado_display = serializers.CharField(source='get_estado_display', read_only=True)
     autorizado_por_detalle = UsuarioResumenSerializer(source='autorizado_por', read_only=True)
     created_by_detalle = UsuarioResumenSerializer(source='created_by', read_only=True)

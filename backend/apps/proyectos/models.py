@@ -5,28 +5,6 @@ from django.utils import timezone
 MONTO_REQUIERE_AUTORIZACION = 50000
 
 
-class Contratista(models.Model):
-    nombre = models.CharField(max_length=200)
-    empresa = models.CharField(max_length=200, blank=True)
-    especialidad = models.CharField(max_length=200)  # Albañilería, Electricidad, Plomería, Herrería...
-    telefono = models.CharField(max_length=20, blank=True)
-    email = models.CharField(max_length=200, blank=True)
-    rfc = models.CharField(max_length=20, blank=True)
-    notas = models.TextField(blank=True)
-    activo = models.BooleanField(default=True)
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='contratistas_creados')
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        ordering = ['nombre']
-        verbose_name = 'Contratista'
-        verbose_name_plural = 'Contratistas'
-
-    def __str__(self):
-        return f'{self.nombre} — {self.especialidad}'
-
-
 class Proyecto(models.Model):
     class Estado(models.TextChoices):
         BORRADOR = 'borrador', 'Borrador'
@@ -82,7 +60,7 @@ class CotizacionManoObra(models.Model):
         RECHAZADA = 'rechazada', 'Rechazada'
 
     proyecto = models.ForeignKey(Proyecto, on_delete=models.CASCADE, related_name='cotizaciones')
-    contratista = models.ForeignKey(Contratista, on_delete=models.PROTECT, related_name='cotizaciones')
+    contratista = models.ForeignKey('proveedores.Proveedor', on_delete=models.PROTECT, related_name='cotizaciones')
     descripcion_trabajo = models.TextField()
     monto = models.DecimalField(max_digits=12, decimal_places=2)
     estado = models.CharField(max_length=10, choices=Estado.choices, default=Estado.PENDIENTE)
@@ -181,7 +159,7 @@ class CompraProyecto(models.Model):
     proyecto = models.ForeignKey(Proyecto, on_delete=models.CASCADE, related_name='compras')
     folio_compra = models.CharField(max_length=20, unique=True, blank=True)
     contratista_proveedor = models.ForeignKey(
-        Contratista, null=True, blank=True, on_delete=models.SET_NULL, related_name='compras_proyecto'
+        'proveedores.Proveedor', null=True, blank=True, on_delete=models.SET_NULL, related_name='compras_proyecto'
     )
     proveedor_nombre = models.CharField(max_length=200, blank=True)
     descripcion = models.TextField()

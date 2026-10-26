@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 import { actualizarCompra, getUsuarios, registrarCompra } from '../../../../api/inventario'
+import SelectorProveedor from '../../../../components/SelectorProveedor'
 import { useToast } from '../../../../hooks/useToast'
 
 const inputClass =
@@ -15,6 +16,7 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
   const [usuarios, setUsuarios] = useState([])
   const [compradoPor, setCompradoPor] = useState(compraExistente?.comprado_por ?? '')
   const [montoTotal, setMontoTotal] = useState(compraExistente?.monto_total ?? '')
+  const [proveedorRef, setProveedorRef] = useState(compraExistente?.proveedor_ref ?? '')
   const [proveedor, setProveedor] = useState(compraExistente?.proveedor ?? '')
   const [notas, setNotas] = useState(compraExistente?.notas ?? '')
   const [foto, setFoto] = useState(null)
@@ -43,6 +45,7 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
       const fd = new FormData()
       fd.append('comprado_por', compradoPor)
       fd.append('monto_total', montoTotal)
+      if (proveedorRef) fd.append('proveedor_ref', proveedorRef)
       fd.append('proveedor', proveedor)
       fd.append('notas', notas)
       if (foto) fd.append('foto_factura', foto)
@@ -153,9 +156,11 @@ export default function FormularioCompra({ solicitud, onCancelar, onRegistrada }
           )}
         </div>
 
+        <SelectorProveedor value={proveedorRef} onChange={setProveedorRef} label="Proveedor del catálogo (opcional)" tipoAlta="material" />
+
         <div>
           <label htmlFor="proveedor" className="mb-1 block text-sm font-medium text-text-secondary">
-            Proveedor (opcional)
+            O nombre libre del proveedor (opcional)
           </label>
           <input
             id="proveedor"

@@ -15,6 +15,7 @@ from .models import (
     CategoriaInventario,
     Compra,
     EnvioMaterial,
+    GrupoMaterial,
     ItemSolicitud,
     MovimientoInventario,
     Producto,
@@ -36,9 +37,9 @@ def crear_usuario(username, rol):
     return User.objects.create_user(username=username, password='rsm12345', rol=rol)
 
 
-def crear_producto(codigo='SM-TEST-001', stock_actual=10, stock_minimo=5):
+def crear_producto(codigo='SM-TEST-001', stock_actual=10, stock_minimo=5, ubicacion=None):
     categoria = CategoriaInventario.objects.first()
-    ubicacion = Ubicacion.objects.first()
+    ubicacion = ubicacion or Ubicacion.objects.first()
     return Producto.objects.create(
         codigo=codigo,
         descripcion='Producto de prueba',
@@ -974,3 +975,245 @@ class ClasificacionABCAPITest(APITestCase):
             format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class GrupoMaterialAPITest(APITestCase):
+    def setUp(self):
+        self.inventario = crear_usuario('yajaira_grupo_test', 'inventario')
+        self.campo = crear_usuario('chino_grupo_test', 'campo')
+        self.ubicacion_a, self.ubicacion_b = Ubicacion.objects.all()[:2]
+        self.p1 = crear_producto(codigo='SM-GRP-001', ubicacion=self.ubicacion_a)
+        self.p2 = crear_producto(codigo='SM-GRP-002', ubicacion=self.ubicacion_a)
+        self.p3 = crear_producto(codigo='SM-GRP-003', ubicacion=self.ubicacion_b)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def test_crear_grupo_con_misma_ubicacion(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            '/api/v1/inventario/grupos-material/',
+            {'nombre': 'Tornillos y tuercas', 'producto_ids': [self.p1.id, self.p2.id]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data['ubicacion'], self.ubicacion_a.id)
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.p1.grupo_id, resp.data['id'])
+        self.assertEqual(self.p2.grupo_id, resp.data['id'])
+
+    def test_no_se_puede_agrupar_ubicaciones_distintas(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            '/api/v1/inventario/grupos-material/',
+            {'nombre': 'Mezcla inválida', 'producto_ids': [self.p1.id, self.p3.id]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.p1.refresh_from_db()
+        self.p3.refresh_from_db()
+        self.assertIsNone(self.p1.grupo_id)
+        self.assertIsNone(self.p3.grupo_id)
+
+    def test_reasignar_producto_a_otro_grupo_lo_quita_del_anterior(self):
+        self._auth(self.inventario)
+        grupo1 = GrupoMaterial.objects.create(nombre='Grupo 1', ubicacion=self.ubicacion_a, creado_por=self.inventario)
+        self.p1.grupo = grupo1
+        self.p1.save(update_fields=['grupo'])
+
+        resp = self.client.post(
+            '/api/v1/inventario/grupos-material/',
+            {'nombre': 'Grupo 2', 'producto_ids': [self.p1.id, self.p2.id]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.p1.refresh_from_db()
+        self.assertEqual(self.p1.grupo_id, resp.data['id'])
+        self.assertEqual(grupo1.productos.count(), 0)
+
+    def test_editar_grupo_quitando_un_producto_lo_desagrupa(self):
+        self._auth(self.inventario)
+        grupo = GrupoMaterial.objects.create(nombre='Grupo', ubicacion=self.ubicacion_a, creado_por=self.inventario)
+        Producto.objects.filter(pk__in=[self.p1.id, self.p2.id]).update(grupo=grupo)
+
+        resp = self.client.patch(
+            f'/api/v1/inventario/grupos-material/{grupo.id}/',
+            {'nombre': 'Grupo renombrado', 'producto_ids': [self.p1.id]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.p1.refresh_from_db()
+        self.p2.refresh_from_db()
+        self.assertEqual(self.p1.grupo_id, grupo.id)
+        self.assertIsNone(self.p2.grupo_id)
+        grupo.refresh_from_db()
+        self.assertEqual(grupo.nombre, 'Grupo renombrado')
+
+    def test_campo_no_puede_crear_grupo(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/grupos-material/',
+            {'nombre': 'Intento de campo', 'producto_ids': [self.p1.id]},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_filtrar_productos_por_grupo(self):
+        grupo = GrupoMaterial.objects.create(nombre='Grupo', ubicacion=self.ubicacion_a, creado_por=self.inventario)
+        self.p1.grupo = grupo
+        self.p1.save(update_fields=['grupo'])
+
+        self._auth(self.inventario)
+        resp = self.client.get(f'/api/v1/inventario/productos/?grupo={grupo.id}')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual([p['id'] for p in resp.data], [self.p1.id])
+
+
+class ResguardoAPITest(APITestCase):
+    def setUp(self):
+        self.campo = crear_usuario('chino_resguardo_test', 'campo')
+        self.otro_campo = crear_usuario('beto_resguardo_test', 'campo')
+        self.inventario = crear_usuario('yajaira_resguardo_test', 'inventario')
+        self.producto = crear_producto(codigo='SM-RESG-001', stock_actual=20)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _salida_resguardo_data(self, **extra):
+        data = {
+            'producto': self.producto.id, 'tipo': 'salida', 'cantidad': '5.00',
+            'en_resguardo': 'true', 'resguardo_lugar': 'Camioneta de Chilo',
+        }
+        data.update(extra)
+        return data
+
+    def test_salida_en_resguardo_requiere_lugar(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/',
+            self._salida_resguardo_data(resguardo_lugar=''),
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_salida_en_resguardo_se_crea_correctamente(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertTrue(resp.data['en_resguardo'])
+        self.assertEqual(resp.data['resguardo_lugar'], 'Camioneta de Chilo')
+        self.assertFalse(resp.data['resguardo_cerrado'])
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 15)
+
+    def test_cerrar_resguardo_usado_no_cambia_stock(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json',
+        )
+        movimiento_id = resp.data['id']
+
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'usado'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertTrue(resp.data['resguardo_cerrado'])
+        self.assertEqual(resp.data['resguardo_resolucion'], 'usado')
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 15)
+
+    def test_cerrar_resguardo_regresado_restaura_stock(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json',
+        )
+        movimiento_id = resp.data['id']
+
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'regresado'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 20)
+
+    def test_campo_no_puede_cerrar_resguardo_de_otro(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json',
+        )
+        movimiento_id = resp.data['id']
+
+        self._auth(self.otro_campo)
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'usado'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_inventario_puede_cerrar_resguardo_de_cualquiera(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json',
+        )
+        movimiento_id = resp.data['id']
+
+        self._auth(self.inventario)
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'usado'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+
+    def test_no_se_puede_cerrar_resguardo_dos_veces(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json',
+        )
+        movimiento_id = resp.data['id']
+        self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'usado'}, format='json',
+        )
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'usado'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_no_se_puede_cerrar_movimiento_que_no_es_resguardo(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/',
+            {'producto': self.producto.id, 'tipo': 'salida', 'cantidad': '2.00'},
+            format='json',
+        )
+        movimiento_id = resp.data['id']
+        resp = self.client.patch(
+            f'/api/v1/inventario/movimientos/{movimiento_id}/cerrar-resguardo/',
+            {'resolucion': 'usado'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_filtro_en_resguardo_y_resguardo_cerrado(self):
+        self._auth(self.campo)
+        self.client.post('/api/v1/inventario/movimientos/', self._salida_resguardo_data(), format='json')
+        self.client.post(
+            '/api/v1/inventario/movimientos/',
+            {'producto': self.producto.id, 'tipo': 'salida', 'cantidad': '1.00'},
+            format='json',
+        )
+
+        self._auth(self.inventario)
+        resp = self.client.get('/api/v1/inventario/movimientos/?en_resguardo=true&resguardo_cerrado=false')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 1)
+        self.assertTrue(resp.data[0]['en_resguardo'])

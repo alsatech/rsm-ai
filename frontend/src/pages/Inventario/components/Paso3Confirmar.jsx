@@ -41,6 +41,12 @@ export default function Paso3Confirmar({
               </span>
             </div>
           )}
+          {form.en_resguardo && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">📦 Guardado en</span>
+              <span className="text-right font-semibold text-highlight">{form.resguardo_lugar}</span>
+            </div>
+          )}
           <div className="flex justify-between border-t border-border pt-2">
             <span className="text-text-secondary">Stock actual</span>
             <span className="font-mono text-text">{productoSeleccionado?.stock_actual} {unidad}</span>

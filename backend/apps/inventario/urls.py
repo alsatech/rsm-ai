@@ -5,10 +5,13 @@ from .views import (
     AutorizarSolicitudView,
     CancelarMovimientoView,
     CategoriaInventarioListView,
+    CerrarResguardoView,
     ComparativoSolicitudView,
     DarEntradaRecepcionView,
     EnviarRelacionComprasView,
     EnviarSolicitudView,
+    GrupoMaterialDetailView,
+    GrupoMaterialListCreateView,
     MovimientoDetailView,
     MovimientoListCreateView,
     ProductoDetailView,
@@ -31,6 +34,8 @@ from .views import (
 
 urlpatterns = [
     path('productos/', ProductoListCreateView.as_view(), name='producto-list-create'),
+    path('grupos-material/', GrupoMaterialListCreateView.as_view(), name='grupo-material-list-create'),
+    path('grupos-material/<int:pk>/', GrupoMaterialDetailView.as_view(), name='grupo-material-detail'),
     path(
         'productos/clasificacion-abc/recalcular/',
         RecalcularClasificacionABCView.as_view(),
@@ -41,6 +46,9 @@ urlpatterns = [
     path('movimientos/', MovimientoListCreateView.as_view(), name='movimiento-list-create'),
     path('movimientos/<int:pk>/', MovimientoDetailView.as_view(), name='movimiento-detail'),
     path('movimientos/<int:pk>/cancelar/', CancelarMovimientoView.as_view(), name='movimiento-cancelar'),
+    path(
+        'movimientos/<int:pk>/cerrar-resguardo/', CerrarResguardoView.as_view(), name='movimiento-cerrar-resguardo',
+    ),
     path('categorias/', CategoriaInventarioListView.as_view(), name='categoria-list'),
     path('ubicaciones/', UbicacionListView.as_view(), name='ubicacion-list'),
     path('alertas-stock/', AlertasStockView.as_view(), name='alertas-stock'),

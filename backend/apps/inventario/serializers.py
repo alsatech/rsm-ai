@@ -3,12 +3,14 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.flota.models import Vehiculo
+from apps.proveedores.serializers import ProveedorSerializer
 
 from .models import (
     CategoriaInventario,
     Compra,
     EnvioMaterial,
     FotoEnvio,
+    GrupoMaterial,
     ItemRecepcion,
     ItemSolicitud,
     MovimientoInventario,
@@ -54,9 +56,20 @@ class UbicacionSerializer(serializers.ModelSerializer):
         read_only_fields = ('id',)
 
 
+class GrupoMaterialResumenSerializer(serializers.ModelSerializer):
+    """Vista mínima del grupo para anidar en ProductoSerializer — la lista completa de
+    productos del grupo se consulta aparte en GrupoMaterialSerializer para no duplicar
+    la carga de datos cada vez que se lista un producto."""
+
+    class Meta:
+        model = GrupoMaterial
+        fields = ('id', 'nombre')
+
+
 class ProductoSerializer(serializers.ModelSerializer):
     categoria_detalle = CategoriaInventarioSerializer(source='categoria', read_only=True)
     ubicacion_detalle = UbicacionSerializer(source='ubicacion', read_only=True)
+    grupo_detalle = GrupoMaterialResumenSerializer(source='grupo', read_only=True)
     unidad_medida_display = serializers.CharField(source='get_unidad_medida_display', read_only=True)
     estado_stock = serializers.SerializerMethodField()
     criticidad_display = serializers.CharField(source='get_criticidad_display', read_only=True)
@@ -66,13 +79,14 @@ class ProductoSerializer(serializers.ModelSerializer):
         model = Producto
         fields = (
             'id', 'codigo', 'descripcion', 'categoria', 'categoria_detalle', 'ubicacion', 'ubicacion_detalle',
+            'grupo', 'grupo_detalle',
             'unidad_medida', 'unidad_medida_display', 'stock_actual', 'stock_minimo', 'estado_stock',
             'costo_unitario', 'criticidad', 'criticidad_display', 'valor_stock',
             'clase_abc', 'score_abc', 'clasificado_en',
             'notas', 'activo', 'created_at', 'updated_at',
         )
         read_only_fields = (
-            'id', 'stock_actual', 'created_at', 'updated_at', 'clase_abc', 'score_abc', 'clasificado_en',
+            'id', 'stock_actual', 'grupo', 'created_at', 'updated_at', 'clase_abc', 'score_abc', 'clasificado_en',
         )
 
     def get_valor_stock(self, obj):
@@ -84,6 +98,52 @@ class ProductoSerializer(serializers.ModelSerializer):
         if obj.stock_minimo and obj.stock_minimo > 0 and obj.stock_actual <= obj.stock_minimo:
             return 'bajo'
         return 'normal'
+
+
+class GrupoMaterialSerializer(serializers.ModelSerializer):
+    ubicacion_detalle = UbicacionSerializer(source='ubicacion', read_only=True)
+    creado_por_detalle = UsuarioResumenSerializer(source='creado_por', read_only=True)
+    productos = ProductoSerializer(many=True, read_only=True)
+    producto_ids = serializers.PrimaryKeyRelatedField(
+        source='productos', queryset=Producto.objects.all(), many=True, write_only=True,
+    )
+
+    class Meta:
+        model = GrupoMaterial
+        fields = (
+            'id', 'nombre', 'ubicacion', 'ubicacion_detalle', 'productos', 'producto_ids',
+            'creado_por', 'creado_por_detalle', 'created_at', 'updated_at',
+        )
+        read_only_fields = ('id', 'ubicacion', 'creado_por', 'created_at', 'updated_at')
+
+    def validate_producto_ids(self, value):
+        if not value:
+            raise serializers.ValidationError('Selecciona al menos un material para el grupo.')
+        ubicaciones = {producto.ubicacion_id for producto in value}
+        if len(ubicaciones) > 1:
+            raise serializers.ValidationError('No se puede agrupar materiales de ubicaciones distintas.')
+        if self.instance is not None and ubicaciones != {self.instance.ubicacion_id}:
+            raise serializers.ValidationError('Los materiales deben ser de la misma ubicación del grupo.')
+        return value
+
+    def create(self, validated_data):
+        productos = validated_data.pop('productos')
+        grupo = GrupoMaterial.objects.create(
+            ubicacion_id=productos[0].ubicacion_id,
+            creado_por=self.context['request'].user,
+            **validated_data,
+        )
+        Producto.objects.filter(pk__in=[p.pk for p in productos]).update(grupo=grupo)
+        return grupo
+
+    def update(self, instance, validated_data):
+        productos = validated_data.pop('productos', None)
+        instance = super().update(instance, validated_data)
+        if productos is not None:
+            ids_nuevos = [p.pk for p in productos]
+            instance.productos.exclude(pk__in=ids_nuevos).update(grupo=None)
+            Producto.objects.filter(pk__in=ids_nuevos).update(grupo=instance)
+        return instance
 
 
 class MovimientoInventarioSerializer(serializers.ModelSerializer):
@@ -99,6 +159,7 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
     )
     compra = serializers.SerializerMethodField()
     solicitud_folio = serializers.SerializerMethodField()
+    resguardo_cerrado_por_detalle = UsuarioResumenSerializer(source='resguardo_cerrado_por', read_only=True)
 
     class Meta:
         model = MovimientoInventario
@@ -109,10 +170,13 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
             'proyecto_referencia', 'solicitud', 'solicitud_folio', 'fecha_movimiento',
             'fecha_hora_registro', 'validado', 'validado_por', 'validado_por_detalle',
             'rechazado', 'notas', 'foto_evidencia', 'compra',
+            'en_resguardo', 'resguardo_lugar', 'resguardo_cerrado', 'resguardo_resolucion',
+            'resguardo_cerrado_en', 'resguardo_cerrado_por_detalle',
         )
         read_only_fields = (
             'id', 'stock_anterior', 'stock_resultante', 'solicitud', 'validado', 'validado_por',
             'rechazado', 'fecha_hora_registro',
+            'resguardo_cerrado', 'resguardo_resolucion', 'resguardo_cerrado_en',
         )
 
     def get_solicitud_folio(self, obj):
@@ -161,6 +225,14 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
                     raise serializers.ValidationError({
                         'vehiculo': 'Debes seleccionar el vehículo al que se le carga el combustible.'
                     })
+
+        en_resguardo = data.get('en_resguardo', getattr(self.instance, 'en_resguardo', False))
+        if en_resguardo:
+            resguardo_lugar = data.get('resguardo_lugar', getattr(self.instance, 'resguardo_lugar', ''))
+            if not resguardo_lugar.strip():
+                raise serializers.ValidationError({
+                    'resguardo_lugar': 'Indica dónde quedó guardado el material.'
+                })
 
         return data
 
@@ -228,6 +300,45 @@ class CancelarMovimientoSerializer(serializers.Serializer):
         return movimiento
 
 
+class CerrarResguardoSerializer(serializers.Serializer):
+    """Cierra una salida marcada como 'guardado para después': la cierra la misma persona de
+    Campo que la registró, o Inventario/Administrador/Superadmin por ella. Si el material
+    regresó sin usarse, restaura el stock (igual que CancelarMovimientoSerializer); si se usó,
+    el stock ya estaba correcto desde que se registró la salida."""
+
+    resolucion = serializers.ChoiceField(choices=MovimientoInventario.ResguardoResolucion.choices)
+    nota = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, data):
+        movimiento = self.instance
+        if not movimiento.en_resguardo:
+            raise serializers.ValidationError('Este movimiento no está marcado como resguardo.')
+        if movimiento.resguardo_cerrado:
+            raise serializers.ValidationError('Este resguardo ya fue cerrado.')
+        return data
+
+    def save(self):
+        movimiento = self.instance
+        request = self.context['request']
+        resolucion = self.validated_data['resolucion']
+        nota = self.validated_data.get('nota', '')
+
+        movimiento.resguardo_cerrado = True
+        movimiento.resguardo_resolucion = resolucion
+        movimiento.resguardo_cerrado_en = timezone.now()
+        movimiento.resguardo_cerrado_por = request.user
+        if nota.strip():
+            movimiento.notas = f'{movimiento.notas}\n\nResguardo cerrado: {nota}'.strip()
+
+        if resolucion == MovimientoInventario.ResguardoResolucion.REGRESADO:
+            producto = movimiento.producto
+            producto.stock_actual = producto.stock_actual + movimiento.cantidad
+            producto.save(update_fields=['stock_actual', 'updated_at'])
+
+        movimiento.save()
+        return movimiento
+
+
 class ItemSolicitudSerializer(serializers.ModelSerializer):
     producto_detalle = ProductoSerializer(source='producto', read_only=True)
 
@@ -253,13 +364,15 @@ class CompraSerializer(serializers.ModelSerializer):
     comprado_por = serializers.PrimaryKeyRelatedField(queryset=User.objects.filter(is_active=True))
     comprado_por_detalle = UsuarioResumenSerializer(source='comprado_por', read_only=True)
     registrado_por_detalle = UsuarioResumenSerializer(source='registrado_por', read_only=True)
+    proveedor_ref_detalle = ProveedorSerializer(source='proveedor_ref', read_only=True)
     solicitud_folio = serializers.SerializerMethodField()
     producto_descripcion = serializers.SerializerMethodField()
 
     class Meta:
         model = Compra
         fields = (
-            'id', 'solicitud', 'solicitud_folio', 'movimiento', 'producto_descripcion', 'proveedor',
+            'id', 'solicitud', 'solicitud_folio', 'movimiento', 'producto_descripcion',
+            'proveedor_ref', 'proveedor_ref_detalle', 'proveedor',
             'comprado_por', 'comprado_por_detalle', 'registrado_por', 'registrado_por_detalle',
             'monto_total', 'foto_factura', 'notas', 'fecha_compra', 'created_at',
         )

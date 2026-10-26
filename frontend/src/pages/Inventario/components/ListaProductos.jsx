@@ -1,9 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { createProducto, getCategorias, getProductos, getUbicaciones } from '../../../api/inventario'
+import {
+  createProducto,
+  getCategorias,
+  getGrupoMaterial,
+  getGruposMaterial,
+  getProductos,
+  getUbicaciones,
+} from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
 import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
+import AgruparMateriales from './AgruparMateriales'
+import EtiquetaGrupo from './EtiquetaGrupo'
 import EtiquetaProducto from './EtiquetaProducto'
 import EtiquetasUbicacion from './EtiquetasUbicacion'
 import FormularioProducto from './FormularioProducto'
@@ -11,21 +20,26 @@ import FormularioProducto from './FormularioProducto'
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
 
-export default function ListaProductos({ ubicacionInicial, recargar, onVolver, onNuevoMovimiento, onProductoCreado }) {
+export default function ListaProductos({ ubicacionInicial, grupoInicial, recargar, onVolver, onNuevoMovimiento, onProductoCreado }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [ubicaciones, setUbicaciones] = useState([])
+  const [grupos, setGrupos] = useState([])
   const [loading, setLoading] = useState(true)
   const [busqueda, setBusqueda] = useState('')
   const [categoria, setCategoria] = useState('')
   const [ubicacion, setUbicacion] = useState(ubicacionInicial ?? '')
+  const [grupo, setGrupo] = useState(grupoInicial ?? '')
   const [estadoFiltro, setEstadoFiltro] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [guardando, setGuardando] = useState(false)
   const [productoParaEtiqueta, setProductoParaEtiqueta] = useState(null)
   const [mostrarEtiquetasUbicacion, setMostrarEtiquetasUbicacion] = useState(false)
+  const [mostrarAgrupar, setMostrarAgrupar] = useState(false)
+  const [grupoParaEditar, setGrupoParaEditar] = useState(null)
+  const [grupoParaEtiqueta, setGrupoParaEtiqueta] = useState(null)
 
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeRegistrarMovimiento = user?.rol !== 'operaciones'
@@ -36,20 +50,23 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
       const params = { activo: true }
       if (categoria) params.categoria = categoria
       if (ubicacion) params.ubicacion = ubicacion
+      if (grupo) params.grupo = grupo
       if (busqueda) params.q = busqueda
-      const [prods, cats, ubis] = await Promise.all([
+      const [prods, cats, ubis, grps] = await Promise.all([
         getProductos(params),
         categorias.length ? Promise.resolve({ data: categorias }) : getCategorias(),
         ubicaciones.length ? Promise.resolve({ data: ubicaciones }) : getUbicaciones(),
+        getGruposMaterial(ubicacion ? { ubicacion } : undefined),
       ])
       setProductos(prods.data)
       setCategorias(cats.data)
       setUbicaciones(ubis.data)
+      setGrupos(grps.data)
     } finally {
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoria, ubicacion, busqueda])
+  }, [categoria, ubicacion, grupo, busqueda])
 
   useEffect(() => { cargar() }, [cargar, recargar])
 
@@ -58,6 +75,36 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
     : productos
 
   const ubicacionActiva = ubicacionInicial ? ubicaciones.find((u) => String(u.id) === String(ubicacionInicial)) : null
+  // grupoInicial llega al escanear el QR del grupo; grupo es el filtro manual del select — en
+  // ambos casos queremos el mismo encabezado "estás viendo este grupo" y el botón de editarlo.
+  const grupoActivo = grupos.find((g) => String(g.id) === String(grupoInicial || grupo)) ?? null
+
+  const abrirEtiquetaGrupo = async (grupoId) => {
+    try {
+      const { data } = await getGrupoMaterial(grupoId)
+      setGrupoParaEtiqueta(data)
+    } catch {
+      showToast('No se pudo cargar el grupo.', 'error')
+    }
+  }
+
+  const abrirEdicionGrupo = async (grupoId) => {
+    try {
+      const { data } = await getGrupoMaterial(grupoId)
+      setGrupoParaEditar(data)
+    } catch {
+      showToast('No se pudo cargar el grupo.', 'error')
+    }
+  }
+
+  const handleGrupoGuardado = (grupoGuardado) => {
+    const eraCreacion = !grupoParaEditar
+    setMostrarAgrupar(false)
+    setGrupoParaEditar(null)
+    cargar()
+    onProductoCreado?.()
+    if (eraCreacion) setGrupoParaEtiqueta(grupoGuardado)
+  }
 
   const handleCrearProducto = async (data) => {
     setGuardando(true)
@@ -88,12 +135,23 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
           </button>
           <div>
             <h1 className="font-bold text-highlight">
-              {ubicacionActiva
-                ? `${UBICACION_ICONS[ubicacionActiva.nombre] ?? '📍'} ${UBICACION_LABELS[ubicacionActiva.nombre] ?? ubicacionActiva.nombre_display}`
-                : 'Productos'}
+              {grupoActivo
+                ? `🏷️ ${grupoActivo.nombre}`
+                : ubicacionActiva
+                  ? `${UBICACION_ICONS[ubicacionActiva.nombre] ?? '📍'} ${UBICACION_LABELS[ubicacionActiva.nombre] ?? ubicacionActiva.nombre_display}`
+                  : 'Productos'}
             </h1>
             <p className="text-xs text-text-secondary">{productosFiltrados.length} resultado{productosFiltrados.length !== 1 ? 's' : ''}</p>
           </div>
+          {grupoActivo && puedeGestionarCatalogo && (
+            <button
+              type="button"
+              onClick={() => abrirEdicionGrupo(grupoActivo.id)}
+              className="ml-auto flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+            >
+              ✏️ Editar grupo
+            </button>
+          )}
         </div>
       </header>
 
@@ -106,17 +164,23 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
           className={`${inputClass} mb-3`}
         />
 
-        <div className="mb-4 grid grid-cols-3 gap-2">
+        <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
           <select value={categoria} onChange={(e) => setCategoria(e.target.value)} className={inputClass}>
             <option value="">Categoría</option>
             {categorias.map((c) => (
               <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
             ))}
           </select>
-          <select value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className={inputClass}>
+          <select value={ubicacion} onChange={(e) => { setUbicacion(e.target.value); setGrupo('') }} className={inputClass}>
             <option value="">Ubicación</option>
             {ubicaciones.map((u) => (
               <option key={u.id} value={u.id}>{UBICACION_LABELS[u.nombre] ?? u.nombre_display}</option>
+            ))}
+          </select>
+          <select value={grupo} onChange={(e) => setGrupo(e.target.value)} className={inputClass}>
+            <option value="">Grupo</option>
+            {grupos.map((g) => (
+              <option key={g.id} value={g.id}>🏷️ {g.nombre}</option>
             ))}
           </select>
           <select value={estadoFiltro} onChange={(e) => setEstadoFiltro(e.target.value)} className={inputClass}>
@@ -136,6 +200,14 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
               className="flex-1 rounded-xl border-2 border-dashed border-accent px-6 text-sm font-semibold text-highlight transition hover:bg-card sm:flex-none"
             >
               + Nuevo producto
+            </button>
+            <button
+              type="button"
+              onClick={() => setMostrarAgrupar(true)}
+              style={{ minHeight: '52px' }}
+              className="flex-1 rounded-xl border border-border px-6 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text sm:flex-none"
+            >
+              🏷️ Agrupar materiales
             </button>
             {ubicacionActiva && productosFiltrados.length > 0 && (
               <button
@@ -180,6 +252,15 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
                     <p className="text-xs text-text-secondary">
                       {producto.categoria_detalle?.icono} {producto.categoria_detalle?.nombre} · {UBICACION_LABELS[producto.ubicacion_detalle?.nombre]}
                     </p>
+                    {producto.grupo_detalle && (
+                      <button
+                        type="button"
+                        onClick={() => abrirEtiquetaGrupo(producto.grupo_detalle.id)}
+                        className="mt-1 text-xs font-semibold text-highlight hover:underline"
+                      >
+                        🏷️ {producto.grupo_detalle.nombre}
+                      </button>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between gap-4 sm:flex-col sm:items-end">
@@ -238,6 +319,18 @@ export default function ListaProductos({ ubicacionInicial, recargar, onVolver, o
           ubicacionNombre={UBICACION_LABELS[ubicacionActiva.nombre] ?? ubicacionActiva.nombre_display}
           onCerrar={() => setMostrarEtiquetasUbicacion(false)}
         />
+      )}
+
+      {(mostrarAgrupar || grupoParaEditar) && (
+        <AgruparMateriales
+          grupoExistente={grupoParaEditar}
+          onGuardado={handleGrupoGuardado}
+          onCerrar={() => { setMostrarAgrupar(false); setGrupoParaEditar(null) }}
+        />
+      )}
+
+      {grupoParaEtiqueta && (
+        <EtiquetaGrupo grupo={grupoParaEtiqueta} onCerrar={() => setGrupoParaEtiqueta(null)} />
       )}
     </div>
   )

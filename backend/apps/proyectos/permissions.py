@@ -5,7 +5,6 @@ from apps.users.models import User
 ROLES_VEN_TODOS = (User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_GESTIONAN_PROYECTO = (User.Rol.OPERACIONES, User.Rol.SUPERADMIN)
 ROLES_REGISTRAN_AVANCE = (User.Rol.CAMPO, User.Rol.OPERACIONES, User.Rol.SUPERADMIN)
-ROLES_CRUD_CONTRATISTAS = (User.Rol.OPERACIONES, User.Rol.ADMINISTRADOR, User.Rol.SUPERADMIN)
 ROLES_AUTORIZAN = (User.Rol.SUPERADMIN,)
 
 
@@ -37,8 +36,3 @@ class PuedeGestionarProyecto(BasePermission):
 class PuedeRegistrarAvance(BasePermission):
     def has_permission(self, request, view):
         return _rol_en(request, ROLES_REGISTRAN_AVANCE)
-
-
-class PuedeCrudContratistas(BasePermission):
-    def has_permission(self, request, view):
-        return _rol_en(request, ROLES_CRUD_CONTRATISTAS)

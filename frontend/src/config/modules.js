@@ -79,6 +79,14 @@ export const MODULOS = [
     ruta: '/facturacion',
   },
   {
+    id: 'proveedores',
+    nombre: 'Proveedores',
+    descripcion: 'Catálogo de proveedores, contratistas y prestadores de servicio',
+    icono: '🧰',
+    roles: ['operaciones', 'inventario', 'administrador', 'superadmin'],
+    ruta: '/proveedores',
+  },
+  {
     id: 'proyectos',
     nombre: 'Proyectos',
     descripcion: 'Gestión de proyectos, materiales, avances y contratistas',

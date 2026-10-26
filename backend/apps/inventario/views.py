@@ -19,6 +19,7 @@ from .models import (
     Compra,
     EnvioMaterial,
     FotoEnvio,
+    GrupoMaterial,
     ItemRecepcion,
     MovimientoInventario,
     Producto,
@@ -30,6 +31,7 @@ from .models import (
 )
 from .permissions import (
     PuedeAutorizarSolicitud,
+    PuedeCerrarResguardo,
     PuedeCrearSolicitud,
     PuedeDarEntradaRecepcion,
     PuedeEditarSolicitud,
@@ -52,8 +54,10 @@ from .serializers import (
     AutorizarSolicitudSerializer,
     CancelarMovimientoSerializer,
     CategoriaInventarioSerializer,
+    CerrarResguardoSerializer,
     CompraSerializer,
     EnvioMaterialSerializer,
+    GrupoMaterialSerializer,
     MovimientoInventarioSerializer,
     ProductoSerializer,
     RecepcionMaterialSerializer,
@@ -78,6 +82,33 @@ class UbicacionListView(generics.ListAPIView):
     permission_classes = [IsAuthenticated]
 
 
+class GrupoMaterialListCreateView(generics.ListCreateAPIView):
+    serializer_class = GrupoMaterialSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), PuedeGestionarCatalogo()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = GrupoMaterial.objects.select_related('ubicacion', 'creado_por').prefetch_related('productos')
+        ubicacion = self.request.query_params.get('ubicacion')
+        if ubicacion:
+            qs = qs.filter(ubicacion_id=ubicacion)
+        return qs
+
+
+class GrupoMaterialDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = GrupoMaterial.objects.select_related('ubicacion', 'creado_por').prefetch_related('productos')
+    serializer_class = GrupoMaterialSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        return [IsAuthenticated(), PuedeGestionarCatalogo()]
+
+
 class ProductoListCreateView(generics.ListCreateAPIView):
     serializer_class = ProductoSerializer
 
@@ -87,11 +118,12 @@ class ProductoListCreateView(generics.ListCreateAPIView):
         return [IsAuthenticated()]
 
     def get_queryset(self):
-        qs = Producto.objects.select_related('categoria', 'ubicacion')
+        qs = Producto.objects.select_related('categoria', 'ubicacion', 'grupo')
         p = self.request.query_params
 
         categoria = p.get('categoria')
         ubicacion = p.get('ubicacion')
+        grupo = p.get('grupo')
         activo = p.get('activo')
         stock_bajo = p.get('stock_bajo')
         q = p.get('q')
@@ -100,6 +132,8 @@ class ProductoListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(categoria_id=categoria)
         if ubicacion:
             qs = qs.filter(ubicacion_id=ubicacion)
+        if grupo:
+            qs = qs.filter(grupo_id=grupo)
         if activo is not None:
             qs = qs.filter(activo=activo.lower() == 'true')
         if stock_bajo is not None and stock_bajo.lower() == 'true':
@@ -178,6 +212,8 @@ class MovimientoListCreateView(generics.ListCreateAPIView):
         responsable = p.get('responsable')
         fecha = p.get('fecha')
         validado = p.get('validado')
+        en_resguardo = p.get('en_resguardo')
+        resguardo_cerrado = p.get('resguardo_cerrado')
 
         if producto:
             qs = qs.filter(producto_id=producto)
@@ -189,6 +225,10 @@ class MovimientoListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(fecha_movimiento=fecha)
         if validado is not None:
             qs = qs.filter(validado=validado.lower() == 'true')
+        if en_resguardo is not None:
+            qs = qs.filter(en_resguardo=en_resguardo.lower() == 'true')
+        if resguardo_cerrado is not None:
+            qs = qs.filter(resguardo_cerrado=resguardo_cerrado.lower() == 'true')
 
         return qs
 
@@ -212,6 +252,30 @@ class CancelarMovimientoView(APIView):
     def patch(self, request, pk):
         movimiento = get_object_or_404(MovimientoInventario, pk=pk)
         serializer = CancelarMovimientoSerializer(
+            movimiento, data=request.data, context={'request': request},
+        )
+        if not serializer.is_valid():
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        serializer.save()
+        return Response(MovimientoInventarioSerializer(movimiento, context={'request': request}).data)
+
+
+class CerrarResguardoView(APIView):
+    """PATCH /movimientos/{id}/cerrar-resguardo/ — cierra una salida 'guardada para después'
+    marcando si el material se usó o regresó a inventario. Campo solo puede cerrar su propio
+    resguardo; Inventario/Administrador/Superadmin pueden cerrar cualquiera (mismos roles que
+    ya ven todos los movimientos, ver ROLES_REPORTES_COMPLETOS)."""
+
+    permission_classes = [IsAuthenticated, PuedeCerrarResguardo]
+
+    def patch(self, request, pk):
+        movimiento = get_object_or_404(MovimientoInventario, pk=pk)
+        if request.user.rol == 'campo' and movimiento.responsable_id != request.user.id:
+            return Response(
+                {'detail': 'Solo puedes cerrar los resguardos que tú registraste.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        serializer = CerrarResguardoSerializer(
             movimiento, data=request.data, context={'request': request},
         )
         if not serializer.is_valid():

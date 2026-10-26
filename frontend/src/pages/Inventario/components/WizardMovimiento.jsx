@@ -27,6 +27,8 @@ function estadoInicial(producto) {
     vehiculo_codigo: '',      // legacy: el backend lo autollena desde vehiculo
     proyecto_referencia: '',
     notas: '',
+    en_resguardo: false,      // true = el material no se usa todo hoy, queda guardado en algún lugar
+    resguardo_lugar: '',
   }
 }
 
@@ -56,7 +58,8 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
   const esCombustible = esProductoCombustible(productoSeleccionado)
   // En salidas de combustible el vehiculo es obligatorio; en el resto del flujo no.
   const vehiculoObligatorioOk = !esCombustible || Boolean(form.vehiculo)
-  const puedeAvanzar2 = cantidadValida && vehiculoObligatorioOk
+  const resguardoObligatorioOk = !form.en_resguardo || form.resguardo_lugar.trim().length > 0
+  const puedeAvanzar2 = cantidadValida && vehiculoObligatorioOk && resguardoObligatorioOk
 
   const cantidad = Number(form.cantidad) || 0
   const stockActual = Number(productoSeleccionado?.stock_actual) || 0
@@ -74,6 +77,10 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
       if (form.vehiculo) fd.append('vehiculo', form.vehiculo)
       if (form.proyecto_referencia) fd.append('proyecto_referencia', form.proyecto_referencia)
       if (form.notas) fd.append('notas', form.notas)
+      if (form.en_resguardo) {
+        fd.append('en_resguardo', 'true')
+        fd.append('resguardo_lugar', form.resguardo_lugar)
+      }
 
       await createMovimiento(fd)
 

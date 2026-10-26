@@ -4,8 +4,8 @@ import { aprobarCotizacion, createCotizacion, getCotizaciones } from '../../../.
 import { useAuth } from '../../../../hooks/useAuth'
 import { useConfirm } from '../../../../hooks/useConfirm'
 import { useToast } from '../../../../hooks/useToast'
+import SelectorProveedor from '../../../../components/SelectorProveedor'
 import { ESTADO_COTIZACION_CONFIG, formatFecha, formatMoneda } from '../../constants'
-import SelectorContratista from './SelectorContratista'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -47,7 +47,7 @@ function FormularioCotizacion({ proyectoId, onCancelar, onCreada }) {
     <div className="rounded-2xl border border-border bg-card p-5">
       <h3 className="mb-4 text-lg font-bold text-text">Nueva cotización de mano de obra</h3>
       <div className="flex flex-col gap-4">
-        <SelectorContratista value={contratista} onChange={setContratista} />
+        <SelectorProveedor value={contratista} onChange={setContratista} />
         <div>
           <label htmlFor="descripcion_trabajo" className="mb-1 block text-sm font-medium text-text-secondary">
             Descripción del trabajo *

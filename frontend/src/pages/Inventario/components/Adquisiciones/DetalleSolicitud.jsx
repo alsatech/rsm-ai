@@ -226,7 +226,11 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                 Compró: {solicitud.compra.comprado_por_detalle?.nombre}
               </p>
               <p className="text-text-secondary">Monto: ${solicitud.compra.monto_total}</p>
-              {solicitud.compra.proveedor && <p className="text-text-secondary">Proveedor: {solicitud.compra.proveedor}</p>}
+              {(solicitud.compra.proveedor_ref_detalle?.nombre || solicitud.compra.proveedor) && (
+                <p className="text-text-secondary">
+                  Proveedor: {solicitud.compra.proveedor_ref_detalle?.nombre || solicitud.compra.proveedor}
+                </p>
+              )}
               <p className="text-text-secondary">Fecha: {solicitud.compra.fecha_compra}</p>
               {solicitud.compra.notas && <p className="text-text-secondary">📝 {solicitud.compra.notas}</p>}
             </div>

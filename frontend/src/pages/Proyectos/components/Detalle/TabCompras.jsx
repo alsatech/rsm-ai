@@ -4,8 +4,8 @@ import { autorizarCompraProyecto, createCompraProyecto, getComprasProyecto } fro
 import { useAuth } from '../../../../hooks/useAuth'
 import { useConfirm } from '../../../../hooks/useConfirm'
 import { useToast } from '../../../../hooks/useToast'
+import SelectorProveedor from '../../../../components/SelectorProveedor'
 import { ESTADO_COMPRA_CONFIG, MONTO_REQUIERE_AUTORIZACION, formatFecha, formatMoneda } from '../../constants'
-import SelectorContratista from './SelectorContratista'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -63,7 +63,7 @@ function FormularioCompra({ proyectoId, onCancelar, onCreada }) {
     <div className="rounded-2xl border border-border bg-card p-5">
       <h3 className="mb-4 text-lg font-bold text-text">Nueva compra del proyecto</h3>
       <div className="flex flex-col gap-4">
-        <SelectorContratista value={contratista} onChange={setContratista} label="Proveedor del catálogo (opcional)" />
+        <SelectorProveedor value={contratista} onChange={setContratista} label="Proveedor del catálogo (opcional)" />
         <div>
           <label htmlFor="proveedor_nombre" className="mb-1 block text-sm font-medium text-text-secondary">
             O nombre libre del proveedor (opcional)

@@ -15,9 +15,17 @@ export const createMovimiento = (data) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 export const cancelarMovimiento = (id, data) => api.patch(`/api/v1/inventario/movimientos/${id}/cancelar/`, data)
+export const cerrarResguardo = (id, data) =>
+  api.patch(`/api/v1/inventario/movimientos/${id}/cerrar-resguardo/`, data)
 
 export const getCategorias = () => api.get('/api/v1/inventario/categorias/')
 export const getUbicaciones = () => api.get('/api/v1/inventario/ubicaciones/')
+
+export const getGruposMaterial = (params) => api.get('/api/v1/inventario/grupos-material/', { params })
+export const getGrupoMaterial = (id) => api.get(`/api/v1/inventario/grupos-material/${id}/`)
+export const createGrupoMaterial = (data) => api.post('/api/v1/inventario/grupos-material/', data)
+export const updateGrupoMaterial = (id, data) => api.patch(`/api/v1/inventario/grupos-material/${id}/`, data)
+export const deleteGrupoMaterial = (id) => api.delete(`/api/v1/inventario/grupos-material/${id}/`)
 export const getAlertasStock = () => api.get('/api/v1/inventario/alertas-stock/')
 export const getResumenInventario = () => api.get('/api/v1/inventario/resumen/')
 export const getReporteDiario = (params) =>

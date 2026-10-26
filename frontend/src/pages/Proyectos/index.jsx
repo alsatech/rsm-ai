@@ -4,11 +4,10 @@ import { Link } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import DashboardProyectos from './components/DashboardProyectos'
 import DetalleProyecto from './components/DetalleProyecto'
-import ListaContratistas from './components/Contratistas/ListaContratistas'
 
 export default function Proyectos() {
   const { user } = useAuth()
-  const [vista, setVista] = useState('dashboard') // dashboard | detalle | contratistas
+  const [vista, setVista] = useState('dashboard') // dashboard | detalle
   const [proyectoId, setProyectoId] = useState(null)
   const [recargar, setRecargar] = useState(0)
 
@@ -48,21 +47,9 @@ export default function Proyectos() {
             )}
             <div>
               <h1 className="font-bold text-highlight">🏗️ Proyectos</h1>
-              <p className="text-xs text-text-secondary">
-                {vista === 'contratistas' ? 'Catálogo de contratistas y proveedores' : 'Cotizaciones, compras, avances e inventario propio'}
-              </p>
+              <p className="text-xs text-text-secondary">Cotizaciones, compras, avances e inventario propio</p>
             </div>
           </div>
-
-          {vista === 'dashboard' && (
-            <button
-              type="button"
-              onClick={() => setVista('contratistas')}
-              className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
-            >
-              👷 Contratistas
-            </button>
-          )}
         </div>
       </header>
 
@@ -78,8 +65,6 @@ export default function Proyectos() {
         {vista === 'detalle' && proyectoId && (
           <DetalleProyecto proyectoId={proyectoId} onVolver={handleVolver} />
         )}
-
-        {vista === 'contratistas' && <ListaContratistas onVolver={() => setVista('dashboard')} />}
       </div>
     </div>
   )

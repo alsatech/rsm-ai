@@ -140,7 +140,8 @@ export default function RelacionComprasPanel() {
                   </p>
                   <p className="text-xs text-text-secondary">
                     Compró: {compra.comprado_por_detalle?.nombre} · {compra.fecha_compra}
-                    {compra.proveedor && ` · ${compra.proveedor}`}
+                    {(compra.proveedor_ref_detalle?.nombre || compra.proveedor) &&
+                      ` · ${compra.proveedor_ref_detalle?.nombre || compra.proveedor}`}
                   </p>
                 </div>
                 <p className="font-mono text-sm font-semibold text-text">${compra.monto_total}</p>

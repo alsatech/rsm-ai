@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { getAlertasStock, getProductos, getUbicaciones } from '../../../api/inventario'
+import { getAlertasStock, getMovimientos, getProductos, getUbicaciones } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
 import { UBICACION_ICONS, UBICACION_LABELS } from '../constants'
 import PanelAlertasStock from './PanelAlertasStock'
+import PanelResguardos from './PanelResguardos'
 import ResumenInventario from './ResumenInventario'
 
 export default function DashboardInventario({ recargar, onVerUbicacion, onSolicitarMaterial, onImprimirEtiquetas }) {
@@ -11,6 +12,8 @@ export default function DashboardInventario({ recargar, onVerUbicacion, onSolici
   const [ubicaciones, setUbicaciones] = useState([])
   const [productos, setProductos] = useState([])
   const [alertas, setAlertas] = useState([])
+  const [resguardos, setResguardos] = useState([])
+  const [recargarResguardos, setRecargarResguardos] = useState(0)
   const [loading, setLoading] = useState(true)
 
   const puedeVerAlertas = ['operaciones', 'inventario', 'administrador', 'superadmin'].includes(user?.rol)
@@ -37,8 +40,19 @@ export default function DashboardInventario({ recargar, onVerUbicacion, onSolici
     }
   }, [puedeVerAlertas])
 
+  const cargarResguardos = useCallback(async () => {
+    if (!puedeVerAlertas) return
+    try {
+      const { data } = await getMovimientos({ en_resguardo: true, resguardo_cerrado: false })
+      setResguardos(data)
+    } catch {
+      setResguardos([])
+    }
+  }, [puedeVerAlertas])
+
   useEffect(() => { cargar() }, [cargar, recargar])
   useEffect(() => { cargarAlertas() }, [cargarAlertas, recargar])
+  useEffect(() => { cargarResguardos() }, [cargarResguardos, recargar, recargarResguardos])
 
   const contarProductos = (ubicacionId) => productos.filter((p) => p.ubicacion === ubicacionId).length
   const contarAlertas = (ubicacionId) => alertas.filter((p) => p.ubicacion === ubicacionId).length
@@ -94,6 +108,7 @@ export default function DashboardInventario({ recargar, onVerUbicacion, onSolici
           {puedeVerAlertas && (
             <>
               <ResumenInventario recargar={recargar} />
+              <PanelResguardos resguardos={resguardos} onCerrado={() => setRecargarResguardos((r) => r + 1)} />
               <PanelAlertasStock alertas={alertas} onSolicitar={onSolicitarMaterial} />
             </>
           )}

@@ -107,6 +107,44 @@ export default function Paso2Detalle({ form, setForm, productoSeleccionado, vehi
           placeholder="Referencia de proyecto, si aplica"
         />
       </div>
+
+      <div>
+        <p className={labelClass}>¿Se va a usar todo hoy?</p>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => setForm((prev) => ({ ...prev, en_resguardo: false, resguardo_lugar: '' }))}
+            style={{ minHeight: '52px' }}
+            className={`rounded-xl border-2 text-sm font-bold transition ${
+              form.en_resguardo === false
+                ? 'border-highlight bg-highlight/10 text-highlight'
+                : 'border-border text-text hover:border-accent'
+            }`}
+          >
+            ✅ Sí, todo
+          </button>
+          <button
+            type="button"
+            onClick={() => setForm((prev) => ({ ...prev, en_resguardo: true }))}
+            style={{ minHeight: '52px' }}
+            className={`rounded-xl border-2 text-sm font-bold transition ${
+              form.en_resguardo === true
+                ? 'border-highlight bg-highlight/10 text-highlight'
+                : 'border-border text-text hover:border-accent'
+            }`}
+          >
+            📦 No, queda guardado
+          </button>
+        </div>
+        {form.en_resguardo === true && (
+          <input
+            value={form.resguardo_lugar}
+            onChange={handleChange('resguardo_lugar')}
+            placeholder="Ej: Camioneta de Chilo / Bodega del proyecto"
+            className={`${inputClass} mt-2`}
+          />
+        )}
+      </div>
     </div>
   )
 }

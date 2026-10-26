@@ -6,7 +6,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from apps.inventario.models import CategoriaInventario, Producto, Ubicacion
 from apps.users.models import User
 
-from .models import Contratista, ItemProyecto, Proyecto
+from .models import ItemProyecto, Proyecto
 
 
 def token(user):
@@ -123,19 +123,6 @@ class ProyectosAPITest(APITestCase):
         self.producto.refresh_from_db()
         self.assertEqual(item.stock_actual, 5)
         self.assertEqual(self.producto.stock_actual, 13)
-
-    def test_contratista_crud_operaciones(self):
-        self._auth(self.operaciones)
-        resp = self.client.post('/api/v1/proyectos/contratistas/', {
-            'nombre': 'Juan Pérez', 'especialidad': 'Albañilería',
-        }, format='json')
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
-
-        self._auth(self.campo)
-        resp_campo = self.client.post('/api/v1/proyectos/contratistas/', {
-            'nombre': 'Juan Pérez', 'especialidad': 'Albañilería',
-        }, format='json')
-        self.assertEqual(resp_campo.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_operaciones_solo_ve_proyectos_asignados(self):
         Proyecto.objects.create(

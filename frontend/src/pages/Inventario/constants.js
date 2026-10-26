@@ -49,6 +49,21 @@ export function extraerUbicacionIdEscaneada(texto) {
   return id || null
 }
 
+// Igual que UBICACION: pero para la etiqueta de un GRUPO de materiales (varios productos de
+// una misma ubicación agrupados bajo un nombre propio, ej. "Tornillos y tuercas" en Hangar).
+const PREFIJO_GRUPO_QR = 'GRUPO:'
+
+export function construirPayloadQrGrupo(grupoId, nombre) {
+  return `${PREFIJO_GRUPO_QR}${grupoId}|${nombre || ''}`
+}
+
+export function extraerGrupoIdEscaneada(texto) {
+  const limpio = (texto || '').trim()
+  if (!limpio.startsWith(PREFIJO_GRUPO_QR)) return null
+  const id = limpio.slice(PREFIJO_GRUPO_QR.length).split('|')[0].trim()
+  return id || null
+}
+
 export const UNIDAD_LABELS = {
   pieza: 'Pieza',
   saco: 'Saco',

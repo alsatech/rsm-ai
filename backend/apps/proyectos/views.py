@@ -10,7 +10,6 @@ from apps.users.models import User
 from .models import (
     AvanceProyecto,
     CompraProyecto,
-    Contratista,
     CotizacionManoObra,
     FotoAvance,
     FotoCompra,
@@ -20,7 +19,6 @@ from .models import (
 from .permissions import (
     PuedeAutorizar,
     PuedeCrearProyecto,
-    PuedeCrudContratistas,
     PuedeGestionarProyecto,
     PuedeRegistrarAvance,
     ROLES_VEN_TODOS,
@@ -31,7 +29,6 @@ from .serializers import (
     AutorizarProyectoSerializer,
     AvanceProyectoSerializer,
     CompraProyectoSerializer,
-    ContratistaSerializer,
     CotizacionManoObraSerializer,
     DevolucionInventarioSerializer,
     ItemProyectoSerializer,
@@ -271,37 +268,6 @@ class DevolverItemView(APIView):
             {'item': ItemProyectoSerializer(item).data, 'devolucion_id': devolucion.id},
             status=status.HTTP_201_CREATED,
         )
-
-
-class ContratistaListCreateView(generics.ListCreateAPIView):
-    serializer_class = ContratistaSerializer
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsAuthenticated(), PuedeCrudContratistas()]
-        return [IsAuthenticated()]
-
-    def get_queryset(self):
-        qs = Contratista.objects.select_related('created_by')
-        p = self.request.query_params
-        q = p.get('q')
-        activo = p.get('activo')
-        if q:
-            from django.db.models import Q
-            qs = qs.filter(Q(nombre__icontains=q) | Q(especialidad__icontains=q) | Q(empresa__icontains=q))
-        if activo is not None:
-            qs = qs.filter(activo=activo.lower() == 'true')
-        return qs
-
-
-class ContratistaDetailView(generics.RetrieveUpdateAPIView):
-    queryset = Contratista.objects.select_related('created_by')
-    serializer_class = ContratistaSerializer
-
-    def get_permissions(self):
-        if self.request.method == 'PATCH':
-            return [IsAuthenticated(), PuedeCrudContratistas()]
-        return [IsAuthenticated()]
 
 
 class ResumenProyectosView(APIView):

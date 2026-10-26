@@ -14,7 +14,7 @@ import ListaProductos from './components/ListaProductos'
 import SalidaFacil from './components/SalidaFacil'
 import VistaCancelacion from './components/VistaCancelacion'
 import WizardMovimiento from './components/WizardMovimiento'
-import { extraerUbicacionIdEscaneada } from './constants'
+import { extraerGrupoIdEscaneada, extraerUbicacionIdEscaneada } from './constants'
 
 // Campo solo recibe material y registra lo que usa (+ Movimiento) — nada de dashboard de
 // stock, historial, validación ni crear solicitudes: eso lo coordina Yajaira directamente.
@@ -25,6 +25,7 @@ export default function Inventario() {
   const vistaInicio = esCampo ? 'recepcion-campo' : 'dashboard'
   const [vista, setVista] = useState(vistaInicio)
   const [ubicacionFiltro, setUbicacionFiltro] = useState(null)
+  const [grupoFiltro, setGrupoFiltro] = useState(null)
   const [productoPreseleccionado, setProductoPreseleccionado] = useState(null)
   const [productoParaSolicitud, setProductoParaSolicitud] = useState(null)
   const [recargar, setRecargar] = useState(0)
@@ -36,15 +37,30 @@ export default function Inventario() {
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
 
   const handleVerUbicacion = (ubicacionId) => {
+    setGrupoFiltro(null)
     setUbicacionFiltro(ubicacionId)
     setVista('lista')
   }
 
+  const handleVerGrupo = (grupoId) => {
+    setUbicacionFiltro(null)
+    setGrupoFiltro(grupoId)
+    setVista('lista')
+  }
+
+  // El mismo escáner detecta tanto la etiqueta de una ubicación (UBICACION:) como la de un
+  // grupo de materiales (GRUPO:) — ver constants.js. Si no coincide con ninguna, se asume que
+  // escanearon la etiqueta de un producto por error.
   const handleDetectadoUbicacion = (texto) => {
     setMostrarEscanerUbicacion(false)
+    const grupoId = extraerGrupoIdEscaneada(texto)
+    if (grupoId) {
+      handleVerGrupo(grupoId)
+      return
+    }
     const ubicacionId = extraerUbicacionIdEscaneada(texto)
     if (!ubicacionId) {
-      showToast('Ese código no es de una ubicación. ¿Escaneaste la etiqueta de un producto?', 'error')
+      showToast('Ese código no es de una ubicación ni de un grupo. ¿Escaneaste la etiqueta de un producto?', 'error')
       return
     }
     handleVerUbicacion(ubicacionId)
@@ -65,6 +81,7 @@ export default function Inventario() {
   const handleVolver = () => {
     setVista(vistaInicio)
     setUbicacionFiltro(null)
+    setGrupoFiltro(null)
     setProductoPreseleccionado(null)
     setProductoParaSolicitud(null)
   }
@@ -135,6 +152,7 @@ export default function Inventario() {
     return (
       <ListaProductos
         ubicacionInicial={ubicacionFiltro}
+        grupoInicial={grupoFiltro}
         recargar={recargar}
         onVolver={handleVolver}
         onNuevoMovimiento={handleNuevoMovimiento}
@@ -198,7 +216,7 @@ export default function Inventario() {
                 onClick={() => setMostrarEscanerUbicacion(true)}
                 className="flex items-center gap-2 rounded-xl border border-border px-4 py-2.5 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
               >
-                📷 Escanear ubicación
+                📷 Escanear
               </button>
             )}
             {!esCampo && (

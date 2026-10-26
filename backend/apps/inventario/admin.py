@@ -5,6 +5,7 @@ from .models import (
     Compra,
     EnvioMaterial,
     FotoEnvio,
+    GrupoMaterial,
     ItemRecepcion,
     ItemSolicitud,
     MovimientoInventario,
@@ -28,10 +29,22 @@ class UbicacionAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'descripcion')
 
 
+@admin.register(GrupoMaterial)
+class GrupoMaterialAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'ubicacion', 'cantidad_productos', 'creado_por', 'created_at')
+    list_filter = ('ubicacion',)
+    search_fields = ('nombre',)
+    raw_id_fields = ('creado_por',)
+
+    def cantidad_productos(self, obj):
+        return obj.productos.count()
+    cantidad_productos.short_description = 'Materiales'
+
+
 @admin.register(Producto)
 class ProductoAdmin(admin.ModelAdmin):
     list_display = (
-        'codigo', 'descripcion', 'categoria', 'ubicacion', 'stock_actual', 'stock_minimo',
+        'codigo', 'descripcion', 'categoria', 'ubicacion', 'grupo', 'stock_actual', 'stock_minimo',
         'costo_unitario', 'criticidad', 'clase_abc', 'activo',
     )
     list_filter = ('categoria', 'ubicacion', 'activo', 'criticidad', 'clase_abc')
@@ -42,10 +55,11 @@ class ProductoAdmin(admin.ModelAdmin):
 class MovimientoInventarioAdmin(admin.ModelAdmin):
     list_display = (
         'producto', 'tipo', 'cantidad', 'responsable', 'fecha_movimiento', 'validado', 'rechazado',
+        'en_resguardo', 'resguardo_cerrado',
     )
-    list_filter = ('tipo', 'validado', 'rechazado')
+    list_filter = ('tipo', 'validado', 'rechazado', 'en_resguardo', 'resguardo_cerrado')
     search_fields = ('producto__codigo', 'producto__descripcion', 'responsable__username')
-    raw_id_fields = ('producto', 'responsable', 'validado_por', 'solicitud')
+    raw_id_fields = ('producto', 'responsable', 'validado_por', 'solicitud', 'resguardo_cerrado_por')
 
 
 class ItemSolicitudInline(admin.TabularInline):
@@ -93,7 +107,7 @@ class CompraAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'proveedor', 'comprado_por', 'registrado_por', 'monto_total', 'fecha_compra')
     list_filter = ('fecha_compra',)
     search_fields = ('proveedor',)
-    raw_id_fields = ('solicitud', 'movimiento', 'comprado_por', 'registrado_por')
+    raw_id_fields = ('solicitud', 'movimiento', 'proveedor_ref', 'comprado_por', 'registrado_por')
 
 
 @admin.register(RelacionCompras)

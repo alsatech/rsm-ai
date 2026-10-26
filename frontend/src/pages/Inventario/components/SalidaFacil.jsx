@@ -13,7 +13,7 @@ const TIPOS_SIN_COMBUSTIBLE = new Set(['traila', 'plataforma', 'remolque'])
 // enormes. Campo nunca registra entradas, así que aquí tipo siempre es 'salida'.
 export default function SalidaFacil({ onVolver, onGuardado }) {
   const { showToast } = useToast()
-  const [pantalla, setPantalla] = useState('producto') // producto | cantidad | destino | confirmar | listo
+  const [pantalla, setPantalla] = useState('producto') // producto | cantidad | destino | resguardo | confirmar | listo
   const [producto, setProducto] = useState(null)
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState([])
@@ -23,6 +23,8 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
   const [vehiculos, setVehiculos] = useState([])
   const [vehiculo, setVehiculo] = useState(null)
   const [proyecto, setProyecto] = useState('')
+  const [enResguardo, setEnResguardo] = useState(null) // null = sin contestar, true | false
+  const [resguardoLugar, setResguardoLugar] = useState('')
   const [guardando, setGuardando] = useState(false)
 
   const esCombustible = esProductoCombustible(producto)
@@ -54,6 +56,8 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
     setCantidad('')
     setVehiculo(null)
     setProyecto('')
+    setEnResguardo(null)
+    setResguardoLugar('')
     setPantalla('cantidad')
   }
 
@@ -86,6 +90,7 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
   }
 
   const destinoListo = esCombustible ? Boolean(vehiculo) : proyecto.trim().length > 0
+  const resguardoListo = enResguardo === false || (enResguardo === true && resguardoLugar.trim().length > 0)
 
   const handleGuardar = async () => {
     setGuardando(true)
@@ -96,6 +101,10 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
       fd.append('cantidad', cantidad)
       if (esCombustible && vehiculo) fd.append('vehiculo', vehiculo)
       if (!esCombustible && proyecto.trim()) fd.append('proyecto_referencia', proyecto.trim())
+      if (enResguardo) {
+        fd.append('en_resguardo', 'true')
+        fd.append('resguardo_lugar', resguardoLugar.trim())
+      }
 
       await createMovimiento(fd)
       setPantalla('listo')
@@ -112,6 +121,8 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
     setCantidad('')
     setVehiculo(null)
     setProyecto('')
+    setEnResguardo(null)
+    setResguardoLugar('')
     setPantalla('producto')
   }
 
@@ -309,7 +320,7 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
           </button>
           <button
             type="button"
-            onClick={() => setPantalla('confirmar')}
+            onClick={() => setPantalla('resguardo')}
             disabled={!destinoListo}
             style={{ minHeight: '56px' }}
             className="flex-1 rounded-xl bg-accent text-base font-bold text-highlight transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
@@ -321,7 +332,79 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
     )
   }
 
-  // ── Pantalla 4: confirmar ───────────────────────────────────────────────────
+  // ── Pantalla 4: ¿se usa todo hoy o queda guardado? ──────────────────────────
+  if (pantalla === 'resguardo') {
+    contenido = (
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <p className="mb-5 text-center text-2xl font-bold text-text">¿Vas a usar todo hoy?</p>
+
+        <div className="mb-5 grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => { setEnResguardo(false); setResguardoLugar('') }}
+            style={{ minHeight: '88px' }}
+            className={`rounded-2xl border-2 text-lg font-bold transition active:scale-95 ${
+              enResguardo === false
+                ? 'border-highlight bg-highlight/10 text-highlight'
+                : 'border-border text-text hover:border-accent'
+            }`}
+          >
+            ✅ Sí, todo
+          </button>
+          <button
+            type="button"
+            onClick={() => setEnResguardo(true)}
+            style={{ minHeight: '88px' }}
+            className={`rounded-2xl border-2 text-lg font-bold transition active:scale-95 ${
+              enResguardo === true
+                ? 'border-highlight bg-highlight/10 text-highlight'
+                : 'border-border text-text hover:border-accent'
+            }`}
+          >
+            📦 No, queda guardado
+          </button>
+        </div>
+
+        {enResguardo === true && (
+          <div className="mb-2">
+            <p className="mb-2 text-center text-base font-semibold text-text">¿Dónde va a quedar?</p>
+            <input
+              value={resguardoLugar}
+              onChange={(e) => setResguardoLugar(e.target.value)}
+              placeholder="Ej: Camioneta de Chilo / Bodega del proyecto"
+              style={{ minHeight: '56px' }}
+              className="w-full rounded-xl border border-border bg-bg px-4 text-lg text-text outline-none focus:border-highlight"
+            />
+            <p className="mt-2 text-center text-xs text-text-secondary">
+              Yajaira va a ver esto en Inventario hasta que se cierre.
+            </p>
+          </div>
+        )}
+
+        <div className="mt-6 flex gap-3">
+          <button
+            type="button"
+            onClick={() => setPantalla('destino')}
+            style={{ minHeight: '56px' }}
+            className="flex-1 rounded-xl border border-border text-base text-text-secondary transition hover:border-text-secondary hover:text-text"
+          >
+            ← Atrás
+          </button>
+          <button
+            type="button"
+            onClick={() => setPantalla('confirmar')}
+            disabled={!resguardoListo}
+            style={{ minHeight: '56px' }}
+            className="flex-1 rounded-xl bg-accent text-base font-bold text-highlight transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Siguiente →
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Pantalla 5: confirmar ───────────────────────────────────────────────────
   if (pantalla === 'confirmar') {
     contenido = (
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -335,6 +418,9 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
           <p className="text-base text-text-secondary">
             {esCombustible ? `🚙 ${vehiculoSeleccionado?.nombre ?? ''}` : `📍 ${proyecto}`}
           </p>
+          {enResguardo && (
+            <p className="text-base font-semibold text-highlight">📦 Guardado en: {resguardoLugar}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-3">
@@ -349,7 +435,7 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
           </button>
           <button
             type="button"
-            onClick={() => setPantalla('destino')}
+            onClick={() => setPantalla('resguardo')}
             className="w-full py-1 text-center text-sm text-text-secondary hover:text-text"
           >
             ← Atrás
@@ -359,7 +445,7 @@ export default function SalidaFacil({ onVolver, onGuardado }) {
     )
   }
 
-  // ── Pantalla 5: listo ────────────────────────────────────────────────────────
+  // ── Pantalla 6: listo ────────────────────────────────────────────────────────
   if (pantalla === 'listo') {
     contenido = (
       <div className="rounded-2xl border border-border bg-card p-5 text-center">

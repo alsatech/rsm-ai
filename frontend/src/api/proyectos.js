@@ -43,11 +43,5 @@ export const registrarMovimientoItem = (proyectoId, itemId, data) =>
 export const devolverItemAlInventario = (proyectoId, itemId, data) =>
   api.post(`/api/v1/proyectos/proyectos/${proyectoId}/inventario/${itemId}/devolver/`, data)
 
-// Contratistas
-export const getContratistas = (params) => api.get('/api/v1/proyectos/contratistas/', { params })
-export const getContratista = (id) => api.get(`/api/v1/proyectos/contratistas/${id}/`)
-export const createContratista = (data) => api.post('/api/v1/proyectos/contratistas/', data)
-export const updateContratista = (id, data) => api.patch(`/api/v1/proyectos/contratistas/${id}/`, data)
-
 // Catálogo general de inventario (para buscar/vincular material al alta del ítem de proyecto)
 export const getProductosInventario = (params) => api.get('/api/v1/inventario/productos/', { params })

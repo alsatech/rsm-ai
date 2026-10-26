@@ -9,6 +9,7 @@ import Hidraulica from './pages/Hidraulica'
 import Inventario from './pages/Inventario'
 import Login from './pages/Login'
 import Pendientes from './pages/Pendientes'
+import Proveedores from './pages/Proveedores'
 import Proyectos from './pages/Proyectos'
 
 function App() {
@@ -68,6 +69,14 @@ function App() {
         element={
           <ProtectedRoute roles={['operaciones', 'administrador', 'superadmin']}>
             <Proyectos />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/proveedores"
+        element={
+          <ProtectedRoute roles={['operaciones', 'inventario', 'administrador', 'superadmin']}>
+            <Proveedores />
           </ProtectedRoute>
         }
       />
