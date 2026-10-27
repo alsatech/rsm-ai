@@ -57,30 +57,37 @@ class ProyectosAPITest(APITestCase):
         self.assertNotEqual(resp1.data['folio'], resp2.data['folio'])
         self.assertTrue(resp1.data['folio'].startswith('PRY'))
 
-    def test_solo_superadmin_autoriza(self):
+    def test_superadmin_y_operaciones_autorizan(self):
         resp = self._crear_proyecto(presupuesto_total='60000.00')
         proyecto_id = resp.data['id']
 
+        self._auth(self.campo)
+        resp_campo = self.client.post(f'/api/v1/proyectos/proyectos/{proyecto_id}/autorizar/', {}, format='json')
+        self.assertEqual(resp_campo.status_code, status.HTTP_403_FORBIDDEN)
+
         self._auth(self.operaciones)
         resp_erik = self.client.post(f'/api/v1/proyectos/proyectos/{proyecto_id}/autorizar/', {}, format='json')
-        self.assertEqual(resp_erik.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resp_erik.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp_erik.data['estado'], 'autorizado')
 
-        self._auth(self.superadmin)
-        resp_ok = self.client.post(f'/api/v1/proyectos/proyectos/{proyecto_id}/autorizar/', {}, format='json')
-        self.assertEqual(resp_ok.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp_ok.data['estado'], 'autorizado')
-
-    def test_erik_no_puede_autorizar(self):
+    def test_erik_puede_rechazar(self):
         resp = self._crear_proyecto(presupuesto_total='60000.00')
         proyecto_id = resp.data['id']
         self._auth(self.operaciones)
         resp_erik = self.client.post(f'/api/v1/proyectos/proyectos/{proyecto_id}/rechazar/', {
             'notas_autorizacion': 'No aplica',
         }, format='json')
-        self.assertEqual(resp_erik.status_code, status.HTTP_403_FORBIDDEN)
+        self.assertEqual(resp_erik.status_code, status.HTTP_200_OK)
 
-    def test_erik_no_puede_crear_proyecto(self):
+    def test_erik_puede_crear_proyecto(self):
         self._auth(self.operaciones)
+        resp = self.client.post('/api/v1/proyectos/proyectos/', {
+            'nombre': 'Cerca norte', 'descripcion': 'x', 'asignado_a': self.operaciones.id,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_campo_no_puede_crear_proyecto(self):
+        self._auth(self.campo)
         resp = self.client.post('/api/v1/proyectos/proyectos/', {
             'nombre': 'Cerca norte', 'descripcion': 'x', 'asignado_a': self.operaciones.id,
         }, format='json')
@@ -124,7 +131,7 @@ class ProyectosAPITest(APITestCase):
         self.assertEqual(item.stock_actual, 5)
         self.assertEqual(self.producto.stock_actual, 13)
 
-    def test_operaciones_solo_ve_proyectos_asignados(self):
+    def test_operaciones_ve_todos_los_proyectos(self):
         Proyecto.objects.create(
             nombre='Asignado a Erik', descripcion='x', creado_por=self.superadmin, asignado_a=self.operaciones,
         )
@@ -133,8 +140,15 @@ class ProyectosAPITest(APITestCase):
         )
         self._auth(self.operaciones)
         resp = self.client.get('/api/v1/proyectos/proyectos/')
-        self.assertEqual(len(resp.data), 1)
-        self.assertEqual(resp.data[0]['nombre'], 'Asignado a Erik')
+        self.assertEqual(len(resp.data), 2)
+
+    def test_campo_no_ve_proyectos(self):
+        Proyecto.objects.create(
+            nombre='Asignado a Erik', descripcion='x', creado_por=self.superadmin, asignado_a=self.operaciones,
+        )
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/proyectos/proyectos/')
+        self.assertEqual(len(resp.data), 0)
 
     def test_compra_mayor_50k_requiere_autorizacion(self):
         proyecto = Proyecto.objects.create(

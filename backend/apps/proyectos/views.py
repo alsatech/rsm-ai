@@ -5,8 +5,6 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.users.models import User
-
 from .models import (
     AvanceProyecto,
     CompraProyecto,
@@ -46,8 +44,6 @@ def _proyectos_visibles(user):
     qs = Proyecto.objects.select_related('creado_por', 'asignado_a', 'autorizado_por')
     if user.rol in ROLES_VEN_TODOS:
         return qs
-    if user.rol == User.Rol.OPERACIONES:
-        return qs.filter(asignado_a=user)
     return qs.none()
 
 

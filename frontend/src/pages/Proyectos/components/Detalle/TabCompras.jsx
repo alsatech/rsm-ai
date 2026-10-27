@@ -12,7 +12,7 @@ const inputClass =
 
 const MAX_FOTOS = 4
 const ROLES_GESTIONAN = ['operaciones', 'superadmin']
-const ROLES_AUTORIZAN = ['superadmin']
+const ROLES_AUTORIZAN = ['operaciones', 'superadmin']
 
 function FormularioCompra({ proyectoId, onCancelar, onCreada }) {
   const { showToast } = useToast()

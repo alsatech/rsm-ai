@@ -11,7 +11,7 @@ export default function Proyectos() {
   const [proyectoId, setProyectoId] = useState(null)
   const [recargar, setRecargar] = useState(0)
 
-  const esSuperadmin = user?.rol === 'superadmin'
+  const puedeCrearProyecto = ['operaciones', 'superadmin'].includes(user?.rol)
 
   const handleVerProyecto = (id) => {
     setProyectoId(id)
@@ -57,7 +57,7 @@ export default function Proyectos() {
         {vista === 'dashboard' && (
           <DashboardProyectos
             recargar={recargar}
-            esSuperadmin={esSuperadmin}
+            puedeCrearProyecto={puedeCrearProyecto}
             onVerProyecto={handleVerProyecto}
           />
         )}

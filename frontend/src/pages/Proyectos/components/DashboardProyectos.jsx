@@ -6,7 +6,7 @@ import FormularioProyecto from './FormularioProyecto'
 
 const CARDS_ESTADO = ['borrador', 'autorizado', 'en_progreso', 'pausado', 'completado']
 
-export default function DashboardProyectos({ recargar, esSuperadmin, onVerProyecto }) {
+export default function DashboardProyectos({ recargar, puedeCrearProyecto, onVerProyecto }) {
   const [proyectos, setProyectos] = useState([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState('')
@@ -78,7 +78,7 @@ export default function DashboardProyectos({ recargar, esSuperadmin, onVerProyec
             </button>
           ))}
         </div>
-        {esSuperadmin && (
+        {puedeCrearProyecto && (
           <button
             type="button"
             onClick={() => setMostrarNuevo(true)}

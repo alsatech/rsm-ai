@@ -11,7 +11,7 @@ const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
 
 const ROLES_GESTIONAN = ['operaciones', 'superadmin']
-const ROLES_APRUEBAN = ['superadmin']
+const ROLES_APRUEBAN = ['operaciones', 'superadmin']
 
 function FormularioCotizacion({ proyectoId, onCancelar, onCreada }) {
   const { showToast } = useToast()

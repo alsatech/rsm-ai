@@ -30,7 +30,7 @@ export default function TabResumen({ proyecto, onActualizado, onVolver }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const confirm = useConfirm()
-  const esSuperadmin = user?.rol === 'superadmin'
+  const puedeAutorizar = ['operaciones', 'superadmin'].includes(user?.rol)
   const [editando, setEditando] = useState(false)
   const [notas, setNotas] = useState('')
   const [procesando, setProcesando] = useState(false)
@@ -113,7 +113,7 @@ export default function TabResumen({ proyecto, onActualizado, onVolver }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {pendienteAutorizacion && esSuperadmin && (
+      {pendienteAutorizacion && puedeAutorizar && (
         <div className="rounded-2xl border border-warning/50 bg-warning/10 p-5">
           <p className="mb-2 font-bold text-warning">⚠️ Este proyecto requiere tu autorización</p>
           <p className="mb-3 text-sm text-text-secondary">
@@ -152,7 +152,7 @@ export default function TabResumen({ proyecto, onActualizado, onVolver }) {
       <div className="rounded-2xl border border-border bg-card p-5">
         <div className="mb-3 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wider text-text-secondary">Información del proyecto</p>
-          {esSuperadmin && !editando && (
+          {puedeAutorizar && !editando && (
             <button type="button" onClick={() => setEditando(true)} className="text-xs font-semibold text-highlight hover:underline">
               ✏️ Editar
             </button>
