@@ -96,13 +96,13 @@ function FormularioAvance({ proyectoId, onCancelar, onCreado }) {
           </p>
           {fotos.length < MAX_FOTOS && (
             <>
-              <input ref={inputRef} type="file" accept="image/*" capture="environment" multiple className="hidden" onChange={handleFile} />
+              <input ref={inputRef} type="file" accept="image/*" multiple className="hidden" onChange={handleFile} />
               <button
                 type="button"
                 onClick={() => inputRef.current?.click()}
                 className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-accent py-4 text-sm font-semibold text-highlight transition hover:bg-bg"
               >
-                📷 Tomar foto
+                📷 Tomar foto o subir desde galería
               </button>
             </>
           )}
