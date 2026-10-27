@@ -7,7 +7,7 @@
 
 **Inicio del proyecto:** Por definir (fecha de firma del SLA)  
 **Fecha límite (día 90):** Por definir  
-**Módulos completados:** 8 / 12  
+**Módulos completados:** 9 / 12  
 **Fase actual:** Mes 3
 
 ---
@@ -28,7 +28,7 @@
 ### Fase 3 — Mes 3 (Días 61–90)
 - [ ] **Módulo 8** — Sanidad animal
 - [ ] **Módulo 9** — Personal
-- [ ] **Módulo 10** — Minuta automática
+- [x] **Módulo 10** — Minuta automática
 - [x] **Módulo 11** — Facturación
 - [x] **Módulo 12** — Proyectos
 
@@ -310,3 +310,14 @@ Nuevo módulo `frontend/src/lib/supvanPrinter/` (`constants.js`, `frame.js`, `bi
 **Esto es experimental y NO ha sido probado contra el aparato real** — no fue posible en este entorno. Quedan sin confirmar: los offsets exactos de la respuesta de `RETURN_MAT` por BLE (por eso el tamaño de etiqueta usa un valor fijo de 30mm de largo en vez de leerlo del material cargado) y el sub-protocolo exacto de subida de datos crudos en `BUF_FULL` (interpretado de la documentación disponible, no confirmado byte a byte). `npm run build` y lint sin errores nuevos; se validó manualmente en Node que la construcción de frames/checksums y el parcheo del header LZMA son consistentes con la especificación. Próximo paso real: probar con Alfredo/Yajaira en Chrome de escritorio o Android contra el T50M físico y reportar en qué paso exacto falla si no imprime, para ajustar dirigido en vez de a ciegas.
 
 **Ajuste posterior (misma sesión) — la ubicación ahora se ve en las etiquetas y al escanear en Recepción.** Alfredo pidió que la etiqueta impresa muestre la ubicación del producto, y que al escanear en Recepción se confirme a qué ubicación pertenece. Decisión: la ubicación se imprime como **texto visible** en la etiqueta y se muestra en pantalla al escanear (siempre consultada en vivo desde `Producto.ubicacion`), pero **no se codifica dentro del QR** — el QR sigue siendo solo el `codigo` del producto. Razón: si la ubicación de un producto cambia después de imprimir su etiqueta, una ubicación grabada en el QR quedaría desactualizada y engañosa; consultarla en la base de datos cada vez que se escanea evita ese riesgo. Cambios: `EtiquetaProducto.jsx` y `EtiquetasUbicacion.jsx` ahora muestran el ícono+nombre de la ubicación debajo del código/descripción (en pantalla, en la descarga PNG y en la hoja impresa); `bitmap.js`/`printer.js` del módulo T50M agregan esa misma línea al raster que se manda a imprimir por Bluetooth (se amplió el largo default de la etiqueta de 30mm a 34mm para que quepan las 3 líneas de texto sin recortarse). En `RecepcionFacil.jsx`, escanear un producto ahora muestra un toast de éxito confirmando su ubicación (no solo bloquea en caso de error como antes), y tanto la lista inicial de "esto es lo que debe llegar" como la tarjeta de cada material en la pantalla de confirmación muestran su ubicación. `npm run build` y lint sin errores nuevos.
+
+### 🟢 Push #20
+**Módulo:** Módulo 10 — Minuta automática
+**Fecha:** 2026-10-27
+**Autor:** Claude Code
+
+**Descripción:** Nueva app `apps/minuta`, modelo `Minuta` (fecha única, generada_por, notas, created_at/updated_at) que solo deja constancia de quién generó la minuta de un día y las notas de la junta — los datos de los demás módulos nunca se duplican, se agregan en vivo desde `services.py` (`obtener_datos_dia`) cada vez que se consulta o se genera: lecturas de `RegistroHidraulico` del día (con alertas si `estado != normal`), `Pendiente` abiertos/bloqueados vigentes + cerrados ese día, `ChecklistVehiculo` de `Flota` del día (destacando incidencias y advertencias), y `RecorridoGanado` + `AlertaSpot` del día. Endpoints: `GET /api/v1/minuta/` (historial), `GET /api/v1/minuta/<fecha>/` (detalle agregado + minuta existente si la hay), `POST /api/v1/minuta/<fecha>/generar/` (`update_or_create` idempotente: generar dos veces el mismo día solo actualiza notas, no duplica), `GET /api/v1/minuta/<fecha>/pdf/` (genera el PDF al vuelo con `reportlab`, sin guardarlo — mismo patrón que `apps/inventario/reportes.py`). Permiso único `PuedeVerMinuta`: administrador y superadmin generan y ven igual (sin distinción), confirmado explícitamente con Alfredo — el resto de roles no ve el módulo.
+
+**Frontend:** página `/minuta` (visible en el dashboard para administrador/superadmin vía `config/modules.js`) con selector de fecha (default hoy), las 4 secciones agregadas del día, textarea de notas de la junta, botón "Generar/Regenerar minuta" y botón "Descargar PDF" (descarga autenticada vía `api/minuta.js` con `responseType: 'blob'` — el endpoint exige JWT, así que no puede ser un `<a href>` plano como el de las relaciones de Facturación que sirve archivos de `media/`), e historial de minutas ya generadas para saltar entre fechas.
+
+**Notas:** Migración `0001_initial` de `apps.minuta`. 10 tests nuevos (permisos por rol en los 3 endpoints, fecha inválida, agregación correcta de los 4 módulos con datos de prueba, generar crea y luego actualiza sin duplicar, PDF con `Content-Type: application/pdf`). Suite completa del backend corrida (244 tests): los 7 fallos son los preexistentes de `apps.flota` de otra sesión en curso (checklists de llegada, endpoint de incidencias), no relacionados con este módulo y no se tocaron. Verificado con llamadas HTTP reales contra el servidor de desarrollo con un usuario temporal `superadmin` creado y borrado al terminar (junto con la `Minuta` que generó durante la prueba): detalle agregando pendientes reales existentes en la base de desarrollo, generar, descargar PDF (confirmado como PDF válido de 1 página) y listar historial. `npm run build` y `npm run lint` sin errores nuevos en los archivos de este módulo (los 10 errores de lint reportados siguen siendo los preexistentes de Flota/Pendientes). No fue posible tomar screenshots de navegador real en este entorno (falta `libnspr4.so` para Chromium headless y no hay sudo) — verificado en su lugar con las llamadas HTTP directas descritas arriba, que ejercitan los mismos endpoints que usa cada botón del frontend.

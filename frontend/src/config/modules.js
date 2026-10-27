@@ -69,6 +69,7 @@ export const MODULOS = [
     descripcion: 'Generación de la minuta diaria con un clic',
     icono: '📝',
     roles: ['administrador', 'superadmin'],
+    ruta: '/minuta',
   },
   {
     id: 'facturacion',

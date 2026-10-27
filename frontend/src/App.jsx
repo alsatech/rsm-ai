@@ -8,6 +8,7 @@ import Ganado from './pages/Ganado'
 import Hidraulica from './pages/Hidraulica'
 import Inventario from './pages/Inventario'
 import Login from './pages/Login'
+import Minuta from './pages/Minuta'
 import Pendientes from './pages/Pendientes'
 import Proveedores from './pages/Proveedores'
 import Proyectos from './pages/Proyectos'
@@ -85,6 +86,14 @@ function App() {
         element={
           <ProtectedRoute roles={['administrador', 'superadmin']}>
             <Facturacion />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/minuta"
+        element={
+          <ProtectedRoute roles={['administrador', 'superadmin']}>
+            <Minuta />
           </ProtectedRoute>
         }
       />
