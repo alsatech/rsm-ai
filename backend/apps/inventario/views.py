@@ -147,7 +147,7 @@ class ProductoListCreateView(generics.ListCreateAPIView):
 CAMPOS_CLASIFICACION_ABC = {'costo_unitario', 'criticidad'}
 
 
-class ProductoDetailView(generics.RetrieveUpdateAPIView):
+class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Producto.objects.select_related('categoria', 'ubicacion')
     serializer_class = ProductoSerializer
 
@@ -157,7 +157,16 @@ class ProductoDetailView(generics.RetrieveUpdateAPIView):
             if campos_enviados and campos_enviados.issubset(CAMPOS_CLASIFICACION_ABC):
                 return [IsAuthenticated(), PuedeGestionarClasificacionABC()]
             return [IsAuthenticated(), PuedeGestionarCatalogo()]
+        if self.request.method == 'DELETE':
+            return [IsAuthenticated(), PuedeGestionarCatalogo()]
         return [IsAuthenticated()]
+
+    def perform_destroy(self, instance):
+        # Baja lógica: hay movimientos (entradas/salidas) con FK protegida al producto, así
+        # que no se puede borrar en duro. activo=False lo saca de su ubicación y del
+        # inventario general (ambos listados filtran activo=True).
+        instance.activo = False
+        instance.save(update_fields=['activo'])
 
 
 class RecalcularClasificacionABCView(APIView):

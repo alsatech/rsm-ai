@@ -316,6 +316,23 @@ class InventarioAPITest(APITestCase):
         }, format='json')
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_inventario_elimina_producto(self):
+        producto = crear_producto(codigo='SM-BORRAR-001')
+        self._auth(self.inventario)
+        resp = self.client.delete(f'/api/v1/inventario/productos/{producto.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_204_NO_CONTENT)
+        producto.refresh_from_db()
+        self.assertFalse(producto.activo)
+
+        resp = self.client.get('/api/v1/inventario/productos/', {'activo': 'true'})
+        self.assertNotIn(producto.codigo, [p['codigo'] for p in resp.data])
+
+    def test_campo_no_puede_eliminar_producto(self):
+        producto = crear_producto(codigo='SM-BORRAR-002')
+        self._auth(self.campo)
+        resp = self.client.delete(f'/api/v1/inventario/productos/{producto.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_resumen_inventario(self):
         self._auth(self.inventario)
         resp = self.client.get('/api/v1/inventario/resumen/')

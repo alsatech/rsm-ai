@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 import {
   createProducto,
+  deleteProducto,
   getCategorias,
   getGrupoMaterial,
   getGruposMaterial,
@@ -9,6 +10,7 @@ import {
   getUbicaciones,
 } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
+import { useConfirm } from '../../../hooks/useConfirm'
 import { useToast } from '../../../hooks/useToast'
 import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
 import AgruparMateriales from './AgruparMateriales'
@@ -23,6 +25,7 @@ const inputClass =
 export default function ListaProductos({ ubicacionInicial, grupoInicial, recargar, onVolver, onNuevoMovimiento, onProductoCreado }) {
   const { user } = useAuth()
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [productos, setProductos] = useState([])
   const [categorias, setCategorias] = useState([])
   const [ubicaciones, setUbicaciones] = useState([])
@@ -104,6 +107,25 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
     cargar()
     onProductoCreado?.()
     if (eraCreacion) setGrupoParaEtiqueta(grupoGuardado)
+  }
+
+  const handleEliminarProducto = async (producto) => {
+    const confirmado = await confirm({
+      titulo: '¿Eliminar este material?',
+      mensaje: `"${producto.descripcion}" se quitará de ${UBICACION_LABELS[producto.ubicacion_detalle?.nombre] ?? 'esta ubicación'} y del inventario general. Su historial de movimientos se conserva.`,
+      confirmText: 'Sí, eliminar',
+      cancelText: 'Cancelar',
+      variante: 'peligro',
+    })
+    if (!confirmado) return
+    try {
+      await deleteProducto(producto.id)
+      showToast('🗑️ Producto eliminado', 'exito')
+      cargar()
+      onProductoCreado?.()
+    } catch {
+      showToast('No se pudo eliminar el producto.', 'error')
+    }
   }
 
   const handleCrearProducto = async (data) => {
@@ -278,6 +300,17 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
                           className="rounded-xl border border-border px-3 text-sm transition hover:border-accent"
                         >
                           🏷️
+                        </button>
+                      )}
+                      {puedeGestionarCatalogo && (
+                        <button
+                          type="button"
+                          onClick={() => handleEliminarProducto(producto)}
+                          aria-label="Eliminar producto"
+                          style={{ minHeight: '44px', minWidth: '44px' }}
+                          className="rounded-xl border border-border px-3 text-sm text-red-400 transition hover:border-red-400 hover:bg-red-500/10"
+                        >
+                          🗑️
                         </button>
                       )}
                       {puedeRegistrarMovimiento && (
