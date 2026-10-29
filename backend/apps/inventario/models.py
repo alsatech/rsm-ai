@@ -123,9 +123,10 @@ class MovimientoInventario(models.Model):
     class Tipo(models.TextChoices):
         ENTRADA = 'entrada', 'Entrada'
         SALIDA = 'salida', 'Salida'
+        TRANSFERENCIA = 'transferencia', 'Transferencia'
 
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='movimientos')
-    tipo = models.CharField(max_length=10, choices=Tipo.choices)
+    tipo = models.CharField(max_length=15, choices=Tipo.choices)
     cantidad = models.DecimalField(max_digits=10, decimal_places=2)
     stock_anterior = models.DecimalField(max_digits=10, decimal_places=2)
     stock_resultante = models.DecimalField(max_digits=10, decimal_places=2)

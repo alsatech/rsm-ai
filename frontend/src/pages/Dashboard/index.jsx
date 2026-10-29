@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import ResumenFacturacion from '../Facturacion/components/ResumenFacturacion'
 import ResumenProyectos from '../Proyectos/components/ResumenProyectos'
+import ResumenClima from './components/ResumenClima'
 
 const ROL_LABELS = {
   campo: 'Campo',
@@ -47,6 +48,7 @@ export default function Dashboard() {
       </header>
 
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <ResumenClima />
         <ResumenProyectos />
         <ResumenFacturacion />
       </div>

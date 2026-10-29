@@ -104,6 +104,44 @@ class InventarioAPITest(APITestCase):
         self.producto.refresh_from_db()
         self.assertEqual(self.producto.stock_actual, 10)
 
+    def test_inventario_registra_entrada_rapida(self):
+        # Alta rápida: Yajaira ya tiene el material en la mano y solo necesita que suba el
+        # stock, sin pasar por Adquisiciones (sin solicitud, sin factura, sin proveedor).
+        self._auth(self.inventario)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/entrada-rapida/',
+            {'producto': self.producto.id, 'cantidad': '5.00'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data['tipo'], 'entrada')
+        self.assertTrue(resp.data['validado'])
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 15)
+
+    def test_entrada_rapida_permite_elegir_ubicacion_distinta(self):
+        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
+        self._auth(self.inventario)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/entrada-rapida/',
+            {'producto': self.producto.id, 'cantidad': '5.00', 'ubicacion': otra_ubicacion.id},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.ubicacion_id, otra_ubicacion.id)
+
+    def test_campo_no_puede_registrar_entrada_rapida(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/entrada-rapida/',
+            {'producto': self.producto.id, 'cantidad': '5.00'},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 10)
+
     def test_stock_no_puede_ser_negativo(self):
         self._auth(self.campo)
         resp = self.client.post(
@@ -331,6 +369,41 @@ class InventarioAPITest(APITestCase):
         producto = crear_producto(codigo='SM-BORRAR-002')
         self._auth(self.campo)
         resp = self.client.delete(f'/api/v1/inventario/productos/{producto.id}/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_inventario_transfiere_producto_a_otra_ubicacion(self):
+        # Caso raro: el material ya está físicamente en otra bodega y hay que corregirlo.
+        # Se mueve TODO el stock (no hay transferencias parciales).
+        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/transferir/',
+            {'ubicacion_destino': otra_ubicacion.id},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data['tipo'], 'transferencia')
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.ubicacion_id, otra_ubicacion.id)
+        self.assertEqual(self.producto.stock_actual, 10)  # la cantidad no cambia, solo la ubicación
+
+    def test_transferir_a_la_misma_ubicacion_falla(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/transferir/',
+            {'ubicacion_destino': self.producto.ubicacion_id},
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_campo_no_puede_transferir_producto(self):
+        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
+        self._auth(self.campo)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/transferir/',
+            {'ubicacion_destino': otra_ubicacion.id},
+            format='json',
+        )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_resumen_inventario(self):

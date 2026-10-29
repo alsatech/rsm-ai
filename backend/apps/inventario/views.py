@@ -169,6 +169,47 @@ class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.save(update_fields=['activo'])
 
 
+class TransferirProductoView(APIView):
+    """POST /productos/{id}/transferir/ — caso raro: el material ya está físicamente en otra
+    ubicación y hay que corregirlo en el sistema. Mueve TODO el stock del producto a la nueva
+    ubicación (no soporta transferencias parciales) y deja un MovimientoInventario tipo
+    'transferencia' para trazabilidad, sin tocar la cantidad."""
+
+    permission_classes = [IsAuthenticated, PuedeGestionarCatalogo]
+
+    def post(self, request, pk):
+        producto = get_object_or_404(Producto, pk=pk)
+        ubicacion_destino = get_object_or_404(Ubicacion, pk=request.data.get('ubicacion_destino'))
+
+        if ubicacion_destino.id == producto.ubicacion_id:
+            return Response(
+                {'ubicacion_destino': 'El producto ya está en esa ubicación.'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ubicacion_origen = producto.ubicacion
+        producto.ubicacion = ubicacion_destino
+        if producto.grupo_id and producto.grupo.ubicacion_id != ubicacion_destino.id:
+            producto.grupo = None
+        producto.save(update_fields=['ubicacion', 'grupo', 'updated_at'])
+
+        movimiento = MovimientoInventario.objects.create(
+            producto=producto,
+            tipo=MovimientoInventario.Tipo.TRANSFERENCIA,
+            cantidad=producto.stock_actual,
+            stock_anterior=producto.stock_actual,
+            stock_resultante=producto.stock_actual,
+            responsable=request.user,
+            uso_descripcion=f'Transferencia de {ubicacion_origen.get_nombre_display()} a {ubicacion_destino.get_nombre_display()}',
+            fecha_movimiento=timezone.localdate(),
+            validado=True,
+            validado_por=request.user,
+        )
+        return Response(
+            MovimientoInventarioSerializer(movimiento, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
 class RecalcularClasificacionABCView(APIView):
     """POST /productos/clasificacion-abc/recalcular/ — recalcula clase/score ABC de
     todos los productos activos y los persiste."""
@@ -749,6 +790,54 @@ class DarEntradaRecepcionView(APIView):
         recepcion.save(update_fields=['entrada_confirmada', 'entrada_confirmada_por', 'entrada_confirmada_en'])
 
         return Response(RecepcionMaterialSerializer(recepcion, context={'request': request}).data)
+
+
+class EntradaRapidaView(APIView):
+    """POST /movimientos/entrada-rapida/ — alta rápida de material que Yajaira ya tiene
+    físicamente en la mano, sin pasar por Adquisiciones (sin solicitud, sin factura, sin
+    proveedor). A diferencia de DarEntradaRecepcionView, aquí ella elige la ubicación antes
+    de elegir el material y la cantidad."""
+
+    permission_classes = [IsAuthenticated, PuedeDarEntradaRecepcion]
+
+    def post(self, request):
+        producto = get_object_or_404(Producto, pk=request.data.get('producto'))
+
+        try:
+            cantidad = Decimal(str(request.data.get('cantidad', '')))
+        except InvalidOperation:
+            return Response({'cantidad': 'Cantidad inválida.'}, status=status.HTTP_400_BAD_REQUEST)
+        if cantidad <= 0:
+            return Response({'cantidad': 'La cantidad debe ser mayor a 0.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        ubicacion_id = request.data.get('ubicacion')
+        if ubicacion_id and str(ubicacion_id) != str(producto.ubicacion_id):
+            nueva_ubicacion = get_object_or_404(Ubicacion, pk=ubicacion_id)
+            producto.ubicacion = nueva_ubicacion
+            if producto.grupo_id and producto.grupo.ubicacion_id != nueva_ubicacion.id:
+                producto.grupo = None
+
+        stock_anterior = producto.stock_actual
+        stock_resultante = stock_anterior + cantidad
+        producto.stock_actual = stock_resultante
+        producto.save(update_fields=['ubicacion', 'grupo', 'stock_actual', 'updated_at'])
+
+        movimiento = MovimientoInventario.objects.create(
+            producto=producto,
+            tipo=MovimientoInventario.Tipo.ENTRADA,
+            cantidad=cantidad,
+            stock_anterior=stock_anterior,
+            stock_resultante=stock_resultante,
+            responsable=request.user,
+            uso_descripcion=request.data.get('notas') or 'Entrada rápida (sin factura/proveedor)',
+            fecha_movimiento=timezone.localdate(),
+            validado=True,
+            validado_por=request.user,
+        )
+        return Response(
+            MovimientoInventarioSerializer(movimiento, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class ComparativoSolicitudView(APIView):

@@ -15,6 +15,8 @@ export const createMovimiento = (data) =>
   api.post('/api/v1/inventario/movimientos/', data, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
+export const registrarEntradaRapida = (data) => api.post('/api/v1/inventario/movimientos/entrada-rapida/', data)
+export const transferirProducto = (id, data) => api.post(`/api/v1/inventario/productos/${id}/transferir/`, data)
 export const cancelarMovimiento = (id, data) => api.patch(`/api/v1/inventario/movimientos/${id}/cancelar/`, data)
 export const cerrarResguardo = (id, data) =>
   api.patch(`/api/v1/inventario/movimientos/${id}/cerrar-resguardo/`, data)

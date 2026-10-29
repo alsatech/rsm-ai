@@ -14,10 +14,12 @@ import { useConfirm } from '../../../hooks/useConfirm'
 import { useToast } from '../../../hooks/useToast'
 import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
 import AgruparMateriales from './AgruparMateriales'
+import EntradaRapida from './EntradaRapida'
 import EtiquetaGrupo from './EtiquetaGrupo'
 import EtiquetaProducto from './EtiquetaProducto'
 import EtiquetasUbicacion from './EtiquetasUbicacion'
 import FormularioProducto from './FormularioProducto'
+import TransferirProducto from './TransferirProducto'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -43,8 +45,11 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
   const [mostrarAgrupar, setMostrarAgrupar] = useState(false)
   const [grupoParaEditar, setGrupoParaEditar] = useState(null)
   const [grupoParaEtiqueta, setGrupoParaEtiqueta] = useState(null)
+  const [mostrarEntradaRapida, setMostrarEntradaRapida] = useState(false)
+  const [productoParaTransferir, setProductoParaTransferir] = useState(null)
 
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
+  const puedeDarEntrada = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeRegistrarMovimiento = user?.rol !== 'operaciones'
 
   const cargar = useCallback(async () => {
@@ -126,6 +131,18 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
     } catch {
       showToast('No se pudo eliminar el producto.', 'error')
     }
+  }
+
+  const handleEntradaRapidaGuardada = () => {
+    setMostrarEntradaRapida(false)
+    cargar()
+    onProductoCreado?.()
+  }
+
+  const handleTransferenciaGuardada = () => {
+    setProductoParaTransferir(null)
+    cargar()
+    onProductoCreado?.()
   }
 
   const handleCrearProducto = async (data) => {
@@ -223,6 +240,16 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
             >
               + Nuevo producto
             </button>
+            {puedeDarEntrada && (
+              <button
+                type="button"
+                onClick={() => setMostrarEntradaRapida(true)}
+                style={{ minHeight: '52px' }}
+                className="flex-1 rounded-xl bg-accent px-6 text-sm font-bold text-highlight transition hover:opacity-90 sm:flex-none"
+              >
+                ⚡ Entrada rápida
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setMostrarAgrupar(true)}
@@ -305,6 +332,17 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
                       {puedeGestionarCatalogo && (
                         <button
                           type="button"
+                          onClick={() => setProductoParaTransferir(producto)}
+                          aria-label="Transferir a otra ubicación"
+                          style={{ minHeight: '44px', minWidth: '44px' }}
+                          className="rounded-xl border border-border px-3 text-sm transition hover:border-accent"
+                        >
+                          🔄
+                        </button>
+                      )}
+                      {puedeGestionarCatalogo && (
+                        <button
+                          type="button"
                           onClick={() => handleEliminarProducto(producto)}
                           aria-label="Eliminar producto"
                           style={{ minHeight: '44px', minWidth: '44px' }}
@@ -364,6 +402,23 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
 
       {grupoParaEtiqueta && (
         <EtiquetaGrupo grupo={grupoParaEtiqueta} onCerrar={() => setGrupoParaEtiqueta(null)} />
+      )}
+
+      {mostrarEntradaRapida && (
+        <EntradaRapida
+          ubicaciones={ubicaciones}
+          onGuardado={handleEntradaRapidaGuardada}
+          onCerrar={() => setMostrarEntradaRapida(false)}
+        />
+      )}
+
+      {productoParaTransferir && (
+        <TransferirProducto
+          producto={productoParaTransferir}
+          ubicaciones={ubicaciones}
+          onGuardado={handleTransferenciaGuardada}
+          onCerrar={() => setProductoParaTransferir(null)}
+        />
       )}
     </div>
   )
