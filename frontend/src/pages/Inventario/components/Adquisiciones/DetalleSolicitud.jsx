@@ -6,6 +6,7 @@ import {
   getComparativoSolicitud,
   getRecepciones,
   getSolicitud,
+  getUbicaciones,
   rechazarSolicitud,
 } from '../../../../api/inventario'
 import { useAuth } from '../../../../hooks/useAuth'
@@ -40,6 +41,8 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
   const [solicitud, setSolicitud] = useState(null)
   const [comparativo, setComparativo] = useState(null)
   const [recepciones, setRecepciones] = useState([])
+  const [ubicaciones, setUbicaciones] = useState([])
+  const [ubicacionPorItem, setUbicacionPorItem] = useState({})
   const [loading, setLoading] = useState(true)
   const [notas, setNotas] = useState('')
   const [procesando, setProcesando] = useState(false)
@@ -59,8 +62,25 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
         try {
           const { data: reps } = await getRecepciones(solicitudId)
           setRecepciones(reps)
+          setUbicacionPorItem((actual) => {
+            const siguiente = { ...actual }
+            reps.forEach((rec) => {
+              rec.items.forEach((item) => {
+                if (siguiente[item.id] === undefined) {
+                  siguiente[item.id] = item.item_solicitud_detalle?.producto_detalle?.ubicacion ?? ''
+                }
+              })
+            })
+            return siguiente
+          })
         } catch {
           setRecepciones([])
+        }
+        try {
+          const { data: ubis } = await getUbicaciones()
+          setUbicaciones(ubis)
+        } catch {
+          setUbicaciones([])
         }
       }
     } finally {
@@ -125,18 +145,22 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
     }
   }
 
-  const handleDarEntrada = async (recepcionId) => {
+  const handleDarEntrada = async (recepcionId, items) => {
     const confirmado = await confirm({
       titulo: '¿Dar entrada a este material?',
-      mensaje: 'El stock del inventario subirá con las cantidades que reportó quien recibió.',
+      mensaje: 'El stock del inventario subirá con las cantidades que reportó quien recibió, en la ubicación elegida.',
       confirmText: 'Sí, dar entrada',
       cancelText: 'Cancelar',
       variante: 'pregunta',
     })
     if (!confirmado) return
+    const ubicacionesElegidas = {}
+    items.forEach((item) => {
+      if (ubicacionPorItem[item.id]) ubicacionesElegidas[item.id] = ubicacionPorItem[item.id]
+    })
     setProcesando(true)
     try {
-      await darEntradaRecepcion(solicitud.id, recepcionId)
+      await darEntradaRecepcion(solicitud.id, recepcionId, ubicacionesElegidas)
       showToast('✅ Entrada confirmada — el stock se actualizó', 'exito')
       cargar()
     } catch {
@@ -296,6 +320,25 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                           className="mt-2 h-16 w-16 rounded-lg border border-border object-cover"
                         />
                       )}
+                      {!rec.entrada_confirmada && item.item_solicitud_detalle?.producto_detalle && (
+                        <label className="mt-2 flex flex-col gap-1 text-xs text-text-secondary">
+                          📍 Ubicación de entrada
+                          <select
+                            value={ubicacionPorItem[item.id] ?? ''}
+                            onChange={(e) =>
+                              setUbicacionPorItem((actual) => ({ ...actual, [item.id]: e.target.value }))
+                            }
+                            style={{ minHeight: '44px' }}
+                            className="rounded-lg border border-border bg-bg px-2 text-sm text-text"
+                          >
+                            {ubicaciones.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.nombre_display}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
                     </div>
                   )
                 })}
@@ -320,7 +363,7 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                 ROLES_COMPARATIVO.includes(user?.rol) && (
                   <button
                     type="button"
-                    onClick={() => handleDarEntrada(rec.id)}
+                    onClick={() => handleDarEntrada(rec.id, rec.items)}
                     disabled={procesando}
                     style={{ minHeight: '52px' }}
                     className="mt-3 w-full rounded-xl bg-accent text-sm font-bold text-highlight transition hover:opacity-90 disabled:opacity-50"

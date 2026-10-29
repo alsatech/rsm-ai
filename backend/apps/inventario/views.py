@@ -689,7 +689,11 @@ class RecepcionesSolicitudView(APIView):
 class DarEntradaRecepcionView(APIView):
     """POST /solicitudes/{id}/recepciones/{recepcion_id}/dar-entrada/ — Yajaira revisa lo que
     reportó Campo (fotos, audio, cantidades) contra la compra y confirma: aquí (y no en la
-    recepción de Campo) es donde se genera el MovimientoInventario real y sube el stock."""
+    recepción de Campo) es donde se genera el MovimientoInventario real y sube el stock.
+
+    Body opcional: {'ubicaciones': {'<item_recepcion_id>': <ubicacion_id>, ...}} — permite
+    elegir/cambiar la ubicación final de cada material al momento de dar entrada. Si no se
+    manda, se conserva la ubicación que el producto ya tenía en catálogo."""
 
     permission_classes = [IsAuthenticated, PuedeDarEntradaRecepcion]
 
@@ -704,11 +708,21 @@ class DarEntradaRecepcionView(APIView):
                 {'detail': 'Ya se le dio entrada a esta recepción.'}, status=status.HTTP_400_BAD_REQUEST,
             )
 
+        ubicaciones_elegidas = request.data.get('ubicaciones') or {}
+
         for item_recepcion in recepcion.items.all():
             item_solicitud = item_recepcion.item_solicitud
             producto = item_solicitud.producto
             if not producto or item_recepcion.cantidad_recibida <= 0:
                 continue
+
+            ubicacion_id = ubicaciones_elegidas.get(str(item_recepcion.id))
+            if ubicacion_id and str(ubicacion_id) != str(producto.ubicacion_id):
+                nueva_ubicacion = get_object_or_404(Ubicacion, pk=ubicacion_id)
+                producto.ubicacion = nueva_ubicacion
+                if producto.grupo_id and producto.grupo.ubicacion_id != nueva_ubicacion.id:
+                    producto.grupo = None
+                producto.save(update_fields=['ubicacion', 'grupo', 'updated_at'])
 
             stock_anterior = producto.stock_actual
             stock_resultante = stock_anterior + item_recepcion.cantidad_recibida

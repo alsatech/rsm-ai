@@ -51,8 +51,8 @@ export const crearRecepcion = (solicitudId, formData) =>
   api.post(`/api/v1/inventario/solicitudes/${solicitudId}/recepciones/`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   })
-export const darEntradaRecepcion = (solicitudId, recepcionId) =>
-  api.post(`/api/v1/inventario/solicitudes/${solicitudId}/recepciones/${recepcionId}/dar-entrada/`)
+export const darEntradaRecepcion = (solicitudId, recepcionId, ubicaciones = {}) =>
+  api.post(`/api/v1/inventario/solicitudes/${solicitudId}/recepciones/${recepcionId}/dar-entrada/`, { ubicaciones })
 export const getComparativoSolicitud = (id) => api.get(`/api/v1/inventario/solicitudes/${id}/comparativo/`)
 export const registrarCompra = (solicitudId, formData) =>
   api.post(`/api/v1/inventario/solicitudes/${solicitudId}/compra/`, formData, {

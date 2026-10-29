@@ -546,6 +546,23 @@ class AdquisicionesAPITest(APITestCase):
         self.assertTrue(movimiento.validado)
         self.assertEqual(movimiento.validado_por_id, self.inventario.id)
 
+    def test_dar_entrada_permite_elegir_ubicacion_distinta(self):
+        # Yajaira puede mandar el material a otra bodega (ej. Bodega Nueva) al dar entrada,
+        # distinta a la que el producto tenía fija en catálogo.
+        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
+        solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
+        item_recepcion_id = recepcion['items'][0]['id']
+
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
+            {'ubicaciones': {item_recepcion_id: otra_ubicacion.id}}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.ubicacion_id, otra_ubicacion.id)
+
     def test_dar_entrada_dos_veces_falla(self):
         solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
 
