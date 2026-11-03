@@ -134,7 +134,7 @@ class MovimientoInventario(models.Model):
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='movimientos_inventario'
     )
     uso_descripcion = models.TextField(blank=True)  # "¿Para qué se usó?"
-    vehiculo_codigo = models.CharField(max_length=20, blank=True)  # legacy: copia legible del vehiculo FK
+    vehiculo_codigo = models.CharField(max_length=150, blank=True)  # legacy: copia legible del vehiculo FK
     vehiculo = models.ForeignKey(
         'flota.Vehiculo',
         null=True,
