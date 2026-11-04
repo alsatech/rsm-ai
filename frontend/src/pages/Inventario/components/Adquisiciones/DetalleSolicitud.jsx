@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from 'react'
 import {
   autorizarSolicitud,
   darEntradaRecepcion,
+  getCategorias,
   getComparativoSolicitud,
   getRecepciones,
   getSolicitud,
@@ -42,7 +43,9 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
   const [comparativo, setComparativo] = useState(null)
   const [recepciones, setRecepciones] = useState([])
   const [ubicaciones, setUbicaciones] = useState([])
+  const [categorias, setCategorias] = useState([])
   const [ubicacionPorItem, setUbicacionPorItem] = useState({})
+  const [productoNuevoPorItem, setProductoNuevoPorItem] = useState({})
   const [loading, setLoading] = useState(true)
   const [notas, setNotas] = useState('')
   const [procesando, setProcesando] = useState(false)
@@ -81,6 +84,12 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
           setUbicaciones(ubis)
         } catch {
           setUbicaciones([])
+        }
+        try {
+          const { data: cats } = await getCategorias()
+          setCategorias(cats)
+        } catch {
+          setCategorias([])
         }
       }
     } finally {
@@ -146,25 +155,54 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
   }
 
   const handleDarEntrada = async (recepcionId, items) => {
+    const itemsNuevos = items.filter(
+      (item) => item.cantidad_recibida > 0 && !item.item_solicitud_detalle?.producto_detalle,
+    )
+    const faltantes = itemsNuevos.filter((item) => {
+      const datos = productoNuevoPorItem[item.id] ?? {}
+      return !datos.codigo?.trim() || !datos.categoria || !ubicacionPorItem[item.id]
+    })
+    if (faltantes.length > 0) {
+      showToast(
+        'Captura código, categoría y ubicación para cada producto nuevo antes de dar entrada.',
+        'alerta',
+      )
+      return
+    }
+
     const confirmado = await confirm({
       titulo: '¿Dar entrada a este material?',
-      mensaje: 'El stock del inventario subirá con las cantidades que reportó quien recibió, en la ubicación elegida.',
+      mensaje: itemsNuevos.length > 0
+        ? 'El stock subirá con las cantidades reportadas. Los productos nuevos quedarán dados de alta en el catálogo con su código y QR.'
+        : 'El stock del inventario subirá con las cantidades que reportó quien recibió, en la ubicación elegida.',
       confirmText: 'Sí, dar entrada',
       cancelText: 'Cancelar',
       variante: 'pregunta',
     })
     if (!confirmado) return
+
     const ubicacionesElegidas = {}
+    const productosNuevos = {}
     items.forEach((item) => {
       if (ubicacionPorItem[item.id]) ubicacionesElegidas[item.id] = ubicacionPorItem[item.id]
+      if (!item.item_solicitud_detalle?.producto_detalle && productoNuevoPorItem[item.id]) {
+        const { codigo, categoria } = productoNuevoPorItem[item.id]
+        productosNuevos[item.id] = { codigo: codigo.trim(), categoria }
+      }
     })
+
     setProcesando(true)
     try {
-      await darEntradaRecepcion(solicitud.id, recepcionId, ubicacionesElegidas)
+      await darEntradaRecepcion(solicitud.id, recepcionId, ubicacionesElegidas, productosNuevos)
       showToast('✅ Entrada confirmada — el stock se actualizó', 'exito')
       cargar()
-    } catch {
-      showToast('No se pudo dar entrada.', 'error')
+    } catch (error) {
+      const pendientes = error?.response?.data?.productos_nuevos_pendientes
+      if (pendientes?.length) {
+        showToast(pendientes[0].detail || 'Revisa los datos de los productos nuevos.', 'error')
+      } else {
+        showToast('No se pudo dar entrada.', 'error')
+      }
     } finally {
       setProcesando(false)
     }
@@ -338,6 +376,66 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                             ))}
                           </select>
                         </label>
+                      )}
+
+                      {!rec.entrada_confirmada && !item.item_solicitud_detalle?.producto_detalle && (
+                        <div className="mt-2 flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-2">
+                          <p className="text-xs font-semibold text-warning">
+                            ⚠️ Producto nuevo — no existe en catálogo. Captura sus datos para darlo de alta con código y QR.
+                          </p>
+                          <div className="grid grid-cols-2 gap-2">
+                            <label className="flex flex-col gap-1 text-xs text-text-secondary">
+                              Código *
+                              <input
+                                value={productoNuevoPorItem[item.id]?.codigo ?? ''}
+                                onChange={(e) =>
+                                  setProductoNuevoPorItem((actual) => ({
+                                    ...actual,
+                                    [item.id]: { ...actual[item.id], codigo: e.target.value },
+                                  }))
+                                }
+                                placeholder="Ej: SM-200"
+                                style={{ minHeight: '44px' }}
+                                className="rounded-lg border border-border bg-bg px-2 text-sm text-text"
+                              />
+                            </label>
+                            <label className="flex flex-col gap-1 text-xs text-text-secondary">
+                              Categoría *
+                              <select
+                                value={productoNuevoPorItem[item.id]?.categoria ?? ''}
+                                onChange={(e) =>
+                                  setProductoNuevoPorItem((actual) => ({
+                                    ...actual,
+                                    [item.id]: { ...actual[item.id], categoria: e.target.value },
+                                  }))
+                                }
+                                style={{ minHeight: '44px' }}
+                                className="rounded-lg border border-border bg-bg px-2 text-sm text-text"
+                              >
+                                <option value="">Elegir…</option>
+                                {categorias.map((c) => (
+                                  <option key={c.id} value={c.id}>{c.icono} {c.nombre}</option>
+                                ))}
+                              </select>
+                            </label>
+                          </div>
+                          <label className="flex flex-col gap-1 text-xs text-text-secondary">
+                            📍 Ubicación *
+                            <select
+                              value={ubicacionPorItem[item.id] ?? ''}
+                              onChange={(e) =>
+                                setUbicacionPorItem((actual) => ({ ...actual, [item.id]: e.target.value }))
+                              }
+                              style={{ minHeight: '44px' }}
+                              className="rounded-lg border border-border bg-bg px-2 text-sm text-text"
+                            >
+                              <option value="">Elegir…</option>
+                              {ubicaciones.map((u) => (
+                                <option key={u.id} value={u.id}>{u.nombre_display}</option>
+                              ))}
+                            </select>
+                          </label>
+                        </div>
                       )}
                     </div>
                   )

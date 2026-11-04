@@ -1,7 +1,7 @@
 import json
 from decimal import Decimal, InvalidOperation
 
-from django.db import models
+from django.db import models, transaction
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -732,9 +732,17 @@ class DarEntradaRecepcionView(APIView):
     reportó Campo (fotos, audio, cantidades) contra la compra y confirma: aquí (y no en la
     recepción de Campo) es donde se genera el MovimientoInventario real y sube el stock.
 
-    Body opcional: {'ubicaciones': {'<item_recepcion_id>': <ubicacion_id>, ...}} — permite
-    elegir/cambiar la ubicación final de cada material al momento de dar entrada. Si no se
-    manda, se conserva la ubicación que el producto ya tenía en catálogo."""
+    Body opcional:
+    - {'ubicaciones': {'<item_recepcion_id>': <ubicacion_id>, ...}} — permite elegir/cambiar la
+      ubicación final de cada material al momento de dar entrada. Si no se manda para un producto
+      que ya existía en catálogo, se conserva la ubicación que ya tenía.
+    - {'productos_nuevos': {'<item_recepcion_id>': {'codigo': ..., 'categoria': <id>,
+      'unidad_medida': ..., 'stock_minimo': ..., 'costo_unitario': ..., 'criticidad': ...}, ...}}
+      — da de alta en catálogo (código + QR) los ítems que se solicitaron como "producto nuevo"
+      (sin producto de catálogo ligado). 'ubicacion' para estos sale de 'ubicaciones' con el mismo
+      item_recepcion_id. Si falta algún dato obligatorio para un ítem nuevo, no se aplica nada
+      (ni para ese ítem ni para el resto) y se regresa 400 detallando qué falta — antes estos
+      ítems se saltaban en silencio y el material llegaba sin subir al stock."""
 
     permission_classes = [IsAuthenticated, PuedeDarEntradaRecepcion]
 
@@ -750,44 +758,106 @@ class DarEntradaRecepcionView(APIView):
             )
 
         ubicaciones_elegidas = request.data.get('ubicaciones') or {}
+        productos_nuevos = request.data.get('productos_nuevos') or {}
 
-        for item_recepcion in recepcion.items.all():
-            item_solicitud = item_recepcion.item_solicitud
-            producto = item_solicitud.producto
-            if not producto or item_recepcion.cantidad_recibida <= 0:
+        items_a_procesar = [
+            item_recepcion for item_recepcion in recepcion.items.all()
+            if item_recepcion.cantidad_recibida > 0
+        ]
+
+        # Primera pasada: valida que todo ítem sin producto de catálogo traiga los datos
+        # necesarios para darlo de alta, antes de tocar stock de ningún ítem.
+        errores = []
+        for item_recepcion in items_a_procesar:
+            if item_recepcion.item_solicitud.producto:
                 continue
+            datos = productos_nuevos.get(str(item_recepcion.id)) or {}
+            ubicacion_id = ubicaciones_elegidas.get(str(item_recepcion.id)) or datos.get('ubicacion')
+            faltantes = [
+                campo for campo, valor in (('codigo', datos.get('codigo')), ('categoria', datos.get('categoria')))
+                if not valor
+            ]
+            if not ubicacion_id:
+                faltantes.append('ubicacion')
+            if faltantes:
+                errores.append({
+                    'item_recepcion': item_recepcion.id,
+                    'descripcion': item_recepcion.item_solicitud.descripcion_libre,
+                    'faltan': faltantes,
+                })
+            elif Producto.objects.filter(codigo=datos['codigo']).exists():
+                errores.append({
+                    'item_recepcion': item_recepcion.id,
+                    'descripcion': item_recepcion.item_solicitud.descripcion_libre,
+                    'faltan': [],
+                    'detail': f"Ya existe un producto con el código {datos['codigo']}.",
+                })
 
-            ubicacion_id = ubicaciones_elegidas.get(str(item_recepcion.id))
-            if ubicacion_id and str(ubicacion_id) != str(producto.ubicacion_id):
-                nueva_ubicacion = get_object_or_404(Ubicacion, pk=ubicacion_id)
-                producto.ubicacion = nueva_ubicacion
-                if producto.grupo_id and producto.grupo.ubicacion_id != nueva_ubicacion.id:
-                    producto.grupo = None
-                producto.save(update_fields=['ubicacion', 'grupo', 'updated_at'])
-
-            stock_anterior = producto.stock_actual
-            stock_resultante = stock_anterior + item_recepcion.cantidad_recibida
-            producto.stock_actual = stock_resultante
-            producto.save(update_fields=['stock_actual', 'updated_at'])
-
-            MovimientoInventario.objects.create(
-                producto=producto,
-                tipo=MovimientoInventario.Tipo.ENTRADA,
-                cantidad=item_recepcion.cantidad_recibida,
-                stock_anterior=stock_anterior,
-                stock_resultante=stock_resultante,
-                responsable=request.user,
-                solicitud=solicitud,
-                uso_descripcion=f'Entrada confirmada por recepción de la solicitud {solicitud.folio}',
-                fecha_movimiento=timezone.localdate(),
-                validado=True,
-                validado_por=request.user,
+        if errores:
+            return Response(
+                {
+                    'detail': 'Faltan datos para dar de alta uno o más productos nuevos.',
+                    'productos_nuevos_pendientes': errores,
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
-        recepcion.entrada_confirmada = True
-        recepcion.entrada_confirmada_por = request.user
-        recepcion.entrada_confirmada_en = timezone.now()
-        recepcion.save(update_fields=['entrada_confirmada', 'entrada_confirmada_por', 'entrada_confirmada_en'])
+        with transaction.atomic():
+            for item_recepcion in items_a_procesar:
+                item_solicitud = item_recepcion.item_solicitud
+                producto = item_solicitud.producto
+                ubicacion_id = ubicaciones_elegidas.get(str(item_recepcion.id))
+
+                if not producto:
+                    datos = productos_nuevos[str(item_recepcion.id)]
+                    ubicacion_nueva = get_object_or_404(
+                        Ubicacion, pk=ubicacion_id or datos.get('ubicacion'),
+                    )
+                    categoria = get_object_or_404(CategoriaInventario, pk=datos['categoria'])
+                    producto = Producto.objects.create(
+                        codigo=datos['codigo'],
+                        descripcion=item_solicitud.descripcion_libre,
+                        categoria=categoria,
+                        ubicacion=ubicacion_nueva,
+                        unidad_medida=datos.get('unidad_medida') or Producto.UnidadMedida.PIEZA,
+                        stock_minimo=datos.get('stock_minimo') or 0,
+                        costo_unitario=datos.get('costo_unitario') or 0,
+                        criticidad=datos.get('criticidad') or Producto.Criticidad.MEDIA,
+                    )
+                    item_solicitud.producto = producto
+                    item_solicitud.save(update_fields=['producto'])
+                elif ubicacion_id and str(ubicacion_id) != str(producto.ubicacion_id):
+                    nueva_ubicacion = get_object_or_404(Ubicacion, pk=ubicacion_id)
+                    producto.ubicacion = nueva_ubicacion
+                    if producto.grupo_id and producto.grupo.ubicacion_id != nueva_ubicacion.id:
+                        producto.grupo = None
+                    producto.save(update_fields=['ubicacion', 'grupo', 'updated_at'])
+
+                stock_anterior = producto.stock_actual
+                stock_resultante = stock_anterior + item_recepcion.cantidad_recibida
+                producto.stock_actual = stock_resultante
+                producto.save(update_fields=['stock_actual', 'updated_at'])
+
+                MovimientoInventario.objects.create(
+                    producto=producto,
+                    tipo=MovimientoInventario.Tipo.ENTRADA,
+                    cantidad=item_recepcion.cantidad_recibida,
+                    stock_anterior=stock_anterior,
+                    stock_resultante=stock_resultante,
+                    responsable=request.user,
+                    solicitud=solicitud,
+                    uso_descripcion=f'Entrada confirmada por recepción de la solicitud {solicitud.folio}',
+                    fecha_movimiento=timezone.localdate(),
+                    validado=True,
+                    validado_por=request.user,
+                )
+
+            recepcion.entrada_confirmada = True
+            recepcion.entrada_confirmada_por = request.user
+            recepcion.entrada_confirmada_en = timezone.now()
+            recepcion.save(
+                update_fields=['entrada_confirmada', 'entrada_confirmada_por', 'entrada_confirmada_en'],
+            )
 
         return Response(RecepcionMaterialSerializer(recepcion, context={'request': request}).data)
 

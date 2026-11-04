@@ -657,6 +657,109 @@ class AdquisicionesAPITest(APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def _crear_recepcion_producto_nuevo(self, cantidad='3.00'):
+        """Igual que _crear_recepcion_completa pero el ítem solicitado no existe en catálogo
+        (es_producto_nuevo, sin producto FK) — así se ejercita el alta en 'dar entrada'."""
+        self._auth(self.campo)
+        payload = {
+            'area': 'campo',
+            'descripcion_necesidad': 'Material nuevo para bebederos',
+            'estado': 'enviada',
+            'items': [
+                {
+                    'descripcion_libre': 'Manguera de 1 pulgada',
+                    'cantidad_solicitada': cantidad,
+                    'unidad': 'rollo',
+                    'es_producto_nuevo': True,
+                },
+            ],
+        }
+        resp = self.client.post('/api/v1/inventario/solicitudes/', payload, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        solicitud = resp.data
+        item_id = solicitud['items'][0]['id']
+        self._enviar(solicitud['id'], item_id, self.operaciones, cantidad=cantidad)
+
+        self._auth(self.campo)
+        data = {
+            'estado_general': 'completo',
+            'items': json.dumps([{'item_solicitud': item_id, 'cantidad_recibida': cantidad, 'estado_item': 'ok'}]),
+            'fotos_llegada': [_fake_foto('llegada.jpg')],
+        }
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/', data, format='multipart',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        return solicitud, resp.data
+
+    def test_dar_entrada_sin_datos_de_producto_nuevo_no_aplica_nada(self):
+        # Antes de este fix, un ítem 'producto nuevo' se saltaba en silencio y el material se
+        # perdía (la recepción quedaba marcada como entrada confirmada sin subir stock). Ahora
+        # debe rechazarse con 400 y no tocar nada, en vez de aplicar los demás ítems a medias.
+        solicitud, recepcion = self._crear_recepcion_producto_nuevo(cantidad='3.00')
+
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
+            {}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(len(resp.data['productos_nuevos_pendientes']), 1)
+
+        recepcion_db = RecepcionMaterial.objects.get(pk=recepcion['id'])
+        self.assertFalse(recepcion_db.entrada_confirmada)
+        self.assertFalse(Producto.objects.filter(codigo='SM-NUEVO-MANGUERA').exists())
+
+    def test_dar_entrada_con_datos_da_de_alta_el_producto_y_sube_stock(self):
+        solicitud, recepcion = self._crear_recepcion_producto_nuevo(cantidad='3.00')
+        item_recepcion_id = recepcion['items'][0]['id']
+        categoria = CategoriaInventario.objects.first()
+        ubicacion = Ubicacion.objects.first()
+
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
+            {
+                'ubicaciones': {item_recepcion_id: ubicacion.id},
+                'productos_nuevos': {item_recepcion_id: {'codigo': 'SM-NUEVO-MANGUERA', 'categoria': categoria.id}},
+            },
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
+        self.assertTrue(resp.data['entrada_confirmada'])
+
+        producto = Producto.objects.get(codigo='SM-NUEVO-MANGUERA')
+        self.assertEqual(producto.descripcion, 'Manguera de 1 pulgada')
+        self.assertEqual(producto.categoria_id, categoria.id)
+        self.assertEqual(producto.ubicacion_id, ubicacion.id)
+        self.assertEqual(producto.stock_actual, Decimal('3.00'))
+
+        item_solicitud = ItemSolicitud.objects.get(pk=solicitud['items'][0]['id'])
+        self.assertEqual(item_solicitud.producto_id, producto.id)
+
+        movimiento = MovimientoInventario.objects.get(producto=producto, tipo=MovimientoInventario.Tipo.ENTRADA)
+        self.assertEqual(movimiento.cantidad, Decimal('3.00'))
+        self.assertEqual(movimiento.stock_anterior, 0)
+
+    def test_dar_entrada_producto_nuevo_con_codigo_repetido_falla(self):
+        solicitud, recepcion = self._crear_recepcion_producto_nuevo(cantidad='3.00')
+        item_recepcion_id = recepcion['items'][0]['id']
+        categoria = CategoriaInventario.objects.first()
+        ubicacion = Ubicacion.objects.first()
+
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
+            {
+                'ubicaciones': {item_recepcion_id: ubicacion.id},
+                'productos_nuevos': {
+                    item_recepcion_id: {'codigo': self.producto.codigo, 'categoria': categoria.id},
+                },
+            },
+            format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_recepcion_con_nota_de_voz_se_guarda(self):
         solicitud = self._crear_solicitud(self.campo, cantidad='5.00')
         item_id = solicitud['items'][0]['id']
