@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 
-import { getMovimientos } from '../../../api/inventario'
+import { getMovimientos, getUbicaciones } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
-import { UNIDAD_LABELS } from '../constants'
+import { UBICACION_LABELS, UNIDAD_LABELS } from '../constants'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -14,11 +14,12 @@ function formatFecha(fecha) {
 }
 
 function exportarCSV(movimientos) {
-  const encabezados = ['Fecha', 'Código', 'Descripción', 'Tipo', 'Cantidad', 'Responsable', 'Uso/Origen', 'Estado']
+  const encabezados = ['Fecha', 'Código', 'Descripción', 'Ubicación', 'Tipo', 'Cantidad', 'Responsable', 'Uso/Origen', 'Estado']
   const filas = movimientos.map((m) => [
     m.fecha_movimiento,
     m.producto_detalle?.codigo,
     m.producto_detalle?.descripcion,
+    UBICACION_LABELS[m.producto_detalle?.ubicacion_detalle?.nombre] ?? m.producto_detalle?.ubicacion_detalle?.nombre_display,
     m.tipo,
     m.cantidad,
     m.responsable_detalle?.nombre,
@@ -38,9 +39,11 @@ function exportarCSV(movimientos) {
 export default function HistorialMovimientos({ onVolver }) {
   const { user } = useAuth()
   const [movimientos, setMovimientos] = useState([])
+  const [ubicaciones, setUbicaciones] = useState([])
   const [loading, setLoading] = useState(true)
   const [fecha, setFecha] = useState('')
   const [tipo, setTipo] = useState('')
+  const [ubicacion, setUbicacion] = useState('')
 
   const puedeExportar = ROLES_EXPORTAN.includes(user?.rol)
 
@@ -50,14 +53,19 @@ export default function HistorialMovimientos({ onVolver }) {
       const params = {}
       if (fecha) params.fecha = fecha
       if (tipo) params.tipo = tipo
+      if (ubicacion) params.ubicacion = ubicacion
       const { data } = await getMovimientos(params)
       setMovimientos(data)
     } finally {
       setLoading(false)
     }
-  }, [fecha, tipo])
+  }, [fecha, tipo, ubicacion])
 
   useEffect(() => { cargar() }, [cargar])
+
+  useEffect(() => {
+    getUbicaciones().then(({ data }) => setUbicaciones(data)).catch(() => setUbicaciones([]))
+  }, [])
 
   return (
     <div className="min-h-svh bg-bg pb-10">
@@ -84,6 +92,12 @@ export default function HistorialMovimientos({ onVolver }) {
             <option value="">Todos los tipos</option>
             <option value="entrada">Entradas</option>
             <option value="salida">Salidas</option>
+          </select>
+          <select value={ubicacion} onChange={(e) => setUbicacion(e.target.value)} className={inputClass}>
+            <option value="">Todas las ubicaciones</option>
+            {ubicaciones.map((u) => (
+              <option key={u.id} value={u.id}>{UBICACION_LABELS[u.nombre] ?? u.nombre_display}</option>
+            ))}
           </select>
           {puedeExportar && (
             <button
@@ -114,6 +128,7 @@ export default function HistorialMovimientos({ onVolver }) {
                 <tr>
                   <th className="px-3 py-2">Fecha</th>
                   <th className="px-3 py-2">Producto</th>
+                  <th className="px-3 py-2">Ubicación</th>
                   <th className="px-3 py-2">Tipo</th>
                   <th className="px-3 py-2">Cantidad</th>
                   <th className="px-3 py-2">Responsable</th>
@@ -127,6 +142,10 @@ export default function HistorialMovimientos({ onVolver }) {
                     <td className="px-3 py-2">
                       <p className="font-mono text-xs text-text-secondary">{m.producto_detalle?.codigo}</p>
                       <p className="font-semibold">{m.producto_detalle?.descripcion}</p>
+                    </td>
+                    <td className="px-3 py-2 text-xs text-text-secondary">
+                      {UBICACION_LABELS[m.producto_detalle?.ubicacion_detalle?.nombre]
+                        ?? m.producto_detalle?.ubicacion_detalle?.nombre_display}
                     </td>
                     <td className="px-3 py-2">{m.tipo === 'entrada' ? '📥 Entrada' : '📤 Salida'}</td>
                     <td className="whitespace-nowrap px-3 py-2 font-mono">

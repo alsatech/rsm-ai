@@ -261,6 +261,7 @@ class MovimientoListCreateView(generics.ListCreateAPIView):
         tipo = p.get('tipo')
         responsable = p.get('responsable')
         fecha = p.get('fecha')
+        ubicacion = p.get('ubicacion')
         validado = p.get('validado')
         en_resguardo = p.get('en_resguardo')
         resguardo_cerrado = p.get('resguardo_cerrado')
@@ -273,6 +274,11 @@ class MovimientoListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(responsable_id=responsable)
         if fecha:
             qs = qs.filter(fecha_movimiento=fecha)
+        if ubicacion:
+            # Filtra por la ubicación ACTUAL del producto (no hay snapshot histórico de
+            # ubicación por movimiento) — suficiente para lo que se pidió: ver qué entró/salió
+            # de una bodega concreta a partir de lo que hoy vive ahí.
+            qs = qs.filter(producto__ubicacion_id=ubicacion)
         if validado is not None:
             qs = qs.filter(validado=validado.lower() == 'true')
         if en_resguardo is not None:

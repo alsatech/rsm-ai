@@ -313,6 +313,24 @@ class InventarioAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 1)
 
+    def test_filtro_por_ubicacion(self):
+        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
+        otro_producto = crear_producto(codigo='SM-UBIC-001', ubicacion=otra_ubicacion)
+
+        self._auth(self.campo)
+        self.client.post('/api/v1/inventario/movimientos/', self._movimiento_data(tipo='salida'), format='json')
+        self.client.post(
+            '/api/v1/inventario/movimientos/',
+            {'producto': otro_producto.id, 'tipo': 'salida', 'cantidad': '1.00', 'uso_descripcion': 'Prueba'},
+            format='json',
+        )
+
+        self._auth(self.inventario)
+        resp = self.client.get(f'/api/v1/inventario/movimientos/?ubicacion={otra_ubicacion.id}')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 1)
+        self.assertEqual(resp.data[0]['producto'], otro_producto.id)
+
     def test_alertas_stock_lista_productos_en_minimo(self):
         producto_bajo = crear_producto(codigo='SM-TEST-BAJO', stock_actual=3, stock_minimo=5)
 
