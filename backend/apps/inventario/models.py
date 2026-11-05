@@ -23,7 +23,6 @@ class Ubicacion(models.Model):
     class Nombre(models.TextChoices):
         ALACENA = 'alacena', 'Alacena'
         ALMACEN = 'almacen', 'Almacén'
-        BODEGA = 'bodega', 'Bodega'
         BODEGA_NUEVA = 'bodega_nueva', 'Bodega Nueva'
         GRANERO = 'granero', 'Granero'
         HANGAR = 'hangar', 'Hangar'

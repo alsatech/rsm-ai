@@ -348,3 +348,25 @@ Se corrigió en `backend/apps/inventario/views.py` (`DarEntradaRecepcionView`): 
 **Frontend:** `DetalleSolicitud.jsx` muestra, en cada ítem de una recepción pendiente que no tiene producto de catálogo, un bloque de alta inline (código, categoría, ubicación) en vez de solo la etiqueta "(nuevo)" que ya existía. El botón "Dar entrada" valida en cliente que estén completos antes de habilitar la confirmación, y si el backend igual rechaza por un código repetido, muestra el detalle devuelto por la API.
 
 **Notas:** 3 tests nuevos en `apps.inventario` (sin datos no aplica nada y no confirma la recepción; con datos da de alta el producto, lo liga al ítem y sube el stock; código repetido falla con 400). Suite completa de `apps.inventario` corrida: 88/88 OK (antes 85). `npm run build` del frontend sin errores nuevos. Sin migración (no se tocó ningún modelo). No se probó en navegador real en este entorno — verificado con los tests de endpoint y lectura del flujo del componente.
+
+### 🟢 Push #22
+**Módulo:** Módulo 6 — Inventarios (ajuste)
+**Fecha:** 2026-11-04
+**Branch:** main
+
+**Descripción:** Alfredo pidió poder filtrar el Historial de movimientos por ubicación (ej. ver solo lo que entró/salió de Bodega Nueva). `MovimientoListCreateView.get_queryset()` (`backend/apps/inventario/views.py`) gana el query param `?ubicacion=<id>`, que filtra por `producto__ubicacion_id` — es la ubicación **actual** del producto, no hay snapshot histórico de ubicación por movimiento (no existe ese campo en `MovimientoInventario`), así que es una aproximación suficiente para lo que se pidió: ver qué movió una bodega concreta a partir de lo que hoy vive ahí.
+
+**Frontend:** `HistorialMovimientos.jsx` carga el catálogo de ubicaciones (`getUbicaciones`) y agrega un `<select>` junto a los filtros de fecha/tipo; también se agregó una columna "Ubicación" en la tabla y en el export CSV.
+
+**Notas:** 1 test nuevo en `apps.inventario` (filtra correctamente por ubicación). Suite completa: 89/89 OK (antes 88). `npm run build` sin errores. Sin migración.
+
+### 🟢 Push #23
+**Módulo:** Módulo 6 — Inventarios (ajuste)
+**Fecha:** 2026-11-05
+**Branch:** main
+
+**Descripción:** Alfredo pidió retirar por completo la ubicación "Bodega" del sistema (los productos que quedaban ahí son duplicados obsoletos — el material real ya está capturado en otras ubicaciones con otros códigos desde el import de auditoría). Se quitó `BODEGA = 'bodega', 'Bodega'` de `Ubicacion.Nombre` en `backend/apps/inventario/models.py` — migración `0020_alter_ubicacion_nombre` (solo actualiza el `choices` del campo, Django no agrega un CHECK a nivel Postgres por esto, así que no falla aunque todavía exista una fila `nombre='bodega'` en producción al momento de aplicarla). `apps/proyectos/tests.py` usaba `'bodega'` como ubicación de prueba — se cambió a `'bodega_nueva'`. Limpieza de `UBICACION_LABELS`/`UBICACION_ICONS` en `frontend/src/pages/Inventario/constants.js` (ya no hace falta la entrada `bodega`, los componentes caen a `nombre_display` si no encuentran la clave).
+
+**Despliegue:** el borrado de los productos obsoletos y de la fila `Ubicacion` en sí **no** se hizo con esta migración (Django no puede borrar una fila con un `AlterField`) — se le dio a Alfredo un script de Python para correr directo en el shell de Django en la VPS: dar de baja lógica (`activo=False`, igual que el botón 🗑️ de Lista de productos) y reasignar a `bodega_nueva` cada producto que seguía en Bodega (`Producto.ubicacion` es `on_delete=PROTECT`, no se puede borrar la ubicación mientras algo la referencie, ni siquiera un producto inactivo), borrar los `GrupoMaterial` de Bodega que quedan vacíos al mover sus productos (mismo PROTECT), y finalmente borrar la fila `Ubicacion` de Bodega. Ese script se corre **antes** de desplegar este commit (el orden no es estrictamente necesario porque el choice no es una restricción de BD, pero evita confusión).
+
+**Notas:** Suite completa de `apps.inventario` + `apps.proyectos` corrida: 100/100 OK. `npm run build` sin errores nuevos.

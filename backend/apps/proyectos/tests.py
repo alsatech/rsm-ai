@@ -25,7 +25,7 @@ class ProyectosAPITest(APITestCase):
         self.campo = crear_usuario('chino_test', 'campo')
 
         categoria, _ = CategoriaInventario.objects.get_or_create(nombre='Materiales de prueba', defaults={'color': '#1f6b3e'})
-        ubicacion, _ = Ubicacion.objects.get_or_create(nombre='bodega')
+        ubicacion, _ = Ubicacion.objects.get_or_create(nombre='bodega_nueva')
         self.producto = Producto.objects.create(
             codigo='PRY-TEST-001', descripcion='Cemento', categoria=categoria, ubicacion=ubicacion, stock_actual=10,
         )

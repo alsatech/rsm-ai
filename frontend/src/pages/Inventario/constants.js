@@ -80,7 +80,6 @@ export const UNIDAD_LABELS = {
 export const UBICACION_LABELS = {
   alacena: 'Alacena',
   almacen: 'Almacén',
-  bodega: 'Bodega',
   bodega_nueva: 'Bodega Nueva',
   granero: 'Granero',
   hangar: 'Hangar',
@@ -93,7 +92,6 @@ export const UBICACION_LABELS = {
 export const UBICACION_ICONS = {
   alacena: '🥫',
   almacen: '📦',
-  bodega: '🏬',
   bodega_nueva: '🏭',
   granero: '🌾',
   hangar: '✈️',
