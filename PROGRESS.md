@@ -370,3 +370,12 @@ Se corrigió en `backend/apps/inventario/views.py` (`DarEntradaRecepcionView`): 
 **Despliegue:** el borrado de los productos obsoletos y de la fila `Ubicacion` en sí **no** se hizo con esta migración (Django no puede borrar una fila con un `AlterField`) — se le dio a Alfredo un script de Python para correr directo en el shell de Django en la VPS: dar de baja lógica (`activo=False`, igual que el botón 🗑️ de Lista de productos) y reasignar a `bodega_nueva` cada producto que seguía en Bodega (`Producto.ubicacion` es `on_delete=PROTECT`, no se puede borrar la ubicación mientras algo la referencie, ni siquiera un producto inactivo), borrar los `GrupoMaterial` de Bodega que quedan vacíos al mover sus productos (mismo PROTECT), y finalmente borrar la fila `Ubicacion` de Bodega. Ese script se corre **antes** de desplegar este commit (el orden no es estrictamente necesario porque el choice no es una restricción de BD, pero evita confusión).
 
 **Notas:** Suite completa de `apps.inventario` + `apps.proyectos` corrida: 100/100 OK. `npm run build` sin errores nuevos.
+
+### 🟢 Push #24
+**Módulo:** Módulo 6 — Inventarios (ajuste)
+**Fecha:** 2026-11-06
+**Branch:** main
+
+**Descripción:** Alfredo pidió una categoría nueva para la comida del personal de la reserva (se guarda en Alacena), distinta de "Alimentos y Costalera" que ya existía para alimento de ganado. Migración `0021_precarga_categoria_alimento_personal` (mismo patrón que `0017_precarga_categoria_talabarteria`) agrega `CategoriaInventario` "Alimento de Personal" (🍞, `#eab308`). La categoría no está ligada por código a ninguna ubicación — igual que el resto del catálogo, `Producto.categoria` y `Producto.ubicacion` son independientes — así que queda disponible para usarse con cualquier ubicación; el criterio de "se usa en Alacena" es solo de cómo la va a operar Yajaira al dar de alta productos, no una restricción del sistema.
+
+**Notas:** Sin tests nuevos (es precarga de catálogo, mismo patrón ya cubierto por la migración de Talabartería). Suite completa de `apps.inventario` corrida tras aplicar la migración: sin regresiones.
