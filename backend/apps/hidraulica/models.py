@@ -101,6 +101,7 @@ class Generador(models.Model):
         CHAPOTE = 'chapote', 'Chapote'
         RANCHO = 'rancho', 'Rancho'
         MARGARITAS = 'margaritas', 'Margaritas'
+        AZUL = 'azul', 'Azul'
 
     nombre = models.CharField(max_length=20, choices=Nombre.choices, unique=True)
     marca_modelo = models.CharField(max_length=100)

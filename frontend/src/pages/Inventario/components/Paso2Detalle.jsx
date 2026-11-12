@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import { useAuth } from '../../../hooks/useAuth'
 import { SUGERENCIAS_USO, UNIDAD_LABELS, esProductoCombustible } from '../constants'
 
@@ -7,10 +9,11 @@ const labelClass = 'mb-1 block text-sm font-medium text-text-secondary'
 
 const ROLES_ASIGNAN_RESPONSABLE = ['inventario', 'administrador', 'superadmin']
 
-export default function Paso2Detalle({ form, setForm, productoSeleccionado, vehiculos, usuarios }) {
+export default function Paso2Detalle({ form, setForm, productoSeleccionado, vehiculos, generadores, usuarios }) {
   const { user } = useAuth()
   const puedeAsignarResponsable = ROLES_ASIGNAN_RESPONSABLE.includes(user?.rol)
   const esCombustible = esProductoCombustible(productoSeleccionado)
+  const [destinoTipo, setDestinoTipo] = useState(form.generador ? 'generador' : 'vehiculo')
 
   const handleChange = (campo) => (e) => setForm((prev) => ({ ...prev, [campo]: e.target.value }))
 
@@ -72,25 +75,67 @@ export default function Paso2Detalle({ form, setForm, productoSeleccionado, vehi
 
       {esCombustible && (
         <div>
-          <label className={labelClass} htmlFor="vehiculo">
-            Vehículo <span className="text-error">*</span>
+          <label className={labelClass}>
+            ¿A qué se le carga? <span className="text-error">*</span>
           </label>
-          <select
-            id="vehiculo"
-            required
-            value={form.vehiculo ?? ''}
-            onChange={(e) =>
-              setForm((prev) => ({ ...prev, vehiculo: e.target.value ? Number(e.target.value) : null }))
-            }
-            className={inputClass}
-          >
-            <option value="">Selecciona un vehículo</option>
-            {vehiculos.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.nombre} — {v.marca} {v.modelo} ({v.placas || 's/placas'})
-              </option>
-            ))}
-          </select>
+          <div className="mb-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => { setDestinoTipo('vehiculo'); setForm((prev) => ({ ...prev, generador: null })) }}
+              className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition ${
+                destinoTipo === 'vehiculo'
+                  ? 'border-highlight bg-highlight/10 text-highlight'
+                  : 'border-border text-text hover:border-accent'
+              }`}
+            >
+              🚙 Vehículo
+            </button>
+            <button
+              type="button"
+              onClick={() => { setDestinoTipo('generador'); setForm((prev) => ({ ...prev, vehiculo: null })) }}
+              className={`rounded-xl border-2 px-3 py-2 text-sm font-bold transition ${
+                destinoTipo === 'generador'
+                  ? 'border-highlight bg-highlight/10 text-highlight'
+                  : 'border-border text-text hover:border-accent'
+              }`}
+            >
+              🔌 Generador
+            </button>
+          </div>
+
+          {destinoTipo === 'vehiculo' ? (
+            <select
+              id="vehiculo"
+              required
+              value={form.vehiculo ?? ''}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, vehiculo: e.target.value ? Number(e.target.value) : null }))
+              }
+              className={inputClass}
+            >
+              <option value="">Selecciona un vehículo</option>
+              {vehiculos.map((v) => (
+                <option key={v.id} value={v.id}>
+                  {v.nombre} — {v.marca} {v.modelo} ({v.placas || 's/placas'})
+                </option>
+              ))}
+            </select>
+          ) : (
+            <select
+              id="generador"
+              required
+              value={form.generador ?? ''}
+              onChange={(e) =>
+                setForm((prev) => ({ ...prev, generador: e.target.value ? Number(e.target.value) : null }))
+              }
+              className={inputClass}
+            >
+              <option value="">Selecciona un generador</option>
+              {generadores.map((g) => (
+                <option key={g.id} value={g.id}>{g.nombre_display}</option>
+              ))}
+            </select>
+          )}
           <p className="mt-1 text-xs text-text-secondary">
             Obligatorio para registrar salidas de combustible.
           </p>

@@ -3,6 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from apps.flota.models import Vehiculo
+from apps.hidraulica.models import Generador
 from apps.proveedores.serializers import ProveedorSerializer
 
 from .models import (
@@ -54,6 +55,18 @@ class UbicacionSerializer(serializers.ModelSerializer):
         model = Ubicacion
         fields = ('id', 'nombre', 'nombre_display', 'descripcion')
         read_only_fields = ('id',)
+
+
+class GeneradorResumenSerializer(serializers.ModelSerializer):
+    """Vista mínima del generador (de Hidráulica) para poblar el selector de destino en
+    salidas de combustible — Inventario no necesita (ni tiene permiso para ver) horas de
+    operación ni alertas de mantenimiento, solo el nombre para elegirlo."""
+
+    nombre_display = serializers.CharField(source='get_nombre_display', read_only=True)
+
+    class Meta:
+        model = Generador
+        fields = ('id', 'nombre', 'nombre_display')
 
 
 class GrupoMaterialResumenSerializer(serializers.ModelSerializer):
@@ -157,6 +170,12 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         required=False,
         allow_null=True,
     )
+    generador = serializers.PrimaryKeyRelatedField(
+        queryset=Generador.objects.all(),
+        required=False,
+        allow_null=True,
+    )
+    generador_detalle = GeneradorResumenSerializer(source='generador', read_only=True)
     compra = serializers.SerializerMethodField()
     solicitud_folio = serializers.SerializerMethodField()
     resguardo_cerrado_por_detalle = UsuarioResumenSerializer(source='resguardo_cerrado_por', read_only=True)
@@ -166,7 +185,7 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'producto', 'producto_detalle', 'tipo', 'tipo_display', 'cantidad',
             'stock_anterior', 'stock_resultante', 'responsable', 'responsable_detalle',
-            'uso_descripcion', 'vehiculo_codigo', 'vehiculo',
+            'uso_descripcion', 'vehiculo_codigo', 'vehiculo', 'generador', 'generador_detalle',
             'proyecto_referencia', 'solicitud', 'solicitud_folio', 'fecha_movimiento',
             'fecha_hora_registro', 'validado', 'validado_por', 'validado_por_detalle',
             'rechazado', 'notas', 'foto_evidencia', 'compra',
@@ -213,17 +232,22 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
                     'cantidad': f'No hay suficiente stock. Stock actual: {producto.stock_actual} {producto.get_unidad_medida_display()}.'
                 })
 
-            # Salidas de combustibles (gasolina/diésel) requieren vehiculo de la flota.
-            # Se valida por nombre de categoría porque la FK a CategoriaInventario puede
-            # cambiar entre instancias y solo nos interesa el caso "Combustibles".
+            # Salidas de combustibles (gasolina/diésel) requieren un destino: el vehiculo de
+            # la flota que se carga, o el generador fijo que consume el combustible (ej.
+            # Generador Azul). Se valida por nombre de categoría porque la FK a
+            # CategoriaInventario puede cambiar entre instancias y solo nos interesa el caso
+            # "Combustibles".
             categoria = getattr(producto, 'categoria', None)
             if categoria and categoria.nombre == CATEGORIA_COMBUSTIBLES:
                 vehiculo = data.get('vehiculo')
                 if vehiculo is None:
                     vehiculo = getattr(self.instance, 'vehiculo', None)
-                if not vehiculo:
+                generador = data.get('generador')
+                if generador is None:
+                    generador = getattr(self.instance, 'generador', None)
+                if not vehiculo and not generador:
                     raise serializers.ValidationError({
-                        'vehiculo': 'Debes seleccionar el vehículo al que se le carga el combustible.'
+                        'vehiculo': 'Debes seleccionar el vehículo o el generador al que se le carga el combustible.'
                     })
 
         en_resguardo = data.get('en_resguardo', getattr(self.instance, 'en_resguardo', False))
@@ -246,12 +270,16 @@ class MovimientoInventarioSerializer(serializers.ModelSerializer):
         if 'responsable' not in validated_data:
             validated_data['responsable'] = self.context['request'].user
 
-        # Copia legible del vehículo a la columna legacy vehiculo_codigo para que los
-        # reportes y vistas históricas sigan mostrando algo entendible. Si el cliente ya
+        # Copia legible del vehículo o generador a la columna legacy vehiculo_codigo para que
+        # los reportes y vistas históricas sigan mostrando algo entendible. Si el cliente ya
         # mandó vehiculo_codigo, respetamos lo que dijo.
         vehiculo = validated_data.get('vehiculo')
-        if vehiculo and not validated_data.get('vehiculo_codigo'):
-            validated_data['vehiculo_codigo'] = vehiculo.equipo or vehiculo.nombre
+        generador = validated_data.get('generador')
+        if not validated_data.get('vehiculo_codigo'):
+            if vehiculo:
+                validated_data['vehiculo_codigo'] = vehiculo.equipo or vehiculo.nombre
+            elif generador:
+                validated_data['vehiculo_codigo'] = generador.get_nombre_display()
 
         producto.stock_actual = stock_resultante
         producto.save(update_fields=['stock_actual', 'updated_at'])

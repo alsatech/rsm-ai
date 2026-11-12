@@ -1,7 +1,7 @@
 import { UNIDAD_LABELS, esProductoCombustible } from '../constants'
 
 export default function Paso3Confirmar({
-  form, productoSeleccionado, stockResultante, guardando, onGuardar, vehiculos = [],
+  form, productoSeleccionado, stockResultante, guardando, onGuardar, vehiculos = [], generadores = [],
 }) {
   const unidad = UNIDAD_LABELS[productoSeleccionado?.unidad_medida]
   const dejaEnCero = stockResultante <= 0
@@ -13,6 +13,9 @@ export default function Paso3Confirmar({
   const esCombustible = esProductoCombustible(productoSeleccionado)
   const vehiculoSeleccionado = esCombustible
     ? vehiculos.find((v) => Number(v.id) === Number(form.vehiculo))
+    : null
+  const generadorSeleccionado = esCombustible
+    ? generadores.find((g) => Number(g.id) === Number(form.generador))
     : null
 
   return (
@@ -39,6 +42,12 @@ export default function Paso3Confirmar({
               <span className="text-right font-semibold text-text">
                 {vehiculoSeleccionado.nombre} — {vehiculoSeleccionado.marca} {vehiculoSeleccionado.modelo}
               </span>
+            </div>
+          )}
+          {generadorSeleccionado && (
+            <div className="flex justify-between">
+              <span className="text-text-secondary">Generador</span>
+              <span className="text-right font-semibold text-text">{generadorSeleccionado.nombre_display}</span>
             </div>
           )}
           {form.en_resguardo && (

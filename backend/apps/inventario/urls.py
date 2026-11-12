@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    AjustarStockView,
     AlertasStockView,
     AutorizarSolicitudView,
     CancelarMovimientoView,
@@ -11,6 +12,7 @@ from .views import (
     EntradaRapidaView,
     EnviarRelacionComprasView,
     EnviarSolicitudView,
+    GeneradorResumenListView,
     GrupoMaterialDetailView,
     GrupoMaterialListCreateView,
     MovimientoDetailView,
@@ -29,6 +31,7 @@ from .views import (
     ReporteFaltanteListCreateView,
     ResolverReporteView,
     ResumenInventarioView,
+    SiguienteCodigoProductoView,
     SolicitudDetailView,
     SolicitudListCreateView,
     UbicacionListView,
@@ -43,9 +46,12 @@ urlpatterns = [
         RecalcularClasificacionABCView.as_view(),
         name='producto-clasificacion-abc-recalcular',
     ),
+    path('productos/siguiente-codigo/', SiguienteCodigoProductoView.as_view(), name='producto-siguiente-codigo'),
     path('productos/<int:pk>/', ProductoDetailView.as_view(), name='producto-detail'),
     path('productos/<int:pk>/movimientos/', ProductoMovimientosView.as_view(), name='producto-movimientos'),
     path('productos/<int:pk>/transferir/', TransferirProductoView.as_view(), name='producto-transferir'),
+    path('productos/<int:pk>/ajustar-stock/', AjustarStockView.as_view(), name='producto-ajustar-stock'),
+    path('generadores/', GeneradorResumenListView.as_view(), name='generador-resumen-list'),
     path('movimientos/entrada-rapida/', EntradaRapidaView.as_view(), name='movimiento-entrada-rapida'),
     path('movimientos/', MovimientoListCreateView.as_view(), name='movimiento-list-create'),
     path('movimientos/<int:pk>/', MovimientoDetailView.as_view(), name='movimiento-detail'),

@@ -8,6 +8,7 @@ import {
   getGruposMaterial,
   getProductos,
   getUbicaciones,
+  updateProducto,
 } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
 import { useConfirm } from '../../../hooks/useConfirm'
@@ -39,6 +40,7 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
   const [grupo, setGrupo] = useState(grupoInicial ?? '')
   const [estadoFiltro, setEstadoFiltro] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
+  const [productoParaEditar, setProductoParaEditar] = useState(null)
   const [guardando, setGuardando] = useState(false)
   const [productoParaEtiqueta, setProductoParaEtiqueta] = useState(null)
   const [mostrarEtiquetasUbicacion, setMostrarEtiquetasUbicacion] = useState(false)
@@ -159,6 +161,33 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
     } finally {
       setGuardando(false)
     }
+  }
+
+  const handleEditarProducto = async (data) => {
+    setGuardando(true)
+    try {
+      // eslint-disable-next-line no-unused-vars -- código no es editable: se descarta, el resto sí se envía
+      const { codigo, ...cambios } = data
+      await updateProducto(productoParaEditar.id, cambios)
+      showToast('✅ Producto actualizado', 'exito')
+      setProductoParaEditar(null)
+      cargar()
+      onProductoCreado?.()
+    } catch (err) {
+      const mensaje = Object.values(err?.response?.data ?? {})[0]?.[0] || 'No se pudo actualizar el producto.'
+      showToast(mensaje, 'error')
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  const handleCerrarEdicion = () => {
+    // Un ajuste de stock se guarda de inmediato dentro del formulario (su propio endpoint),
+    // independiente de si al final se cancela la edición del resto de los campos — por eso
+    // siempre recargamos al cerrar, no solo cuando se confirma el formulario.
+    setProductoParaEditar(null)
+    cargar()
+    onProductoCreado?.()
   }
 
   return (
@@ -332,6 +361,17 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
                       {puedeGestionarCatalogo && (
                         <button
                           type="button"
+                          onClick={() => setProductoParaEditar(producto)}
+                          aria-label="Editar producto"
+                          style={{ minHeight: '44px', minWidth: '44px' }}
+                          className="rounded-xl border border-border px-3 text-sm transition hover:border-accent"
+                        >
+                          ✏️
+                        </button>
+                      )}
+                      {puedeGestionarCatalogo && (
+                        <button
+                          type="button"
                           onClick={() => setProductoParaTransferir(producto)}
                           aria-label="Transferir a otra ubicación"
                           style={{ minHeight: '44px', minWidth: '44px' }}
@@ -376,6 +416,17 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
           ubicaciones={ubicaciones}
           onGuardar={handleCrearProducto}
           onCancelar={() => setMostrarFormulario(false)}
+          guardando={guardando}
+        />
+      )}
+
+      {productoParaEditar && (
+        <FormularioProducto
+          producto={productoParaEditar}
+          categorias={categorias}
+          ubicaciones={ubicaciones}
+          onGuardar={handleEditarProducto}
+          onCancelar={handleCerrarEdicion}
           guardando={guardando}
         />
       )}

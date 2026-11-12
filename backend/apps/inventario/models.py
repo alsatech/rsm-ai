@@ -123,6 +123,7 @@ class MovimientoInventario(models.Model):
         ENTRADA = 'entrada', 'Entrada'
         SALIDA = 'salida', 'Salida'
         TRANSFERENCIA = 'transferencia', 'Transferencia'
+        AJUSTE = 'ajuste', 'Ajuste'
 
     producto = models.ForeignKey(Producto, on_delete=models.PROTECT, related_name='movimientos')
     tipo = models.CharField(max_length=15, choices=Tipo.choices)
@@ -140,7 +141,14 @@ class MovimientoInventario(models.Model):
         blank=True,
         on_delete=models.PROTECT,
         related_name='movimientos_combustible',
-    )  # obligatorio cuando producto.categoria == 'Combustibles' y tipo == 'salida'
+    )  # obligatorio (junto con 'generador') cuando producto.categoria == 'Combustibles' y tipo == 'salida'
+    generador = models.ForeignKey(
+        'hidraulica.Generador',
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='movimientos_combustible',
+    )  # alternativa a 'vehiculo' para salidas de combustible que cargan un generador fijo (ej. Generador Azul)
     proyecto_referencia = models.CharField(max_length=200, blank=True)
     solicitud = models.ForeignKey(
         'SolicitudMaterial',

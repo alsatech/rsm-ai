@@ -8,6 +8,8 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.flota.models import Vehiculo
+from apps.hidraulica.models import Generador
 from apps.users.models import User
 
 from .clasificacion_abc import calcular_clasificacion_abc
@@ -1445,3 +1447,129 @@ class ResguardoAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 1)
         self.assertTrue(resp.data[0]['en_resguardo'])
+
+
+class SalidaCombustibleAPITest(APITestCase):
+    """Las salidas de gasolina/diésel necesitan un destino: un vehículo de la flota o un
+    generador fijo (ej. Generador Azul) — ver MovimientoInventarioSerializer.validate."""
+
+    def setUp(self):
+        self.inventario = crear_usuario('yajaira_combustible', 'inventario')
+        self.combustible = Producto.objects.create(
+            codigo='SM-TEST-COMB',
+            descripcion='Gasolina de prueba',
+            categoria=CategoriaInventario.objects.get(nombre='Combustibles'),
+            ubicacion=Ubicacion.objects.first(),
+            stock_actual=100,
+            unidad_medida='litro',
+        )
+        self.vehiculo = Vehiculo.objects.create(
+            nombre='Camioneta de prueba', tipo='camioneta', marca='Ford', modelo='F150',
+            color='Blanco', kilometraje_actual=0,
+        )
+        self.generador = Generador.objects.get(nombre=Generador.Nombre.AZUL)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def _data(self, extra=None):
+        data = {'producto': self.combustible.id, 'tipo': 'salida', 'cantidad': '5.00'}
+        data.update(extra or {})
+        return data
+
+    def test_salida_combustible_sin_destino_falla(self):
+        self._auth(self.inventario)
+        resp = self.client.post('/api/v1/inventario/movimientos/', self._data(), format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_salida_combustible_con_vehiculo(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._data({'vehiculo': self.vehiculo.id}), format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['vehiculo_codigo'], self.vehiculo.nombre)
+
+    def test_salida_combustible_con_generador(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            '/api/v1/inventario/movimientos/', self._data({'generador': self.generador.id}), format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['generador'], self.generador.id)
+        self.assertEqual(resp.data['vehiculo_codigo'], 'Azul')
+
+    def test_inventario_puede_listar_generadores(self):
+        self._auth(self.inventario)
+        resp = self.client.get('/api/v1/inventario/generadores/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertTrue(any(g['nombre'] == 'azul' for g in resp.data))
+
+
+class AjustarStockAPITest(APITestCase):
+    """Corrección manual de stock (conteo físico, merma) — a diferencia del PATCH normal del
+    catálogo, exige motivo y deja un MovimientoInventario tipo 'ajuste' en el historial."""
+
+    def setUp(self):
+        self.inventario = crear_usuario('yajaira_ajuste', 'inventario')
+        self.campo = crear_usuario('chino_ajuste', 'campo')
+        self.producto = crear_producto(codigo='SM-TEST-AJUSTE', stock_actual=10)
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def test_inventario_ajusta_stock_con_motivo(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/ajustar-stock/',
+            {'stock_nuevo': '7.00', 'motivo': 'Conteo físico'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.producto.refresh_from_db()
+        self.assertEqual(self.producto.stock_actual, 7)
+        self.assertEqual(resp.data['tipo'], 'ajuste')
+
+    def test_ajuste_sin_motivo_falla(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/ajustar-stock/',
+            {'stock_nuevo': '7.00', 'motivo': ''}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_ajuste_con_mismo_stock_falla(self):
+        self._auth(self.inventario)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/ajustar-stock/',
+            {'stock_nuevo': '10.00', 'motivo': 'Sin cambios'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_campo_no_puede_ajustar_stock(self):
+        self._auth(self.campo)
+        resp = self.client.post(
+            f'/api/v1/inventario/productos/{self.producto.id}/ajustar-stock/',
+            {'stock_nuevo': '7.00', 'motivo': 'Conteo'}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class SiguienteCodigoAPITest(APITestCase):
+    """Sugerencia del siguiente código al dar de alta un producto — ver
+    SiguienteCodigoProductoView."""
+
+    def setUp(self):
+        self.inventario = crear_usuario('yajaira_codigo', 'inventario')
+
+    def _auth(self, user):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+
+    def test_sugiere_siguiente_codigo_tras_el_mas_alto(self):
+        Producto.objects.create(
+            codigo='SM-900', descripcion='Producto tope',
+            categoria=CategoriaInventario.objects.first(), ubicacion=Ubicacion.objects.first(),
+        )
+        self._auth(self.inventario)
+        resp = self.client.get('/api/v1/inventario/productos/siguiente-codigo/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp.data['siguiente_codigo'], 'SM-901')

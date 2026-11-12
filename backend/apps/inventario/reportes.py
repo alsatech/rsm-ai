@@ -51,7 +51,8 @@ def _destino_salida(movimiento):
     llama 'destino o lugar donde será utilizado el artículo'. uso_descripcion es el motivo,
     no el destino, así que van en columnas separadas."""
     if movimiento.vehiculo_codigo:
-        return f'Vehículo: {movimiento.vehiculo_codigo}'
+        etiqueta = 'Generador' if movimiento.generador_id else 'Vehículo'
+        return f'{etiqueta}: {movimiento.vehiculo_codigo}'
     if movimiento.proyecto_referencia:
         return movimiento.proyecto_referencia
     return '—'
@@ -98,7 +99,7 @@ def generar_pdf_reporte_diario(fecha, request):
 
     # Entradas / salidas del día.
     movimientos_dia = MovimientoInventario.objects.filter(fecha_movimiento=fecha).select_related(
-        'producto', 'responsable', 'vehiculo',
+        'producto', 'responsable', 'vehiculo', 'generador',
     ).order_by('producto__codigo')
 
     entradas = [m for m in movimientos_dia if m.tipo == MovimientoInventario.Tipo.ENTRADA]

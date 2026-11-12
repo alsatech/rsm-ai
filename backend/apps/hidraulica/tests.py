@@ -156,12 +156,17 @@ class RegistroHidraulicoEndpointTest(APITestCase):
 
 class GeneradorModelTest(TestCase):
     def test_generadores_precargados_con_alertas(self):
-        self.assertEqual(Generador.objects.count(), 3)
+        # Azul (usado como destino de combustible en Inventario, ver apps.inventario) no
+        # trae alertas de mantenimiento precargadas — solo Chapote/Rancho/Margaritas las tienen.
+        self.assertEqual(Generador.objects.count(), 4)
 
         chapote = Generador.objects.get(nombre=Generador.Nombre.CHAPOTE)
         self.assertEqual(chapote.marca_modelo, 'Wacker Neuson G25 20kW')
         self.assertEqual(chapote.horas_operacion, Decimal('0.00'))
         self.assertEqual(chapote.alertas_mantenimiento.count(), 3)
+
+        azul = Generador.objects.get(nombre=Generador.Nombre.AZUL)
+        self.assertEqual(azul.alertas_mantenimiento.count(), 0)
 
 
 class GeneradorEndpointTest(APITestCase):

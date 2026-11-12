@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 
-import { createMovimiento } from '../../../api/inventario'
+import { createMovimiento, getGeneradoresInventario } from '../../../api/inventario'
 import { getUsuarios, getVehiculos } from '../../../api/flota'
 import { useToast } from '../../../hooks/useToast'
 import { UNIDAD_LABELS, esProductoCombustible } from '../constants'
@@ -23,8 +23,9 @@ function estadoInicial(producto) {
     cantidad: '',
     responsable: '',
     uso_descripcion: '',
-    vehiculo: null,           // ID del vehiculo de flota (obligatorio en salidas de combustibles)
-    vehiculo_codigo: '',      // legacy: el backend lo autollena desde vehiculo
+    vehiculo: null,           // ID del vehiculo de flota (alternativa a 'generador' en salidas de combustibles)
+    generador: null,          // ID del generador de Hidráulica (alternativa a 'vehiculo', ej. Generador Azul)
+    vehiculo_codigo: '',      // legacy: el backend lo autollena desde vehiculo o generador
     proyecto_referencia: '',
     notas: '',
     en_resguardo: false,      // true = el material no se usa todo hoy, queda guardado en algún lugar
@@ -39,25 +40,29 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
   const [form, setForm] = useState(() => estadoInicial(productoPreseleccionado))
   const [guardando, setGuardando] = useState(false)
   const [vehiculos, setVehiculos] = useState([])
+  const [generadores, setGeneradores] = useState([])
   const [usuarios, setUsuarios] = useState([])
 
-  // Cargamos la lista de vehículos una sola vez al montar — Paso2 y Paso3 la consumen.
-  // Excluimos tipos que no usan combustible propio: trailas, plataformas y remolques.
-  // (La lista de flota los trae porque también se usan en checklists, pero en salidas
-  // de gasolina/diésel no aplica — son elementos que jalan o transportan, no que carguen.)
+  // Cargamos vehículos y generadores una sola vez al montar — Paso2 y Paso3 los consumen.
+  // De vehículos excluimos tipos que no usan combustible propio: trailas, plataformas y
+  // remolques. (La lista de flota los trae porque también se usan en checklists, pero en
+  // salidas de gasolina/diésel no aplica — son elementos que jalan o transportan, no que
+  // carguen.) Los generadores (Chapote, Rancho, Margaritas, Azul) son la otra opción de
+  // destino: equipos fijos que también consumen combustible.
   useEffect(() => {
     const TIPOS_SIN_COMBUSTIBLE = new Set(['traila', 'plataforma', 'remolque'])
     getVehiculos()
       .then(({ data }) => setVehiculos(data.filter((v) => !TIPOS_SIN_COMBUSTIBLE.has(v.tipo))))
       .catch(() => setVehiculos([]))
+    getGeneradoresInventario().then(({ data }) => setGeneradores(data)).catch(() => setGeneradores([]))
     getUsuarios().then(({ data }) => setUsuarios(data)).catch(() => setUsuarios([]))
   }, [])
 
   const puedeAvanzar1 = Boolean(productoSeleccionado && form.tipo)
   const cantidadValida = Number(form.cantidad) > 0
   const esCombustible = esProductoCombustible(productoSeleccionado)
-  // En salidas de combustible el vehiculo es obligatorio; en el resto del flujo no.
-  const vehiculoObligatorioOk = !esCombustible || Boolean(form.vehiculo)
+  // En salidas de combustible hay que elegir un destino: vehículo o generador.
+  const vehiculoObligatorioOk = !esCombustible || Boolean(form.vehiculo || form.generador)
   const resguardoObligatorioOk = !form.en_resguardo || form.resguardo_lugar.trim().length > 0
   const puedeAvanzar2 = cantidadValida && vehiculoObligatorioOk && resguardoObligatorioOk
 
@@ -75,6 +80,7 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
       if (form.responsable) fd.append('responsable', form.responsable)
       if (form.uso_descripcion) fd.append('uso_descripcion', form.uso_descripcion)
       if (form.vehiculo) fd.append('vehiculo', form.vehiculo)
+      if (form.generador) fd.append('generador', form.generador)
       if (form.proyecto_referencia) fd.append('proyecto_referencia', form.proyecto_referencia)
       if (form.notas) fd.append('notas', form.notas)
       if (form.en_resguardo) {
@@ -134,6 +140,7 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
             setForm={setForm}
             productoSeleccionado={productoSeleccionado}
             vehiculos={vehiculos}
+            generadores={generadores}
             usuarios={usuarios}
           />
         )}
@@ -145,6 +152,7 @@ export default function WizardMovimiento({ productoPreseleccionado, onVolver, on
             guardando={guardando}
             onGuardar={handleGuardar}
             vehiculos={vehiculos}
+            generadores={generadores}
           />
         )}
 

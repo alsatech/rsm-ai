@@ -1,4 +1,5 @@
 import json
+import re
 from decimal import Decimal, InvalidOperation
 
 from django.db import models, transaction
@@ -12,6 +13,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.facturacion.services import crear_factura_desde_compra
+from apps.hidraulica.models import Generador
 
 from .clasificacion_abc import calcular_clasificacion_abc
 from .models import (
@@ -57,6 +59,7 @@ from .serializers import (
     CerrarResguardoSerializer,
     CompraSerializer,
     EnvioMaterialSerializer,
+    GeneradorResumenSerializer,
     GrupoMaterialSerializer,
     MovimientoInventarioSerializer,
     ProductoSerializer,
@@ -144,6 +147,33 @@ class ProductoListCreateView(generics.ListCreateAPIView):
         return qs
 
 
+class SiguienteCodigoProductoView(APIView):
+    """GET /productos/siguiente-codigo/ — para que Yajaira no tenga que adivinar con qué
+    número dar de alta un producto nuevo: lee el código más alto del catálogo (patrón
+    'SM-001') y propone el siguiente. Solo es una sugerencia — el campo código sigue siendo
+    editable en el formulario de alta."""
+
+    permission_classes = [IsAuthenticated, PuedeGestionarCatalogo]
+
+    def get(self, request):
+        patron = re.compile(r'^([A-Za-z]+)-?(\d+)$')
+        mejor_prefijo, mejor_numero, mejor_digitos = 'SM', 0, 3
+
+        for codigo in Producto.objects.values_list('codigo', flat=True):
+            match = patron.match(codigo.strip())
+            if not match:
+                continue
+            numero = int(match.group(2))
+            if numero > mejor_numero:
+                mejor_prefijo = match.group(1).upper()
+                mejor_numero = numero
+                mejor_digitos = len(match.group(2))
+
+        ultimo_codigo = f'{mejor_prefijo}-{mejor_numero:0{mejor_digitos}d}' if mejor_numero else None
+        siguiente_codigo = f'{mejor_prefijo}-{mejor_numero + 1:0{mejor_digitos}d}'
+        return Response({'ultimo_codigo': ultimo_codigo, 'siguiente_codigo': siguiente_codigo})
+
+
 CAMPOS_CLASIFICACION_ABC = {'costo_unitario', 'criticidad'}
 
 
@@ -208,6 +238,63 @@ class TransferirProductoView(APIView):
             MovimientoInventarioSerializer(movimiento, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class AjustarStockView(APIView):
+    """POST /productos/{id}/ajustar-stock/ — corrección manual del stock (conteo físico
+    distinto al del sistema, mermas, etc.). A diferencia de PATCH /productos/{id}/, que no
+    permite tocar stock_actual, aquí se exige un motivo y se deja un MovimientoInventario
+    tipo 'ajuste' para que la corrección quede en el historial del producto."""
+
+    permission_classes = [IsAuthenticated, PuedeGestionarCatalogo]
+
+    def post(self, request, pk):
+        producto = get_object_or_404(Producto, pk=pk)
+        motivo = (request.data.get('motivo') or '').strip()
+        if not motivo:
+            return Response({'motivo': 'Indica por qué cambia el stock.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            stock_nuevo = Decimal(str(request.data.get('stock_nuevo')))
+        except (InvalidOperation, TypeError):
+            return Response({'stock_nuevo': 'Indica el stock correcto.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if stock_nuevo < 0:
+            return Response({'stock_nuevo': 'El stock no puede ser negativo.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        stock_anterior = producto.stock_actual
+        if stock_nuevo == stock_anterior:
+            return Response({'stock_nuevo': 'El stock no cambió.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        producto.stock_actual = stock_nuevo
+        producto.save(update_fields=['stock_actual', 'updated_at'])
+
+        movimiento = MovimientoInventario.objects.create(
+            producto=producto,
+            tipo=MovimientoInventario.Tipo.AJUSTE,
+            cantidad=abs(stock_nuevo - stock_anterior),
+            stock_anterior=stock_anterior,
+            stock_resultante=stock_nuevo,
+            responsable=request.user,
+            uso_descripcion=motivo,
+            fecha_movimiento=timezone.localdate(),
+            validado=True,
+            validado_por=request.user,
+        )
+        return Response(
+            MovimientoInventarioSerializer(movimiento, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class GeneradorResumenListView(generics.ListAPIView):
+    """GET /generadores/ — lista mínima de los generadores de Hidráulica (id + nombre), solo
+    para poblar el selector de destino en salidas de combustible. No reutilizamos el endpoint
+    de Hidráulica porque su permiso excluye al rol 'inventario'."""
+
+    queryset = Generador.objects.all()
+    serializer_class = GeneradorResumenSerializer
+    permission_classes = [IsAuthenticated]
 
 
 class RecalcularClasificacionABCView(APIView):
