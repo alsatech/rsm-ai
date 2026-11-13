@@ -1,14 +1,17 @@
+from django.db import transaction
 from django.db.models import Count
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from rest_framework import generics, status
 from rest_framework.exceptions import NotFound
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.parsers import MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.users.models import User
 
+from .importar_archivo import buscar_responsables, extraer_pendientes
 from .models import FotoPendiente, HistorialPendiente, Pendiente
 from .permissions import (
     PuedeCambiarEstado,
@@ -234,3 +237,81 @@ class FotoPendienteDeleteView(APIView):
         foto = get_object_or_404(FotoPendiente, pk=foto_id, pendiente_id=pk)
         foto.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+MAX_ARCHIVO_BYTES = 10 * 1024 * 1024
+
+
+class ImportarPendientesArchivoView(APIView):
+    """POST /pendientes/importar-archivo/ (multipart, campo 'archivo') — lee las tablas de
+    pendientes/acuerdos en seguimiento de un .docx (minuta operativa) o .pdf y los crea de
+    inmediato. Omite los que ya existen sin terminar (mismo número de seguimiento o mismo
+    título), para que subir dos veces el mismo archivo no duplique."""
+
+    permission_classes = [IsAuthenticated, PuedeCrearPendiente]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        archivo = request.FILES.get('archivo')
+        if not archivo:
+            return Response({'detail': 'Selecciona un archivo (.docx o .pdf).'}, status=status.HTTP_400_BAD_REQUEST)
+        if not archivo.name.lower().endswith(('.docx', '.pdf')) or archivo.size > MAX_ARCHIVO_BYTES:
+            return Response(
+                {'detail': 'El archivo debe ser Word (.docx) o PDF, de máximo 10 MB.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            detectados = extraer_pendientes(archivo, archivo.name)
+        except Exception:
+            return Response(
+                {'detail': 'No se pudo leer el archivo. Verifica que no esté dañado ni protegido.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not detectados:
+            return Response(
+                {'detail': 'No se encontraron pendientes. El archivo debe traer una tabla de seguimiento '
+                           '(columnas como "Acuerdo en seguimiento" o "Pendiente"). Si es un PDF escaneado '
+                           '(imagen) no se puede leer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        usuarios = list(User.objects.filter(is_active=True))
+        abiertos = list(
+            Pendiente.objects.exclude(estado=Pendiente.Estado.CERRADO).values_list('titulo', flat=True)
+        )
+        titulos_existentes = {t.strip().lower() for t in abiertos}
+        codigos_existentes = {t.split(' · ', 1)[0].strip().lower() for t in abiertos if ' · ' in t}
+        creados, omitidos, sin_asignar = [], [], []
+
+        with transaction.atomic():
+            for item in detectados:
+                clave = item['titulo'].strip().lower()
+                codigo = item['codigo'].lower()
+                if clave in titulos_existentes or (codigo and codigo in codigos_existentes):
+                    omitidos.append(item['titulo'])
+                    continue
+                asignados, faltantes = buscar_responsables(item['responsables'], usuarios)
+                sin_asignar.extend(faltantes)
+                pendiente = Pendiente.objects.create(
+                    titulo=item['titulo'],
+                    descripcion=item['descripcion'],
+                    prioridad=item['prioridad'],
+                    estado=item['estado'],
+                    motivo_bloqueo=item['motivo_bloqueo'],
+                    fecha_asignacion=item['fecha_asignacion'],
+                    origen=Pendiente.Origen.JUNTA,
+                    created_by=request.user,
+                )
+                pendiente.asignado_a.set(asignados)
+                titulos_existentes.add(clave)
+                if codigo:
+                    codigos_existentes.add(codigo)
+                creados.append(pendiente)
+
+        return Response({
+            'creados': PendienteSerializer(creados, many=True).data,
+            'total_creados': len(creados),
+            'omitidos_duplicados': omitidos,
+            'responsables_no_encontrados': sorted(set(sin_asignar)),
+        }, status=status.HTTP_201_CREATED)

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { createPendiente, getPendientes, getResumen } from '../../api/pendientes'
+import { createPendiente, getPendientes, getResumen, importarPendientesArchivo } from '../../api/pendientes'
 import { useAuth } from '../../hooks/useAuth'
 import { useToast } from '../../hooks/useToast'
 import DetallePendiente from './components/DetallePendiente'
@@ -80,6 +80,23 @@ export default function Pendientes() {
     }
   }
 
+  const handleImportarArchivo = async (archivo) => {
+    const formData = new FormData()
+    formData.append('archivo', archivo)
+    try {
+      const { data } = await importarPendientesArchivo(formData)
+      const omitidos = data.omitidos_duplicados.length
+      const sinAsignar = data.responsables_no_encontrados.length
+      let mensaje = `📄 ${data.total_creados} pendiente(s) creados desde el archivo.`
+      if (omitidos) mensaje += ` ${omitidos} ya existían y se omitieron.`
+      if (sinAsignar) mensaje += ` ${sinAsignar} responsable(s) no coinciden con un usuario; quedaron anotados en la descripción.`
+      showToast(mensaje, data.total_creados ? 'exito' : 'error')
+      await cargarDatos()
+    } catch (err) {
+      showToast(err.response?.data?.detail || 'No se pudo importar el archivo.', 'error')
+    }
+  }
+
   return (
     <div className="min-h-svh bg-bg px-4 py-6 sm:px-8">
       <header className="mb-6">
@@ -122,6 +139,7 @@ export default function Pendientes() {
               resumen={resumen}
               onSeleccionar={handleSeleccionar}
               onNuevo={handleNuevo}
+              onImportarArchivo={handleImportarArchivo}
             />
           )}
 

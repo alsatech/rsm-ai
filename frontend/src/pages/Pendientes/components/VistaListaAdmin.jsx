@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 
 import { ESTADO, MODULO_ICON, PRIORIDAD } from '../estadoConfig'
 
@@ -110,8 +110,10 @@ function PendienteCard({ p, onSeleccionar }) {
   )
 }
 
-export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, onNuevo }) {
+export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, onNuevo, onImportarArchivo }) {
   const [tabEstado, setTabEstado] = useState(null)
+  const inputArchivo = useRef(null)
+  const [importando, setImportando] = useState(false)
   const [filtroFecha, setFiltroFecha] = useState('todo')
   const [filtroModulo, setFiltroModulo] = useState(null)
   const [rangoFechas, setRangoFechas] = useState({ desde: '', hasta: '' })
@@ -273,7 +275,32 @@ export default function VistaListaAdmin({ pendientes, resumen, onSeleccionar, on
       )}
 
       {/* Botón flotante */}
-      <div className="fixed bottom-6 right-6 z-20">
+      <div className="fixed bottom-6 right-6 z-20 flex flex-col items-end gap-2">
+        <input
+          ref={inputArchivo}
+          type="file"
+          accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+          className="hidden"
+          onChange={async (e) => {
+            const archivo = e.target.files?.[0]
+            e.target.value = ''
+            if (!archivo) return
+            setImportando(true)
+            try {
+              await onImportarArchivo(archivo)
+            } finally {
+              setImportando(false)
+            }
+          }}
+        />
+        <button
+          onClick={() => inputArchivo.current?.click()}
+          disabled={importando}
+          style={{ minHeight: '48px' }}
+          className="rounded-xl border border-border bg-card px-5 py-2 text-sm font-semibold text-text transition hover:border-accent disabled:opacity-60"
+        >
+          {importando ? 'Leyendo archivo…' : '📄 Cargar minuta'}
+        </button>
         <button
           onClick={onNuevo}
           style={{ minHeight: '56px', boxShadow: '0 0 20px rgba(74, 222, 128, 0.35)' }}

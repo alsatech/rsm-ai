@@ -175,3 +175,123 @@ class PendienteEndpointTest(APITestCase):
         self.client.force_authenticate(user=self.campo)
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
+
+
+class ImportarArchivoTest(APITestCase):
+    def setUp(self):
+        self.admin = crear_usuario('abigail', User.Rol.ADMINISTRADOR)
+        self.campo = crear_usuario('chino', User.Rol.CAMPO)
+        self.url = reverse('pendiente-importar-archivo')
+
+    def _pdf(self, filas, nombre='pendientes.pdf'):
+        import io
+
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        from reportlab.lib import colors
+        from reportlab.lib.pagesizes import letter
+        from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+
+        buffer = io.BytesIO()
+        tabla = Table(filas)
+        tabla.setStyle(TableStyle([('GRID', (0, 0), (-1, -1), 0.5, colors.black)]))
+        SimpleDocTemplate(buffer, pagesize=letter).build([tabla])
+        return SimpleUploadedFile(nombre, buffer.getvalue(), content_type='application/pdf')
+
+    def test_crea_pendientes_desde_tabla(self):
+        self.client.force_authenticate(user=self.admin)
+        archivo = self._pdf([
+            ['Pendiente', 'Descripción', 'Responsable', 'Prioridad', 'Fecha'],
+            ['Reparar bomba', 'Cambiar sello de la bomba 2', 'chino', 'Alta', '05/11/2026'],
+            ['Check list apiario', 'Terminar el protocolo', 'Persona Inexistente', '', ''],
+        ])
+        resp = self.client.post(self.url, {'archivo': archivo}, format='multipart')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data['total_creados'], 2)
+        bomba = Pendiente.objects.get(titulo='Reparar bomba')
+        self.assertEqual(bomba.prioridad, 'alta')
+        self.assertEqual(str(bomba.fecha_asignacion), '2026-11-05')
+        self.assertEqual(list(bomba.asignado_a.all()), [self.campo])
+        self.assertEqual(bomba.created_by, self.admin)
+        self.assertEqual(resp.data['responsables_no_encontrados'], ['persona inexistente'])
+
+    def test_subir_dos_veces_no_duplica(self):
+        self.client.force_authenticate(user=self.admin)
+        filas = [['Pendiente'], ['Reparar bomba']]
+        self.client.post(self.url, {'archivo': self._pdf(filas)}, format='multipart')
+        resp = self.client.post(self.url, {'archivo': self._pdf(filas)}, format='multipart')
+        self.assertEqual(resp.data['total_creados'], 0)
+        self.assertEqual(resp.data['omitidos_duplicados'], ['Reparar bomba'])
+        self.assertEqual(Pendiente.objects.count(), 1)
+
+    def test_pdf_sin_pendientes_regresa_400(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(self.url, {'archivo': self._pdf([['Foo', 'Bar'], ['a', 'b']])}, format='multipart')
+        self.assertEqual(resp.status_code, 400)
+
+    def test_archivo_no_pdf_regresa_400(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(
+            self.url, {'archivo': SimpleUploadedFile('a.txt', b'hola')}, format='multipart',
+        )
+        self.assertEqual(resp.status_code, 400)
+
+    def test_campo_no_puede_importar(self):
+        self.client.force_authenticate(user=self.campo)
+        resp = self.client.post(self.url, {'archivo': self._pdf([['Pendiente'], ['X']])}, format='multipart')
+        self.assertEqual(resp.status_code, 403)
+
+
+class ImportarDocxTest(APITestCase):
+    def setUp(self):
+        self.admin = crear_usuario('abigail', User.Rol.ADMINISTRADOR)
+        self.url = reverse('pendiente-importar-archivo')
+
+    def _docx(self):
+        import io
+
+        import docx
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        d = docx.Document()
+        instrucciones = d.add_table(rows=2, cols=3)
+        for i, v in enumerate(['Responsable', 'Instrucción y lugar', 'Plazo']):
+            instrucciones.rows[0].cells[i].text = v
+        for i, v in enumerate(['GANADO', 'Pastorear', 'Hoy']):
+            instrucciones.rows[1].cells[i].text = v
+
+        encabezado = ['Nº', 'Acuerdo en seguimiento', 'Acuerdo logrado', 'ESTATUS', 'Fecha o siguiente revisión']
+        t1 = d.add_table(rows=3, cols=5)
+        for i, v in enumerate(encabezado):
+            t1.rows[0].cells[i].text = v
+        for i, v in enumerate(['011', 'Ajuste de flotadores', 'Ya se comunicó', 'EN PROCESO', '12/11/2026']):
+            t1.rows[1].cells[i].text = v
+        for i, v in enumerate(['015', 'Reparación de cazuelas', 'Esperar reguladores', 'EN PAUSA', 'PENDIENTE\nPRIORITARIO']):
+            t1.rows[2].cells[i].text = v
+
+        t2 = d.add_table(rows=1, cols=5)  # continuación sin encabezado
+        for i, v in enumerate(['P05\nEY', 'Contratar tres elementos', 'Vacante publicada', 'EN PROCESO', '11/11/2026']):
+            t2.rows[0].cells[i].text = v
+        buffer = io.BytesIO()
+        d.save(buffer)
+        return SimpleUploadedFile('Minuta.docx', buffer.getvalue())
+
+    def test_importa_tablas_de_seguimiento_y_omite_instrucciones(self):
+        self.client.force_authenticate(user=self.admin)
+        resp = self.client.post(self.url, {'archivo': self._docx()}, format='multipart')
+        self.assertEqual(resp.status_code, 201, resp.data)
+        self.assertEqual(resp.data['total_creados'], 3)
+        p011 = Pendiente.objects.get(titulo__startswith='011 · ')
+        self.assertEqual(p011.estado, 'en_proceso')
+        self.assertIn('Siguiente revisión: 12/11/2026', p011.descripcion)
+        p015 = Pendiente.objects.get(titulo__startswith='015 · ')
+        self.assertEqual((p015.estado, p015.motivo_bloqueo, p015.prioridad), ('bloqueado', 'otro', 'alta'))
+        p05 = Pendiente.objects.get(titulo__startswith='P05 · ')
+        self.assertIn('Responsable: EY', p05.descripcion)
+
+    def test_segunda_carga_no_duplica(self):
+        self.client.force_authenticate(user=self.admin)
+        self.client.post(self.url, {'archivo': self._docx()}, format='multipart')
+        resp = self.client.post(self.url, {'archivo': self._docx()}, format='multipart')
+        self.assertEqual(resp.data['total_creados'], 0)
+        self.assertEqual(Pendiente.objects.count(), 3)

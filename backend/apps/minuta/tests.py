@@ -1,3 +1,6 @@
+from datetime import date
+
+from django.test import TestCase
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
@@ -147,3 +150,51 @@ class MinutaAPITest(APITestCase):
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
         self.assertEqual(len(resp.data), 2)
         self.assertEqual(resp.data[0]['fecha'], '2026-05-21')
+
+
+class PendientesFormatoMinutaOperativaTest(TestCase):
+    def test_separa_numero_acuerdo_logrado_responsable_y_revision(self):
+        from apps.minuta.services import datos_pendientes
+        admin = User.objects.create_user(username='adm_fmt', password='x', rol=User.Rol.ADMINISTRADOR)
+        Pendiente.objects.create(
+            titulo='P05 · Contratar tres elementos', created_by=admin, estado=Pendiente.Estado.EN_PROCESO,
+            descripcion='Vacante publicada.\nResponsable: EY\nSiguiente revisión: 11/11/2026',
+        )
+        Pendiente.objects.create(titulo='Pendiente a mano', descripcion='Detalle libre', created_by=admin)
+        Pendiente.objects.create(
+            titulo='003 · Impermeabilizar', descripcion='x', created_by=admin,
+            estado=Pendiente.Estado.BLOQUEADO, motivo_bloqueo=Pendiente.MotivoBloqueo.OTRO,
+        )
+        cerrado = Pendiente.objects.create(titulo='011 · Cerrado', descripcion='x', created_by=admin)
+        cerrado.estado = Pendiente.Estado.CERRADO
+        cerrado.save()
+
+        filas = datos_pendientes(date.today())['abiertos_y_bloqueados']
+        self.assertEqual([f['codigo'] for f in filas], ['003', 'P05', ''])  # orden del documento; sin Nº al final
+        self.assertEqual(filas[0]['estatus_minuta'], 'EN PAUSA')
+        p05 = filas[1]
+        self.assertEqual(
+            (p05['acuerdo'], p05['acuerdo_logrado'], p05['responsable'], p05['fecha_revision'], p05['estatus_minuta']),
+            ('Contratar tres elementos', 'Vacante publicada.', 'EY', '11/11/2026', 'EN PROCESO'),
+        )
+        self.assertEqual(filas[2]['acuerdo_logrado'], 'Detalle libre')
+
+
+class CerradosVentanaMinutaTest(TestCase):
+    def test_cierre_aparece_una_sola_vez(self):
+        from datetime import datetime, timedelta
+
+        from django.utils import timezone
+
+        from apps.minuta.services import datos_pendientes
+        admin = User.objects.create_user(username='adm_cierre', password='x', rol=User.Rol.ADMINISTRADOR)
+        p = Pendiente.objects.create(titulo='X', descripcion='x', created_by=admin)
+        Pendiente.objects.filter(pk=p.pk).update(
+            estado=Pendiente.Estado.CERRADO,
+            fecha_cierre=timezone.make_aware(datetime(2026, 11, 13, 10, 0)),  # viernes
+        )
+        titulos = lambda f: [x['titulo'] for x in datos_pendientes(f)['cerrados_hoy']]  # noqa: E731
+        self.assertEqual(titulos(date(2026, 11, 13)), ['X'])   # viernes
+        self.assertEqual(titulos(date(2026, 11, 14)), ['X'])   # sábado: aún aparece
+        self.assertEqual(titulos(date(2026, 11, 15)), [])      # domingo: ya no
+        self.assertEqual(titulos(date(2026, 11, 12)), [])      # antes del cierre

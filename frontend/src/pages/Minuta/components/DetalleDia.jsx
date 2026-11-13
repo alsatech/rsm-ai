@@ -64,8 +64,8 @@ function SeccionPendientes({ pendientes }) {
     <Seccion icono="📋" titulo="Pendientes">
       <p className="mb-2 text-xs font-semibold uppercase text-text-secondary">Abiertos / bloqueados</p>
       <ListaPendientes pendientes={pendientes.abiertos_y_bloqueados} vacioTexto="Sin pendientes abiertos ni bloqueados." />
-      <p className="mb-2 mt-4 text-xs font-semibold uppercase text-text-secondary">Cerrados hoy</p>
-      <ListaPendientes pendientes={pendientes.cerrados_hoy} vacioTexto="Sin pendientes cerrados hoy." />
+      <p className="mb-2 mt-4 text-xs font-semibold uppercase text-text-secondary">Cerrados desde la minuta anterior</p>
+      <ListaPendientes pendientes={pendientes.cerrados_hoy} vacioTexto="Sin pendientes cerrados desde la minuta anterior." />
     </Seccion>
   )
 }

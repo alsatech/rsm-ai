@@ -62,12 +62,21 @@ export default function Minuta() {
   }
 
   const handleDescargar = async () => {
+    // La pestaña se abre antes del await: si se abriera después, el navegador la bloquearía
+    // como ventana emergente. Desde el visor del navegador ya se puede descargar o imprimir.
+    const pestana = window.open('', '_blank')
     setDescargando(true)
     try {
       const { data } = await descargarMinutaPdf(fecha)
-      descargarBlob(data, `minuta_${fecha}.pdf`)
+      const pdf = new Blob([data], { type: 'application/pdf' })
+      if (pestana) {
+        pestana.location.href = URL.createObjectURL(pdf)
+      } else {
+        descargarBlob(pdf, `minuta_${fecha}.pdf`)
+      }
     } catch {
-      showToast('No se pudo descargar el PDF.', 'error')
+      pestana?.close()
+      showToast('No se pudo abrir el PDF.', 'error')
     } finally {
       setDescargando(false)
     }
@@ -149,7 +158,7 @@ export default function Minuta() {
                 style={{ minHeight: '56px' }}
                 className="flex-1 rounded-xl border border-accent text-base font-bold text-highlight transition hover:bg-accent disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {descargando ? 'Descargando…' : '⬇️ Descargar PDF'}
+                {descargando ? 'Abriendo…' : '📄 Ver PDF'}
               </button>
             </div>
 

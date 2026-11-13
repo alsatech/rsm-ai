@@ -1,4 +1,5 @@
 from io import BytesIO
+from xml.sax.saxutils import escape
 
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
@@ -27,7 +28,15 @@ def _p(texto):
     return Paragraph(str(texto) if texto not in (None, '') else '—', _CELDA)
 
 
+_ENCABEZADO_CELDA = ParagraphStyle(
+    'encabezado_celda', parent=_CELDA, textColor=colors.white, fontName='Helvetica-Bold',
+)
+
+
 def _tabla(encabezados, filas, col_widths):
+    # El color de texto de TableStyle no aplica a Paragraphs; el encabezado se arma blanco
+    # sobre el verde para que se lea.
+    encabezados = [Paragraph(h.getPlainText(), _ENCABEZADO_CELDA) for h in encabezados]
     data = [encabezados] + filas
     tabla = Table(data, colWidths=col_widths, repeatRows=1)
     tabla.setStyle(_ENCABEZADO_ESTILO)
@@ -65,24 +74,31 @@ def _seccion_pendientes(story, datos):
     story.append(Paragraph('Abiertos / bloqueados', _STYLES['Heading4']))
     if abiertos:
         filas = [
-            [_p(p['titulo']), _p(p['estado_display']), _p(p['prioridad']), _p(p['motivo_bloqueo']), _p(', '.join(p['asignados']))]
+            [
+                _p('<br/>'.join(escape(x) for x in (p['codigo'], p['responsable']) if x)),
+                _p(escape(p['acuerdo'])),
+                _p(escape(p['acuerdo_logrado'])),
+                _p(p['estatus_minuta']),
+                _p(escape(p['fecha_revision'])),
+            ]
             for p in abiertos
         ]
         story.append(_tabla(
-            [_p('Título'), _p('Estado'), _p('Prioridad'), _p('Motivo bloqueo'), _p('Asignado a')],
-            filas, [5 * cm, 2.3 * cm, 2 * cm, 3 * cm, 4.2 * cm],
+            [_p('<b>Nº y responsable</b>'), _p('<b>Acuerdo en seguimiento</b>'), _p('<b>Acuerdo logrado</b>'),
+             _p('<b>ESTATUS</b>'), _p('<b>Fecha o siguiente revisión</b>')],
+            filas, [2.2 * cm, 4.4 * cm, 5.3 * cm, 1.9 * cm, 2.7 * cm],
         ))
     else:
         story.append(Paragraph('Sin pendientes abiertos ni bloqueados.', _VACIO))
 
     cerrados = datos['cerrados_hoy']
     story.append(Spacer(1, 0.2 * cm))
-    story.append(Paragraph('Cerrados hoy', _STYLES['Heading4']))
+    story.append(Paragraph('Cerrados desde la minuta anterior', _STYLES['Heading4']))
     if cerrados:
         filas = [[_p(p['titulo']), _p(p['solucion_cierre'])] for p in cerrados]
         story.append(_tabla([_p('Título'), _p('Solución')], filas, [5 * cm, 11.5 * cm]))
     else:
-        story.append(Paragraph('Sin pendientes cerrados hoy.', _VACIO))
+        story.append(Paragraph('Sin pendientes cerrados desde la minuta anterior.', _VACIO))
 
 
 def _seccion_flota(story, datos):

@@ -5,6 +5,7 @@ from .views import (
     FotoPendienteDeleteView,
     FotoPendienteListView,
     HistorialPendienteView,
+    ImportarPendientesArchivoView,
     PendienteDetailView,
     PendienteListCreateView,
     ResumenPendientesView,
@@ -12,6 +13,7 @@ from .views import (
 
 urlpatterns = [
     path('', PendienteListCreateView.as_view(), name='pendiente-list-create'),
+    path('importar-archivo/', ImportarPendientesArchivoView.as_view(), name='pendiente-importar-archivo'),
     path('resumen/', ResumenPendientesView.as_view(), name='pendiente-resumen'),
     path('<int:pk>/', PendienteDetailView.as_view(), name='pendiente-detail'),
     path('<int:pk>/historial/', HistorialPendienteView.as_view(), name='pendiente-historial'),

@@ -13,3 +13,6 @@ export const subirFoto = (id, formData) => api.post(`/api/v1/pendientes/${id}/fo
 export const eliminarPendiente = (id) => api.delete(`/api/v1/pendientes/${id}/`)
 export const eliminarFoto = (id, fotoId) => api.delete(`/api/v1/pendientes/${id}/fotos/${fotoId}/`)
 export const getUsuarios = () => api.get('/api/v1/auth/usuarios/')
+export const importarPendientesArchivo = (formData) => api.post('/api/v1/pendientes/importar-archivo/', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' },
+})
