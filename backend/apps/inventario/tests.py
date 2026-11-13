@@ -385,6 +385,42 @@ class InventarioAPITest(APITestCase):
         resp = self.client.get('/api/v1/inventario/productos/', {'activo': 'true'})
         self.assertNotIn(producto.codigo, [p['codigo'] for p in resp.data])
 
+    def test_codigo_repetido_indica_ubicacion_del_material_activo(self):
+        existente = crear_producto(codigo='SM-DUP-001')
+        self._auth(self.inventario)
+        resp = self.client.post('/api/v1/inventario/productos/', {
+            'codigo': 'SM-DUP-001', 'descripcion': 'Otro', 'categoria': existente.categoria_id,
+            'ubicacion': existente.ubicacion_id,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('activo en', resp.data['codigo'][0])
+        self.assertEqual(resp.data['producto_existente'], {'id': existente.id, 'activo': True})
+
+    def test_codigo_repetido_de_producto_dado_de_baja_permite_reactivar(self):
+        existente = crear_producto(codigo='SM-DUP-002')
+        self._auth(self.inventario)
+        self.client.delete(f'/api/v1/inventario/productos/{existente.id}/')
+        resp = self.client.post('/api/v1/inventario/productos/', {
+            'codigo': 'SM-DUP-002', 'descripcion': 'Otro', 'categoria': existente.categoria_id,
+            'ubicacion': existente.ubicacion_id,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('dado de baja', resp.data['codigo'][0])
+        self.assertEqual(resp.data['producto_existente'], {'id': existente.id, 'activo': False})
+
+        resp = self.client.post(f'/api/v1/inventario/productos/{existente.id}/reactivar/')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        existente.refresh_from_db()
+        self.assertTrue(existente.activo)
+
+    def test_campo_no_puede_reactivar_producto(self):
+        existente = crear_producto(codigo='SM-DUP-003')
+        existente.activo = False
+        existente.save()
+        self._auth(self.campo)
+        resp = self.client.post(f'/api/v1/inventario/productos/{existente.id}/reactivar/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
     def test_campo_no_puede_eliminar_producto(self):
         producto = crear_producto(codigo='SM-BORRAR-002')
         self._auth(self.campo)

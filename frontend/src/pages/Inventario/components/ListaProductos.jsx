@@ -9,6 +9,7 @@ import {
   getProductos,
   getUbicaciones,
   updateProducto,
+  reactivarProducto,
 } from '../../../api/inventario'
 import { useAuth } from '../../../hooks/useAuth'
 import { useConfirm } from '../../../hooks/useConfirm'
@@ -156,8 +157,30 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
       cargar()
       onProductoCreado?.()
     } catch (err) {
-      const mensaje = err?.response?.data?.codigo?.[0] || 'No se pudo crear el producto.'
-      showToast(mensaje, 'error')
+      const datos = err?.response?.data
+      const mensaje = datos?.codigo?.[0] || 'No se pudo crear el producto.'
+      const existente = datos?.producto_existente
+      if (existente && !existente.activo) {
+        const reactivar = await confirm({
+          titulo: 'Este código está dado de baja',
+          mensaje: `${mensaje} ¿Quieres reactivarlo?`,
+          confirmText: 'Sí, reactivar',
+          cancelText: 'No, usar otro código',
+        })
+        if (reactivar) {
+          try {
+            await reactivarProducto(existente.id)
+            showToast('✅ Producto reactivado', 'exito')
+            setMostrarFormulario(false)
+            cargar()
+            onProductoCreado?.()
+          } catch {
+            showToast('No se pudo reactivar el producto.', 'error')
+          }
+        }
+      } else {
+        showToast(mensaje, 'error')
+      }
     } finally {
       setGuardando(false)
     }

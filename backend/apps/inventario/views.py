@@ -8,6 +8,7 @@ from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 from rest_framework import generics, status
+from rest_framework.exceptions import ValidationError
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -120,6 +121,17 @@ class ProductoListCreateView(generics.ListCreateAPIView):
             return [IsAuthenticated(), PuedeGestionarCatalogo()]
         return [IsAuthenticated()]
 
+    def create(self, request, *args, **kwargs):
+        try:
+            return super().create(request, *args, **kwargs)
+        except ValidationError as exc:
+            codigo = str(request.data.get('codigo', ''))
+            if isinstance(exc.detail, dict) and 'codigo' in exc.detail:
+                existente = Producto.objects.filter(codigo=codigo).first()
+                if existente:
+                    exc.detail['producto_existente'] = {'id': existente.id, 'activo': existente.activo}
+            raise
+
     def get_queryset(self):
         qs = Producto.objects.select_related('categoria', 'ubicacion', 'grupo')
         p = self.request.query_params
@@ -145,6 +157,21 @@ class ProductoListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(models.Q(codigo__icontains=q) | models.Q(descripcion__icontains=q))
 
         return qs
+
+
+class ReactivarProductoView(APIView):
+    """POST /productos/{id}/reactivar/ — revierte la baja lógica de un producto (sigue en su
+    ubicación, con su stock e historial). Útil cuando se intenta dar de alta un código que
+    pertenece a un producto dado de baja."""
+
+    permission_classes = [IsAuthenticated, PuedeGestionarCatalogo]
+
+    def post(self, request, pk):
+        producto = get_object_or_404(Producto, pk=pk)
+        if not producto.activo:
+            producto.activo = True
+            producto.save(update_fields=['activo'])
+        return Response(ProductoSerializer(producto).data)
 
 
 class SiguienteCodigoProductoView(APIView):

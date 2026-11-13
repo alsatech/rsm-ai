@@ -5,6 +5,7 @@ export const getProducto = (id) => api.get(`/api/v1/inventario/productos/${id}/`
 export const createProducto = (data) => api.post('/api/v1/inventario/productos/', data)
 export const updateProducto = (id, data) => api.patch(`/api/v1/inventario/productos/${id}/`, data)
 export const deleteProducto = (id) => api.delete(`/api/v1/inventario/productos/${id}/`)
+export const reactivarProducto = (id) => api.post(`/api/v1/inventario/productos/${id}/reactivar/`)
 export const getSiguienteCodigoProducto = () => api.get('/api/v1/inventario/productos/siguiente-codigo/')
 export const ajustarStockProducto = (id, data) => api.post(`/api/v1/inventario/productos/${id}/ajustar-stock/`, data)
 export const getGeneradoresInventario = () => api.get('/api/v1/inventario/generadores/')

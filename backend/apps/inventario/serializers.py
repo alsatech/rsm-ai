@@ -79,6 +79,19 @@ class GrupoMaterialResumenSerializer(serializers.ModelSerializer):
         fields = ('id', 'nombre')
 
 
+def mensaje_codigo_duplicado(producto):
+    ubicacion = producto.ubicacion.get_nombre_display()
+    if producto.activo:
+        return (
+            f'El código {producto.codigo} ya lo tiene "{producto.descripcion}", '
+            f'que está activo en {ubicacion}.'
+        )
+    return (
+        f'El código {producto.codigo} pertenece a "{producto.descripcion}", que fue dado de baja '
+        f'(estaba en {ubicacion}). Puedes reactivarlo o usar otro código.'
+    )
+
+
 class ProductoSerializer(serializers.ModelSerializer):
     categoria_detalle = CategoriaInventarioSerializer(source='categoria', read_only=True)
     ubicacion_detalle = UbicacionSerializer(source='ubicacion', read_only=True)
@@ -101,6 +114,18 @@ class ProductoSerializer(serializers.ModelSerializer):
         read_only_fields = (
             'id', 'stock_actual', 'grupo', 'created_at', 'updated_at', 'clase_abc', 'score_abc', 'clasificado_en',
         )
+        # El validador de unicidad por defecto solo dice "ya existe"; lo reemplazamos por
+        # validate_codigo para indicar dónde está el material o si está dado de baja.
+        extra_kwargs = {'codigo': {'validators': []}}
+
+    def validate_codigo(self, value):
+        existente = Producto.objects.select_related('ubicacion').filter(codigo=value)
+        if self.instance is not None:
+            existente = existente.exclude(pk=self.instance.pk)
+        existente = existente.first()
+        if existente:
+            raise serializers.ValidationError(mensaje_codigo_duplicado(existente))
+        return value
 
     def get_valor_stock(self, obj):
         return obj.stock_actual * obj.costo_unitario
