@@ -149,6 +149,8 @@ class ProductoListCreateView(generics.ListCreateAPIView):
             qs = qs.filter(ubicacion_id=ubicacion)
         if grupo:
             qs = qs.filter(grupo_id=grupo)
+        if p.get('sin_grupo', '').lower() == 'true':
+            qs = qs.filter(grupo__isnull=True)
         if activo is not None:
             qs = qs.filter(activo=activo.lower() == 'true')
         if stock_bajo is not None and stock_bajo.lower() == 'true':
@@ -174,34 +176,23 @@ class ReactivarProductoView(APIView):
         return Response(ProductoSerializer(producto).data)
 
 
+CAMPOS_CLASIFICACION_ABC = {'costo_unitario', 'criticidad'}
+
+
 class SiguienteCodigoProductoView(APIView):
-    """GET /productos/siguiente-codigo/ — para que Yajaira no tenga que adivinar con qué
-    número dar de alta un producto nuevo: lee el código más alto del catálogo (patrón
-    'SM-001') y propone el siguiente. Solo es una sugerencia — el campo código sigue siendo
-    editable en el formulario de alta."""
+    """GET /productos/siguiente-codigo/?ubicacion=<id> — sugiere el siguiente código libre de la
+    serie de esa ubicación (AL-001, HNG-001…). Solo es una sugerencia: el alta valida que el
+    código lleve el prefijo de la ubicación."""
 
     permission_classes = [IsAuthenticated, PuedeGestionarCatalogo]
 
     def get(self, request):
-        patron = re.compile(r'^([A-Za-z]+)-?(\d+)$')
-        mejor_prefijo, mejor_numero, mejor_digitos = 'SM', 0, 3
-
-        for codigo in Producto.objects.values_list('codigo', flat=True):
-            match = patron.match(codigo.strip())
-            if not match:
-                continue
-            numero = int(match.group(2))
-            if numero > mejor_numero:
-                mejor_prefijo = match.group(1).upper()
-                mejor_numero = numero
-                mejor_digitos = len(match.group(2))
-
-        ultimo_codigo = f'{mejor_prefijo}-{mejor_numero:0{mejor_digitos}d}' if mejor_numero else None
-        siguiente_codigo = f'{mejor_prefijo}-{mejor_numero + 1:0{mejor_digitos}d}'
-        return Response({'ultimo_codigo': ultimo_codigo, 'siguiente_codigo': siguiente_codigo})
-
-
-CAMPOS_CLASIFICACION_ABC = {'costo_unitario', 'criticidad'}
+        ubicacion = get_object_or_404(Ubicacion, pk=request.query_params.get('ubicacion'))
+        if not ubicacion.prefijo:
+            return Response(
+                {'ubicacion': 'Esta ubicación no tiene prefijo de código.'}, status=status.HTTP_400_BAD_REQUEST,
+            )
+        return Response({'prefijo': ubicacion.prefijo, 'siguiente_codigo': ubicacion.siguiente_codigo()})
 
 
 class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
@@ -224,47 +215,6 @@ class ProductoDetailView(generics.RetrieveUpdateDestroyAPIView):
         # inventario general (ambos listados filtran activo=True).
         instance.activo = False
         instance.save(update_fields=['activo'])
-
-
-class TransferirProductoView(APIView):
-    """POST /productos/{id}/transferir/ — caso raro: el material ya está físicamente en otra
-    ubicación y hay que corregirlo en el sistema. Mueve TODO el stock del producto a la nueva
-    ubicación (no soporta transferencias parciales) y deja un MovimientoInventario tipo
-    'transferencia' para trazabilidad, sin tocar la cantidad."""
-
-    permission_classes = [IsAuthenticated, PuedeGestionarCatalogo]
-
-    def post(self, request, pk):
-        producto = get_object_or_404(Producto, pk=pk)
-        ubicacion_destino = get_object_or_404(Ubicacion, pk=request.data.get('ubicacion_destino'))
-
-        if ubicacion_destino.id == producto.ubicacion_id:
-            return Response(
-                {'ubicacion_destino': 'El producto ya está en esa ubicación.'}, status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        ubicacion_origen = producto.ubicacion
-        producto.ubicacion = ubicacion_destino
-        if producto.grupo_id and producto.grupo.ubicacion_id != ubicacion_destino.id:
-            producto.grupo = None
-        producto.save(update_fields=['ubicacion', 'grupo', 'updated_at'])
-
-        movimiento = MovimientoInventario.objects.create(
-            producto=producto,
-            tipo=MovimientoInventario.Tipo.TRANSFERENCIA,
-            cantidad=producto.stock_actual,
-            stock_anterior=producto.stock_actual,
-            stock_resultante=producto.stock_actual,
-            responsable=request.user,
-            uso_descripcion=f'Transferencia de {ubicacion_origen.get_nombre_display()} a {ubicacion_destino.get_nombre_display()}',
-            fecha_movimiento=timezone.localdate(),
-            validado=True,
-            validado_por=request.user,
-        )
-        return Response(
-            MovimientoInventarioSerializer(movimiento, context={'request': request}).data,
-            status=status.HTTP_201_CREATED,
-        )
 
 
 class AjustarStockView(APIView):
@@ -853,9 +803,9 @@ class DarEntradaRecepcionView(APIView):
     recepción de Campo) es donde se genera el MovimientoInventario real y sube el stock.
 
     Body opcional:
-    - {'ubicaciones': {'<item_recepcion_id>': <ubicacion_id>, ...}} — permite elegir/cambiar la
-      ubicación final de cada material al momento de dar entrada. Si no se manda para un producto
-      que ya existía en catálogo, se conserva la ubicación que ya tenía.
+    - {'ubicaciones': {'<item_recepcion_id>': <ubicacion_id>, ...}} — ubicación de los productos
+      NUEVOS que se dan de alta. Los productos que ya existen conservan siempre su ubicación
+      (no hay traslados entre ubicaciones).
     - {'productos_nuevos': {'<item_recepcion_id>': {'codigo': ..., 'categoria': <id>,
       'unidad_medida': ..., 'stock_minimo': ..., 'costo_unitario': ..., 'criticidad': ...}, ...}}
       — da de alta en catálogo (código + QR) los ítems que se solicitaron como "producto nuevo"
@@ -905,6 +855,15 @@ class DarEntradaRecepcionView(APIView):
                     'descripcion': item_recepcion.item_solicitud.descripcion_libre,
                     'faltan': faltantes,
                 })
+            elif not Ubicacion.objects.filter(pk=ubicacion_id).first() or not Ubicacion.objects.get(
+                pk=ubicacion_id,
+            ).codigo_valido(datos['codigo']):
+                errores.append({
+                    'item_recepcion': item_recepcion.id,
+                    'descripcion': item_recepcion.item_solicitud.descripcion_libre,
+                    'faltan': [],
+                    'detail': f"El código {datos['codigo']} no corresponde a la serie de la ubicación elegida.",
+                })
             elif Producto.objects.filter(codigo=datos['codigo']).exists():
                 errores.append({
                     'item_recepcion': item_recepcion.id,
@@ -946,12 +905,6 @@ class DarEntradaRecepcionView(APIView):
                     )
                     item_solicitud.producto = producto
                     item_solicitud.save(update_fields=['producto'])
-                elif ubicacion_id and str(ubicacion_id) != str(producto.ubicacion_id):
-                    nueva_ubicacion = get_object_or_404(Ubicacion, pk=ubicacion_id)
-                    producto.ubicacion = nueva_ubicacion
-                    if producto.grupo_id and producto.grupo.ubicacion_id != nueva_ubicacion.id:
-                        producto.grupo = None
-                    producto.save(update_fields=['ubicacion', 'grupo', 'updated_at'])
 
                 stock_anterior = producto.stock_actual
                 stock_resultante = stock_anterior + item_recepcion.cantidad_recibida
@@ -1000,17 +953,10 @@ class EntradaRapidaView(APIView):
         if cantidad <= 0:
             return Response({'cantidad': 'La cantidad debe ser mayor a 0.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        ubicacion_id = request.data.get('ubicacion')
-        if ubicacion_id and str(ubicacion_id) != str(producto.ubicacion_id):
-            nueva_ubicacion = get_object_or_404(Ubicacion, pk=ubicacion_id)
-            producto.ubicacion = nueva_ubicacion
-            if producto.grupo_id and producto.grupo.ubicacion_id != nueva_ubicacion.id:
-                producto.grupo = None
-
         stock_anterior = producto.stock_actual
         stock_resultante = stock_anterior + cantidad
         producto.stock_actual = stock_resultante
-        producto.save(update_fields=['ubicacion', 'grupo', 'stock_actual', 'updated_at'])
+        producto.save(update_fields=['stock_actual', 'updated_at'])
 
         movimiento = MovimientoInventario.objects.create(
             producto=producto,

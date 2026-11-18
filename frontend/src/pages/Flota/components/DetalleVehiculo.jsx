@@ -6,6 +6,7 @@ import {
   getAlertasFlota,
   getCambiosAceite,
   getHistorialVehiculo,
+  getMantenimientos,
   getVehiculo,
   resolverAlertaFlota,
   updateVehiculo,
@@ -13,19 +14,21 @@ import {
 } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
-import { ALERTA_TIPO_LABELS, ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, unidadMedicion } from '../constants'
+import { ALERTA_TIPO_LABELS, ESTADO_VEHICULO_CONFIG, TIPO_ICONOS, esTraila, unidadMedicion } from '../constants'
 import BitacoraAceite from './BitacoraAceite'
 import DetalleChecklist from './DetalleChecklist'
 import FormularioVehiculo from './FormularioVehiculo'
 import HistorialChecklists from './HistorialChecklists'
+import HistorialMantenimientos from './HistorialMantenimientos'
 
-export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
+export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist, onNuevoMantenimiento }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [vehiculo, setVehiculo] = useState(null)
   const [checklists, setChecklists] = useState([])
   const [alertas, setAlertas] = useState([])
   const [cambiosAceite, setCambiosAceite] = useState([])
+  const [mantenimientos, setMantenimientos] = useState([])
   const [loading, setLoading] = useState(true)
   const [mostrarEdicion, setMostrarEdicion] = useState(false)
   const [checklistSeleccionado, setChecklistSeleccionado] = useState(null)
@@ -45,6 +48,10 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
         getHistorialVehiculo(id),
         getCambiosAceite({ vehiculo: id }),
       ])
+      if (v.tipo === 'traila') {
+        const { data: mttos } = await getMantenimientos({ vehiculo: id })
+        setMantenimientos(mttos)
+      }
       setVehiculo(v)
       setChecklists(hist)
       setCambiosAceite(cambios)
@@ -264,6 +271,17 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
             <p className="mt-4 rounded-lg bg-flotabg px-3 py-2 text-sm text-flotafg-muted">{vehiculo.notas}</p>
           )}
 
+          {puedeCrearChecklist && esTraila(vehiculo.tipo) && (
+            <button
+              type="button"
+              onClick={() => onNuevoMantenimiento(vehiculo)}
+              style={{ minHeight: '56px' }}
+              className="flota-cta-primary mt-5 w-full rounded-xl text-base"
+            >
+              🔧 Nuevo mantenimiento
+            </button>
+          )}
+
           {puedeCrearChecklist && (
             <button
               type="button"
@@ -287,6 +305,13 @@ export default function DetalleVehiculo({ id, onVolver, onNuevoChecklist }) {
           guardando={guardando}
         />
       </div>
+
+      {esTraila(vehiculo.tipo) && (
+        <div className="glass-card flota-fade-in rounded-2xl p-4" style={{ animationDelay: '90ms' }}>
+          <h2 className="mb-3 font-bold text-flotafg">Mantenimientos</h2>
+          <HistorialMantenimientos mantenimientos={mantenimientos} />
+        </div>
+      )}
 
       <div className="glass-card flota-fade-in rounded-2xl p-4" style={{ animationDelay: '100ms' }}>
         <h2 className="mb-3 font-bold text-flotafg">Historial de checklists</h2>

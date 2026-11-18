@@ -121,7 +121,7 @@ class InventarioAPITest(APITestCase):
         self.producto.refresh_from_db()
         self.assertEqual(self.producto.stock_actual, 15)
 
-    def test_entrada_rapida_permite_elegir_ubicacion_distinta(self):
+    def test_entrada_rapida_ignora_ubicacion_distinta(self):
         otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
         self._auth(self.inventario)
         resp = self.client.post(
@@ -130,8 +130,9 @@ class InventarioAPITest(APITestCase):
             format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        ubicacion_original = self.producto.ubicacion_id
         self.producto.refresh_from_db()
-        self.assertEqual(self.producto.ubicacion_id, otra_ubicacion.id)
+        self.assertEqual(self.producto.ubicacion_id, ubicacion_original)
 
     def test_campo_no_puede_registrar_entrada_rapida(self):
         self._auth(self.campo)
@@ -351,9 +352,9 @@ class InventarioAPITest(APITestCase):
     def test_inventario_crea_producto(self):
         self._auth(self.inventario)
         categoria = CategoriaInventario.objects.first()
-        ubicacion = Ubicacion.objects.first()
+        ubicacion = Ubicacion.objects.get(nombre='alacena')
         resp = self.client.post('/api/v1/inventario/productos/', {
-            'codigo': 'SM-NUEVO-001',
+            'codigo': 'AL-001',
             'descripcion': 'Producto nuevo',
             'categoria': categoria.id,
             'ubicacion': ubicacion.id,
@@ -361,6 +362,24 @@ class InventarioAPITest(APITestCase):
             'stock_minimo': '10.00',
         }, format='json')
         self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+
+    def test_codigo_debe_llevar_prefijo_de_la_ubicacion(self):
+        self._auth(self.inventario)
+        categoria = CategoriaInventario.objects.first()
+        ubicacion = Ubicacion.objects.get(nombre='hangar')
+        resp = self.client.post('/api/v1/inventario/productos/', {
+            'codigo': 'AL-001', 'descripcion': 'X', 'categoria': categoria.id, 'ubicacion': ubicacion.id,
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertIn('codigo', resp.data)
+
+    def test_producto_no_puede_cambiar_de_ubicacion(self):
+        self._auth(self.inventario)
+        otra = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
+        resp = self.client.patch(
+            f'/api/v1/inventario/productos/{self.producto.id}/', {'ubicacion': otra.id}, format='json',
+        )
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_campo_no_puede_crear_producto(self):
         self._auth(self.campo)
@@ -425,41 +444,6 @@ class InventarioAPITest(APITestCase):
         producto = crear_producto(codigo='SM-BORRAR-002')
         self._auth(self.campo)
         resp = self.client.delete(f'/api/v1/inventario/productos/{producto.id}/')
-        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
-
-    def test_inventario_transfiere_producto_a_otra_ubicacion(self):
-        # Caso raro: el material ya está físicamente en otra bodega y hay que corregirlo.
-        # Se mueve TODO el stock (no hay transferencias parciales).
-        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
-        self._auth(self.inventario)
-        resp = self.client.post(
-            f'/api/v1/inventario/productos/{self.producto.id}/transferir/',
-            {'ubicacion_destino': otra_ubicacion.id},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
-        self.assertEqual(resp.data['tipo'], 'transferencia')
-        self.producto.refresh_from_db()
-        self.assertEqual(self.producto.ubicacion_id, otra_ubicacion.id)
-        self.assertEqual(self.producto.stock_actual, 10)  # la cantidad no cambia, solo la ubicación
-
-    def test_transferir_a_la_misma_ubicacion_falla(self):
-        self._auth(self.inventario)
-        resp = self.client.post(
-            f'/api/v1/inventario/productos/{self.producto.id}/transferir/',
-            {'ubicacion_destino': self.producto.ubicacion_id},
-            format='json',
-        )
-        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
-
-    def test_campo_no_puede_transferir_producto(self):
-        otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
-        self._auth(self.campo)
-        resp = self.client.post(
-            f'/api/v1/inventario/productos/{self.producto.id}/transferir/',
-            {'ubicacion_destino': otra_ubicacion.id},
-            format='json',
-        )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
     def test_resumen_inventario(self):
@@ -675,9 +659,8 @@ class AdquisicionesAPITest(APITestCase):
         self.assertTrue(movimiento.validado)
         self.assertEqual(movimiento.validado_por_id, self.inventario.id)
 
-    def test_dar_entrada_permite_elegir_ubicacion_distinta(self):
-        # Yajaira puede mandar el material a otra bodega (ej. Bodega Nueva) al dar entrada,
-        # distinta a la que el producto tenía fija en catálogo.
+    def test_dar_entrada_no_cambia_la_ubicacion_de_un_producto_existente(self):
+        # No hay traslados: cada producto conserva su ubicación (y su serie de códigos).
         otra_ubicacion = Ubicacion.objects.exclude(pk=self.producto.ubicacion_id).first()
         solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
         item_recepcion_id = recepcion['items'][0]['id']
@@ -689,8 +672,9 @@ class AdquisicionesAPITest(APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
 
+        ubicacion_original = self.producto.ubicacion_id
         self.producto.refresh_from_db()
-        self.assertEqual(self.producto.ubicacion_id, otra_ubicacion.id)
+        self.assertEqual(self.producto.ubicacion_id, ubicacion_original)
 
     def test_dar_entrada_dos_veces_falla(self):
         solicitud, recepcion = self._crear_recepcion_completa(cantidad='5.00')
@@ -764,27 +748,27 @@ class AdquisicionesAPITest(APITestCase):
 
         recepcion_db = RecepcionMaterial.objects.get(pk=recepcion['id'])
         self.assertFalse(recepcion_db.entrada_confirmada)
-        self.assertFalse(Producto.objects.filter(codigo='SM-NUEVO-MANGUERA').exists())
+        self.assertFalse(Producto.objects.filter(codigo='ALM-001').exists())
 
     def test_dar_entrada_con_datos_da_de_alta_el_producto_y_sube_stock(self):
         solicitud, recepcion = self._crear_recepcion_producto_nuevo(cantidad='3.00')
         item_recepcion_id = recepcion['items'][0]['id']
         categoria = CategoriaInventario.objects.first()
-        ubicacion = Ubicacion.objects.first()
+        ubicacion = Ubicacion.objects.get(nombre='almacen')
 
         self._auth(self.inventario)
         resp = self.client.post(
             f'/api/v1/inventario/solicitudes/{solicitud["id"]}/recepciones/{recepcion["id"]}/dar-entrada/',
             {
                 'ubicaciones': {item_recepcion_id: ubicacion.id},
-                'productos_nuevos': {item_recepcion_id: {'codigo': 'SM-NUEVO-MANGUERA', 'categoria': categoria.id}},
+                'productos_nuevos': {item_recepcion_id: {'codigo': 'ALM-001', 'categoria': categoria.id}},
             },
             format='json',
         )
         self.assertEqual(resp.status_code, status.HTTP_200_OK, resp.data)
         self.assertTrue(resp.data['entrada_confirmada'])
 
-        producto = Producto.objects.get(codigo='SM-NUEVO-MANGUERA')
+        producto = Producto.objects.get(codigo='ALM-001')
         self.assertEqual(producto.descripcion, 'Manguera de 1 pulgada')
         self.assertEqual(producto.categoria_id, categoria.id)
         self.assertEqual(producto.ubicacion_id, ubicacion.id)
@@ -1325,6 +1309,18 @@ class GrupoMaterialAPITest(APITestCase):
         )
         self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
 
+    def test_filtro_sin_grupo_oculta_productos_agrupados_y_el_grupo_cuenta_sus_productos(self):
+        self._auth(self.inventario)
+        resp = self.client.post('/api/v1/inventario/grupos-material/', {
+            'nombre': 'Freezer', 'producto_ids': [self.p1.id],
+        }, format='json')
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED, resp.data)
+        self.assertEqual(resp.data['total_productos'], 1)
+        resp = self.client.get('/api/v1/inventario/productos/', {'sin_grupo': 'true', 'activo': 'true'})
+        ids = [p['id'] for p in resp.data]
+        self.assertNotIn(self.p1.id, ids)
+        self.assertIn(self.p2.id, ids)
+
     def test_filtrar_productos_por_grupo(self):
         grupo = GrupoMaterial.objects.create(nombre='Grupo', ubicacion=self.ubicacion_a, creado_por=self.inventario)
         self.p1.grupo = grupo
@@ -1600,12 +1596,17 @@ class SiguienteCodigoAPITest(APITestCase):
     def _auth(self, user):
         self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
 
-    def test_sugiere_siguiente_codigo_tras_el_mas_alto(self):
+    def test_sugiere_siguiente_codigo_de_la_ubicacion(self):
+        hangar = Ubicacion.objects.get(nombre='hangar')
+        alacena = Ubicacion.objects.get(nombre='alacena')
         Producto.objects.create(
-            codigo='SM-900', descripcion='Producto tope',
-            categoria=CategoriaInventario.objects.first(), ubicacion=Ubicacion.objects.first(),
+            codigo='HNG-009', descripcion='Producto tope',
+            categoria=CategoriaInventario.objects.first(), ubicacion=hangar,
         )
         self._auth(self.inventario)
-        resp = self.client.get('/api/v1/inventario/productos/siguiente-codigo/')
+        resp = self.client.get(f'/api/v1/inventario/productos/siguiente-codigo/?ubicacion={hangar.id}')
         self.assertEqual(resp.status_code, status.HTTP_200_OK)
-        self.assertEqual(resp.data['siguiente_codigo'], 'SM-901')
+        self.assertEqual(resp.data['siguiente_codigo'], 'HNG-010')
+        # Cada ubicación lleva su propia serie.
+        resp = self.client.get(f'/api/v1/inventario/productos/siguiente-codigo/?ubicacion={alacena.id}')
+        self.assertEqual(resp.data['siguiente_codigo'], 'AL-001')

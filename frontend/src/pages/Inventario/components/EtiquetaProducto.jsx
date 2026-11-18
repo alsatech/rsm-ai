@@ -86,7 +86,7 @@ async function generarPngEtiqueta({ imagenUrl, esQr, codigo, descripcion, ubicac
   return canvas.toDataURL('image/png')
 }
 
-// Genera una etiqueta con el código QR del producto (a partir de su código actual, ej. SM-001)
+// Genera una etiqueta con el código QR del producto (a partir de su código actual, ej. ALM-001)
 // para imprimir y pegar en el bote/anaquel — sin esto, el escáner de SalidaFacil.jsx no tiene
 // nada físico que leer todavía.
 export default function EtiquetaProducto({ producto, onCerrar }) {

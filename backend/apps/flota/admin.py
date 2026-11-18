@@ -7,6 +7,8 @@ from .models import (
     CambioAceite,
     ChecklistVehiculo,
     FotoChecklist,
+    FotoMantenimiento,
+    MantenimientoTraila,
     Vehiculo,
 )
 
@@ -58,3 +60,17 @@ class CambioAceiteAdmin(admin.ModelAdmin):
     list_filter = ('estado', 'vehiculo')
     search_fields = ('vehiculo__nombre',)
     raw_id_fields = ('vehiculo', 'registrado_por')
+
+
+class FotoMantenimientoInline(admin.TabularInline):
+    model = FotoMantenimiento
+    extra = 0
+    raw_id_fields = ('uploaded_by',)
+
+
+@admin.register(MantenimientoTraila)
+class MantenimientoTrailaAdmin(admin.ModelAdmin):
+    list_display = ('vehiculo', 'responsable', 'fecha_hora')
+    list_filter = ('vehiculo',)
+    raw_id_fields = ('vehiculo', 'responsable')
+    inlines = [FotoMantenimientoInline]

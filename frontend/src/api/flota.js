@@ -50,3 +50,10 @@ export const crearCambioAceite = (data) => api.post('/api/v1/flota/cambios-aceit
 export const getIncidencias = (params) => api.get('/api/v1/flota/incidencias/', { params })
 
 export const getResumenFlota = () => api.get('/api/v1/flota/resumen/')
+
+// Mantenimiento de trailas — formData trae `vehiculo` y uno o más `fotos`.
+export const getMantenimientos = (params) => api.get('/api/v1/flota/mantenimientos/', { params })
+export const crearMantenimiento = (formData) =>
+  api.post('/api/v1/flota/mantenimientos/', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })

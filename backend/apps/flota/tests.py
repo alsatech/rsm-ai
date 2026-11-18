@@ -9,7 +9,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.users.models import User
 
-from .models import AdvertenciaChecklist, AlertaFlota, CambioAceite, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AdvertenciaChecklist, AlertaFlota, CambioAceite, ChecklistVehiculo, FotoChecklist, MantenimientoTraila, Vehiculo
 from .tasks import revisar_alertas_flota
 
 TOTAL_VEHICULOS_PRECARGADOS = 20
@@ -817,3 +817,45 @@ class CambioAceiteTaskTest(TestCase):
         self.assertFalse(
             AlertaFlota.objects.filter(vehiculo=moto, tipo=AlertaFlota.Tipo.CAMBIO_ACEITE).exists()
         )
+
+
+class MantenimientoTrailaAPITest(APITestCase):
+    def setUp(self):
+        self.campo = crear_usuario('campo_mtto', 'campo')
+        self.inventario = crear_usuario('inv_mtto', 'inventario')
+        self.traila = Vehiculo.objects.create(
+            nombre='Traila Mtto Test', tipo=Vehiculo.Tipo.TRAILA, marca='Fabricada', modelo='4x5',
+            kilometraje_actual=0,
+        )
+        self.camioneta = crear_vehiculo(nombre='Camioneta Mtto Test')
+
+    def _post(self, user, vehiculo, n_fotos=2):
+        self.client.credentials(HTTP_AUTHORIZATION=f'Bearer {token(user)}')
+        data = {'vehiculo': vehiculo.id, 'fotos': [imagen_test() for _ in range(n_fotos)]}
+        return self.client.post('/api/v1/flota/mantenimientos/', data, format='multipart')
+
+    def test_crea_mantenimiento_con_fotos_y_responsable(self):
+        resp = self._post(self.campo, self.traila)
+        self.assertEqual(resp.status_code, status.HTTP_201_CREATED)
+        self.assertEqual(resp.data['responsable'], self.campo.id)
+        self.assertEqual(len(resp.data['fotos']), 2)
+        self.assertEqual(MantenimientoTraila.objects.count(), 1)
+
+    def test_sin_fotos_es_rechazado(self):
+        resp = self._post(self.campo, self.traila, n_fotos=0)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertEqual(MantenimientoTraila.objects.count(), 0)
+
+    def test_solo_aplica_a_trailas(self):
+        resp = self._post(self.campo, self.camioneta)
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_rol_sin_permiso_no_puede_crear(self):
+        resp = self._post(self.inventario, self.traila)
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_lista_filtra_por_vehiculo(self):
+        self._post(self.campo, self.traila)
+        resp = self.client.get(f'/api/v1/flota/mantenimientos/?vehiculo={self.traila.id}')
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(len(resp.data), 1)

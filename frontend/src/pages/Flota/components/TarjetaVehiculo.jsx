@@ -9,7 +9,7 @@ function formatFechaHora(fechaHora) {
 
 // Vista en lista — thumbnail pequeño (mismo tamaño que el ícono de respaldo).
 // La foto grande se muestra al entrar al detalle del vehículo.
-export default function TarjetaVehiculo({ vehiculo, onVerDetalle, onNuevoChecklist, puedeCrearChecklist }) {
+export default function TarjetaVehiculo({ vehiculo, onVerDetalle, onNuevoChecklist, onNuevoMantenimiento, puedeCrearChecklist }) {
   const estadoConfig = ESTADO_VEHICULO_CONFIG[vehiculo.estado] ?? ESTADO_VEHICULO_CONFIG.activo
   const ultimo = vehiculo.ultimo_checklist
   const unidad = unidadMedicion(vehiculo.tipo)
@@ -77,6 +77,17 @@ export default function TarjetaVehiculo({ vehiculo, onVerDetalle, onNuevoCheckli
           )}
         </div>
       </button>
+
+      {puedeCrearChecklist && esTraila(vehiculo.tipo) && (
+        <button
+          type="button"
+          onClick={onNuevoMantenimiento}
+          style={{ minHeight: '48px' }}
+          className="flota-cta-primary shrink-0 rounded-xl px-4 py-2.5 text-sm"
+        >
+          🔧 Mantenimiento
+        </button>
+      )}
 
       {puedeCrearChecklist && !esTraila(vehiculo.tipo) && (
         <button

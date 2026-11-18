@@ -17,11 +17,11 @@ import { useToast } from '../../../hooks/useToast'
 import { ESTADO_STOCK_CONFIG, UBICACION_ICONS, UBICACION_LABELS, UNIDAD_LABELS, estadoStock } from '../constants'
 import AgruparMateriales from './AgruparMateriales'
 import EntradaRapida from './EntradaRapida'
+import AgregarAGrupo from './AgregarAGrupo'
 import EtiquetaGrupo from './EtiquetaGrupo'
 import EtiquetaProducto from './EtiquetaProducto'
 import EtiquetasUbicacion from './EtiquetasUbicacion'
 import FormularioProducto from './FormularioProducto'
-import TransferirProducto from './TransferirProducto'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -48,17 +48,23 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
   const [mostrarAgrupar, setMostrarAgrupar] = useState(false)
   const [grupoParaEditar, setGrupoParaEditar] = useState(null)
   const [grupoParaEtiqueta, setGrupoParaEtiqueta] = useState(null)
+  const [grupoParaAgregar, setGrupoParaAgregar] = useState(null)
   const [mostrarEntradaRapida, setMostrarEntradaRapida] = useState(false)
-  const [productoParaTransferir, setProductoParaTransferir] = useState(null)
 
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeDarEntrada = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeRegistrarMovimiento = user?.rol !== 'operaciones'
 
+  // Vista principal (sin filtros ni búsqueda): los materiales que ya están en un grupo no se
+  // listan sueltos, se ven dentro de su grupo (una tarjeta por grupo). Con búsqueda o filtros sí
+  // se muestran todos, para que un material agrupado siga siendo fácil de encontrar.
+  const vistaJerarquica = !grupo && !busqueda && !categoria && !estadoFiltro
+
   const cargar = useCallback(async () => {
     setLoading(true)
     try {
       const params = { activo: true }
+      if (vistaJerarquica) params.sin_grupo = true
       if (categoria) params.categoria = categoria
       if (ubicacion) params.ubicacion = ubicacion
       if (grupo) params.grupo = grupo
@@ -77,7 +83,7 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
       setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoria, ubicacion, grupo, busqueda])
+  }, [categoria, ubicacion, grupo, busqueda, estadoFiltro])
 
   useEffect(() => { cargar() }, [cargar, recargar])
 
@@ -109,12 +115,22 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
   }
 
   const handleGrupoGuardado = (grupoGuardado) => {
-    const eraCreacion = !grupoParaEditar
+    const eraCreacion = !grupoParaEditar && !grupoParaAgregar
     setMostrarAgrupar(false)
     setGrupoParaEditar(null)
+    setGrupoParaAgregar(null)
     cargar()
     onProductoCreado?.()
     if (eraCreacion) setGrupoParaEtiqueta(grupoGuardado)
+  }
+
+  const abrirAgregarAGrupo = async (grupoId) => {
+    try {
+      const { data } = await getGrupoMaterial(grupoId)
+      setGrupoParaAgregar(data)
+    } catch {
+      showToast('No se pudo cargar el grupo.', 'error')
+    }
   }
 
   const handleEliminarProducto = async (producto) => {
@@ -138,12 +154,6 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
 
   const handleEntradaRapidaGuardada = () => {
     setMostrarEntradaRapida(false)
-    cargar()
-    onProductoCreado?.()
-  }
-
-  const handleTransferenciaGuardada = () => {
-    setProductoParaTransferir(null)
     cargar()
     onProductoCreado?.()
   }
@@ -235,13 +245,22 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
             <p className="text-xs text-text-secondary">{productosFiltrados.length} resultado{productosFiltrados.length !== 1 ? 's' : ''}</p>
           </div>
           {grupoActivo && puedeGestionarCatalogo && (
-            <button
-              type="button"
-              onClick={() => abrirEdicionGrupo(grupoActivo.id)}
-              className="ml-auto flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
-            >
-              ✏️ Editar grupo
-            </button>
+            <div className="ml-auto flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => abrirAgregarAGrupo(grupoActivo.id)}
+                className="flex items-center gap-1 rounded-xl bg-accent px-3 py-2 text-sm font-bold text-highlight transition hover:opacity-90"
+              >
+                ➕ Agregar productos
+              </button>
+              <button
+                type="button"
+                onClick={() => abrirEdicionGrupo(grupoActivo.id)}
+                className="flex items-center gap-1 rounded-xl border border-border px-3 py-2 text-sm font-semibold text-text-secondary transition hover:border-accent hover:text-text"
+              >
+                ✏️ Editar grupo
+              </button>
+            </div>
           )}
         </div>
       </header>
@@ -325,7 +344,30 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
 
         {loading && <p className="text-center text-sm text-text-secondary">Cargando productos…</p>}
 
-        {!loading && productosFiltrados.length === 0 && (
+        {!loading && vistaJerarquica && grupos.length > 0 && (
+          <div className="mb-3 flex flex-col gap-3">
+            {grupos.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                onClick={() => setGrupo(String(g.id))}
+                className="flex items-center justify-between gap-3 rounded-2xl border border-accent/60 bg-card p-4 text-left transition hover:border-highlight"
+              >
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-text">🏷️ {g.nombre}</p>
+                  <p className="text-xs text-text-secondary">
+                    Grupo · {UBICACION_LABELS[g.ubicacion_detalle?.nombre] ?? g.ubicacion_detalle?.nombre_display}
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-full border border-border px-3 py-1 text-xs font-bold text-highlight">
+                  {g.total_productos} material{g.total_productos !== 1 ? 'es' : ''} ›
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!loading && productosFiltrados.length === 0 && !(vistaJerarquica && grupos.length > 0) && (
           <div className="mt-12 flex flex-col items-center gap-3 text-center">
             <span className="text-5xl">📦</span>
             <p className="text-text-secondary">No se encontraron productos.</p>
@@ -390,17 +432,6 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
                           className="rounded-xl border border-border px-3 text-sm transition hover:border-accent"
                         >
                           ✏️
-                        </button>
-                      )}
-                      {puedeGestionarCatalogo && (
-                        <button
-                          type="button"
-                          onClick={() => setProductoParaTransferir(producto)}
-                          aria-label="Transferir a otra ubicación"
-                          style={{ minHeight: '44px', minWidth: '44px' }}
-                          className="rounded-xl border border-border px-3 text-sm transition hover:border-accent"
-                        >
-                          🔄
                         </button>
                       )}
                       {puedeGestionarCatalogo && (
@@ -474,6 +505,14 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
         />
       )}
 
+      {grupoParaAgregar && (
+        <AgregarAGrupo
+          grupo={grupoParaAgregar}
+          onGuardado={handleGrupoGuardado}
+          onCerrar={() => setGrupoParaAgregar(null)}
+        />
+      )}
+
       {grupoParaEtiqueta && (
         <EtiquetaGrupo grupo={grupoParaEtiqueta} onCerrar={() => setGrupoParaEtiqueta(null)} />
       )}
@@ -486,14 +525,6 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
         />
       )}
 
-      {productoParaTransferir && (
-        <TransferirProducto
-          producto={productoParaTransferir}
-          ubicaciones={ubicaciones}
-          onGuardado={handleTransferenciaGuardada}
-          onCerrar={() => setProductoParaTransferir(null)}
-        />
-      )}
     </div>
   )
 }

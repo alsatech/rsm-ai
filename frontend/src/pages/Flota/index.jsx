@@ -6,6 +6,7 @@ import { useAuth } from '../../hooks/useAuth'
 import DashboardFlota from './components/DashboardFlota'
 import DetalleVehiculo from './components/DetalleVehiculo'
 import FlotaLayout from './components/FlotaLayout'
+import FormularioMantenimiento from './components/FormularioMantenimiento'
 import HistorialIncidencias from './components/HistorialIncidencias'
 import VistaAlertas from './components/VistaAlertas'
 import WizardChecklist from './components/WizardChecklist'
@@ -44,6 +45,11 @@ export default function Flota() {
     setVista('nuevo-checklist')
   }
 
+  const handleNuevoMantenimiento = (vehiculo) => {
+    setVehiculoPreseleccionado(vehiculo)
+    setVista('nuevo-mantenimiento')
+  }
+
   const handleVolver = () => {
     setVista('dashboard')
     setVehiculoId(null)
@@ -70,12 +76,22 @@ export default function Flota() {
     )
   }
 
+  if (vista === 'nuevo-mantenimiento' && vehiculoPreseleccionado) {
+    return (
+      <FormularioMantenimiento
+        vehiculo={vehiculoPreseleccionado}
+        onVolver={handleVolver}
+        onGuardado={handleGuardado}
+      />
+    )
+  }
+
   if (vista === 'detalle' && vehiculoId) {
     // DetalleVehiculo ya tiene su propio header visual interno. Para no duplicar,
     // lo renderizamos sin header externo (FlotaLayout solo provee fondo + contenedores).
     return (
       <FlotaLayout>
-        <DetalleVehiculo id={vehiculoId} onVolver={handleVolver} onNuevoChecklist={handleNuevoChecklist} />
+        <DetalleVehiculo id={vehiculoId} onVolver={handleVolver} onNuevoChecklist={handleNuevoChecklist} onNuevoMantenimiento={handleNuevoMantenimiento} recargar={recargar} />
       </FlotaLayout>
     )
   }
@@ -151,6 +167,7 @@ export default function Flota() {
         recargar={recargar}
         onVerVehiculo={handleVerVehiculo}
         onNuevoChecklist={handleNuevoChecklist}
+        onNuevoMantenimiento={handleNuevoMantenimiento}
         onVerSinValidar={() => setVista('alertas')}
         onVerIncidencias={() => setVista('incidencias')}
         onVehiculoCreado={() => setRecargar((r) => r + 1)}

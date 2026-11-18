@@ -217,6 +217,14 @@ class AvanceProyectoListCreateView(generics.ListCreateAPIView):
         for foto in fotos:
             FotoAvance.objects.create(avance=avance, foto=foto, uploaded_by=request.user)
 
+        # Al llegar al 100% el proyecto pasa solo a Completado.
+        if avance.porcentaje >= 100 and proyecto.estado not in (
+            Proyecto.Estado.COMPLETADO, Proyecto.Estado.CANCELADO,
+        ):
+            proyecto.estado = Proyecto.Estado.COMPLETADO
+            proyecto.fecha_fin_real = avance.fecha_avance
+            proyecto.save(update_fields=['estado', 'fecha_fin_real', 'updated_at'])
+
         return Response(self.get_serializer(avance).data, status=status.HTTP_201_CREATED)
 
 

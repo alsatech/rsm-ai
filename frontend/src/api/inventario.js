@@ -6,7 +6,7 @@ export const createProducto = (data) => api.post('/api/v1/inventario/productos/'
 export const updateProducto = (id, data) => api.patch(`/api/v1/inventario/productos/${id}/`, data)
 export const deleteProducto = (id) => api.delete(`/api/v1/inventario/productos/${id}/`)
 export const reactivarProducto = (id) => api.post(`/api/v1/inventario/productos/${id}/reactivar/`)
-export const getSiguienteCodigoProducto = () => api.get('/api/v1/inventario/productos/siguiente-codigo/')
+export const getSiguienteCodigoProducto = (ubicacion) => api.get('/api/v1/inventario/productos/siguiente-codigo/', { params: { ubicacion } })
 export const ajustarStockProducto = (id, data) => api.post(`/api/v1/inventario/productos/${id}/ajustar-stock/`, data)
 export const getGeneradoresInventario = () => api.get('/api/v1/inventario/generadores/')
 export const getMovimientosProducto = (id) => api.get(`/api/v1/inventario/productos/${id}/movimientos/`)
@@ -20,7 +20,6 @@ export const createMovimiento = (data) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   })
 export const registrarEntradaRapida = (data) => api.post('/api/v1/inventario/movimientos/entrada-rapida/', data)
-export const transferirProducto = (id, data) => api.post(`/api/v1/inventario/productos/${id}/transferir/`, data)
 export const cancelarMovimiento = (id, data) => api.patch(`/api/v1/inventario/movimientos/${id}/cancelar/`, data)
 export const cerrarResguardo = (id, data) =>
   api.patch(`/api/v1/inventario/movimientos/${id}/cerrar-resguardo/`, data)

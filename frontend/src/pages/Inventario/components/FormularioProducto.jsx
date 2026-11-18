@@ -49,16 +49,18 @@ export default function FormularioProducto({ producto, categorias, ubicaciones, 
   const [ajustando, setAjustando] = useState(false)
   const [stockActual, setStockActual] = useState(producto?.stock_actual ?? 0)
 
+  // Cada ubicación tiene su propia serie (AL-001, HNG-001…): al elegir o cambiar la ubicación
+  // se vuelve a pedir el siguiente código, salvo que Yajaira ya lo haya escrito a mano.
   useEffect(() => {
-    if (esEdicion) return
-    getSiguienteCodigoProducto()
+    if (esEdicion || !form.ubicacion) return
+    getSiguienteCodigoProducto(form.ubicacion)
       .then(({ data }) => {
+        setForm((prev) => (prev.codigo && prev.codigo !== codigoSugerido ? prev : { ...prev, codigo: data.siguiente_codigo }))
         setCodigoSugerido(data.siguiente_codigo)
-        setForm((prev) => (prev.codigo ? prev : { ...prev, codigo: data.siguiente_codigo }))
       })
       .catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [form.ubicacion])
 
   const handleChange = (campo) => (e) => setForm((prev) => ({ ...prev, [campo]: e.target.value }))
 
@@ -105,9 +107,9 @@ export default function FormularioProducto({ producto, categorias, ubicaciones, 
               </p>
             ) : (
               <>
-                <input id="codigo" required value={form.codigo} onChange={handleChange('codigo')} className={inputClass} placeholder="Ej: SM-200" />
+                <input id="codigo" required value={form.codigo} onChange={handleChange('codigo')} className={inputClass} placeholder="Ej: ALM-001" />
                 {codigoSugerido && (
-                  <p className="mt-1 text-xs text-text-secondary">Último código del catálogo: siguiente sugerido {codigoSugerido}.</p>
+                  <p className="mt-1 text-xs text-text-secondary">Siguiente código de esta ubicación: {codigoSugerido}.</p>
                 )}
               </>
             )}
@@ -176,7 +178,7 @@ export default function FormularioProducto({ producto, categorias, ubicaciones, 
             </div>
             <div>
               <label className={labelClass} htmlFor="ubicacion">Ubicación *</label>
-              <select id="ubicacion" required value={form.ubicacion} onChange={handleChange('ubicacion')} className={inputClass}>
+              <select id="ubicacion" required disabled={esEdicion} value={form.ubicacion} onChange={handleChange('ubicacion')} className={inputClass}>
                 {ubicaciones.map((u) => (
                   <option key={u.id} value={u.id}>{UBICACION_LABELS[u.nombre] ?? u.nombre_display}</option>
                 ))}

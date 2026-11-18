@@ -9,12 +9,15 @@ from .models import (
     CambioAceite,
     ChecklistVehiculo,
     FotoChecklist,
+    FotoMantenimiento,
+    MantenimientoTraila,
     Vehiculo,
 )
 
 User = get_user_model()
 
 MAX_FOTOS = 12
+MANTENIMIENTO_MAX_FOTOS = MAX_FOTOS
 
 
 class UsuarioResumenSerializer(serializers.ModelSerializer):
@@ -382,3 +385,31 @@ class CambioAceiteSerializer(serializers.ModelSerializer):
             'observaciones', 'registrado_por', 'registrado_por_detalle', 'created_at',
         )
         read_only_fields = ('id', 'registrado_por', 'created_at')
+
+
+class FotoMantenimientoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FotoMantenimiento
+        fields = ('id', 'foto', 'created_at')
+        read_only_fields = fields
+
+
+class MantenimientoTrailaSerializer(serializers.ModelSerializer):
+    """Lectura del mantenimiento. La creación (con fotos) la arma la vista en una sola
+    petición multipart: `vehiculo` + `fotos` (1 a MAX_FOTOS archivos)."""
+
+    vehiculo = serializers.PrimaryKeyRelatedField(
+        queryset=Vehiculo.objects.filter(tipo=Vehiculo.Tipo.TRAILA),
+        error_messages={'does_not_exist': 'El mantenimiento solo aplica a trailas.'},
+    )
+    vehiculo_nombre = serializers.CharField(source='vehiculo.nombre', read_only=True)
+    responsable_detalle = UsuarioResumenSerializer(source='responsable', read_only=True)
+    fotos = FotoMantenimientoSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = MantenimientoTraila
+        fields = (
+            'id', 'vehiculo', 'vehiculo_nombre', 'responsable', 'responsable_detalle',
+            'fecha_hora', 'fotos', 'created_at',
+        )
+        read_only_fields = ('id', 'responsable', 'fecha_hora', 'created_at')

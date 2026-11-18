@@ -358,26 +358,6 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                           className="mt-2 h-16 w-16 rounded-lg border border-border object-cover"
                         />
                       )}
-                      {!rec.entrada_confirmada && item.item_solicitud_detalle?.producto_detalle && (
-                        <label className="mt-2 flex flex-col gap-1 text-xs text-text-secondary">
-                          📍 Ubicación de entrada
-                          <select
-                            value={ubicacionPorItem[item.id] ?? ''}
-                            onChange={(e) =>
-                              setUbicacionPorItem((actual) => ({ ...actual, [item.id]: e.target.value }))
-                            }
-                            style={{ minHeight: '44px' }}
-                            className="rounded-lg border border-border bg-bg px-2 text-sm text-text"
-                          >
-                            {ubicaciones.map((u) => (
-                              <option key={u.id} value={u.id}>
-                                {u.nombre_display}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-
                       {!rec.entrada_confirmada && !item.item_solicitud_detalle?.producto_detalle && (
                         <div className="mt-2 flex flex-col gap-2 rounded-lg border border-warning/40 bg-warning/10 p-2">
                           <p className="text-xs font-semibold text-warning">
@@ -394,7 +374,7 @@ export default function DetalleSolicitud({ solicitudId, onVolver, onAbrirCompra,
                                     [item.id]: { ...actual[item.id], codigo: e.target.value },
                                   }))
                                 }
-                                placeholder="Ej: SM-200"
+                                placeholder="Ej: ALM-001 (según la ubicación)"
                                 style={{ minHeight: '44px' }}
                                 className="rounded-lg border border-border bg-bg px-2 text-sm text-text"
                               />

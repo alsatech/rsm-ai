@@ -38,7 +38,7 @@ export default function AgruparMateriales({ grupoExistente, onGuardado, onCerrar
     }
     setBuscando(true)
     const timeout = setTimeout(() => {
-      const params = { q: busqueda, activo: true }
+      const params = { q: busqueda, activo: true, sin_grupo: true }
       if (ubicacionBloqueadaId) params.ubicacion = ubicacionBloqueadaId
       getProductos(params)
         .then(({ data }) => {

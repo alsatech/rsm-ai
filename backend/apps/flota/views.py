@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
@@ -6,7 +7,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import AlertaFlota, AudioChecklist, CambioAceite, ChecklistVehiculo, FotoChecklist, Vehiculo
+from .models import AlertaFlota, AudioChecklist, CambioAceite, ChecklistVehiculo, FotoChecklist, FotoMantenimiento, MantenimientoTraila, Vehiculo
 from .permissions import (
     PuedeCrearChecklist,
     PuedeEliminarVehiculo,
@@ -23,6 +24,8 @@ from .serializers import (
     CambioAceiteSerializer,
     ChecklistVehiculoSerializer,
     FotoChecklistSerializer,
+    MANTENIMIENTO_MAX_FOTOS,
+    MantenimientoTrailaSerializer,
     ResolverAlertaSerializer,
     SalidaRelacionadaSerializer,
     ValidarChecklistSerializer,
@@ -372,3 +375,39 @@ class IncidenciaListView(APIView):
 
         serializer = ChecklistVehiculoSerializer(qs, many=True, context={'request': request})
         return Response(serializer.data)
+
+
+class MantenimientoTrailaListCreateView(generics.ListCreateAPIView):
+    """GET /mantenimientos/?vehiculo=<id> · POST multipart: `vehiculo` + `fotos` (1+ archivos)."""
+    serializer_class = MantenimientoTrailaSerializer
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            return [IsAuthenticated(), PuedeCrearChecklist()]
+        return [IsAuthenticated()]
+
+    def get_queryset(self):
+        qs = MantenimientoTraila.objects.select_related('vehiculo', 'responsable').prefetch_related('fotos')
+        vehiculo = self.request.query_params.get('vehiculo')
+        if vehiculo:
+            qs = qs.filter(vehiculo_id=vehiculo)
+        return qs
+
+    def create(self, request, *args, **kwargs):
+        archivos = request.FILES.getlist('fotos')
+        if not archivos:
+            return Response({'fotos': ['Sube al menos una foto del mantenimiento.']}, status=status.HTTP_400_BAD_REQUEST)
+        if len(archivos) > MANTENIMIENTO_MAX_FOTOS:
+            return Response(
+                {'fotos': [f'El máximo es de {MANTENIMIENTO_MAX_FOTOS} fotos por mantenimiento.']},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = self.get_serializer(data={'vehiculo': request.data.get('vehiculo')})
+        serializer.is_valid(raise_exception=True)
+        with transaction.atomic():
+            mantenimiento = serializer.save(responsable=request.user)
+            for archivo in archivos:
+                foto = FotoMantenimiento(mantenimiento=mantenimiento, foto=archivo, uploaded_by=request.user)
+                foto.full_clean()  # valida que sea una imagen real
+                foto.save()
+        return Response(self.get_serializer(mantenimiento).data, status=status.HTTP_201_CREATED)

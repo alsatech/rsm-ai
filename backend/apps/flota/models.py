@@ -306,6 +306,46 @@ class FotoChecklist(models.Model):
         return f'Foto — {self.checklist}'
 
 
+class MantenimientoTraila(models.Model):
+    """Mantenimiento de una traila — mismo esquema que el checklist pero solo con
+    fotos de evidencia y el responsable (quien hizo/registró el mantenimiento)."""
+
+    vehiculo = models.ForeignKey(
+        Vehiculo,
+        on_delete=models.PROTECT,
+        related_name='mantenimientos',
+        limit_choices_to={'tipo': Vehiculo.Tipo.TRAILA},
+    )
+    responsable = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT, related_name='mantenimientos_traila'
+    )
+    fecha_hora = models.DateTimeField(default=timezone.now)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-fecha_hora']
+        verbose_name = 'Mantenimiento de traila'
+        verbose_name_plural = 'Mantenimientos de trailas'
+
+    def __str__(self):
+        return f'Mantenimiento — {self.vehiculo.nombre} ({self.fecha_hora:%Y-%m-%d})'
+
+
+class FotoMantenimiento(models.Model):
+    mantenimiento = models.ForeignKey(MantenimientoTraila, on_delete=models.CASCADE, related_name='fotos')
+    foto = models.ImageField(upload_to='flota/mantenimientos/%Y/%m/')
+    uploaded_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        verbose_name = 'Foto de mantenimiento'
+        verbose_name_plural = 'Fotos de mantenimiento'
+
+    def __str__(self):
+        return f'Foto — {self.mantenimiento}'
+
+
 class AudioChecklist(models.Model):
     """Nota de voz estilo WhatsApp adjunta a un checklist.
 

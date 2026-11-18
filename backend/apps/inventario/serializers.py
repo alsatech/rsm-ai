@@ -127,6 +127,21 @@ class ProductoSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(mensaje_codigo_duplicado(existente))
         return value
 
+    def validate(self, attrs):
+        if self.instance is not None:
+            ubicacion = attrs.get('ubicacion')
+            if ubicacion is not None and ubicacion.pk != self.instance.ubicacion_id:
+                raise serializers.ValidationError(
+                    {'ubicacion': 'Un producto no puede cambiar de ubicación; da de alta uno nuevo en la otra.'}
+                )
+            return attrs
+        ubicacion, codigo = attrs.get('ubicacion'), attrs.get('codigo')
+        if ubicacion is not None and codigo and not ubicacion.codigo_valido(codigo):
+            raise serializers.ValidationError(
+                {'codigo': f'El código de {ubicacion} debe tener el formato {ubicacion.prefijo}-001.'}
+            )
+        return attrs
+
     def get_valor_stock(self, obj):
         return obj.stock_actual * obj.costo_unitario
 
@@ -145,14 +160,18 @@ class GrupoMaterialSerializer(serializers.ModelSerializer):
     producto_ids = serializers.PrimaryKeyRelatedField(
         source='productos', queryset=Producto.objects.all(), many=True, write_only=True,
     )
+    total_productos = serializers.SerializerMethodField()
 
     class Meta:
         model = GrupoMaterial
         fields = (
-            'id', 'nombre', 'ubicacion', 'ubicacion_detalle', 'productos', 'producto_ids',
+            'id', 'nombre', 'ubicacion', 'ubicacion_detalle', 'productos', 'producto_ids', 'total_productos',
             'creado_por', 'creado_por_detalle', 'created_at', 'updated_at',
         )
         read_only_fields = ('id', 'ubicacion', 'creado_por', 'created_at', 'updated_at')
+
+    def get_total_productos(self, obj):
+        return sum(1 for p in obj.productos.all() if p.activo)
 
     def validate_producto_ids(self, value):
         if not value:

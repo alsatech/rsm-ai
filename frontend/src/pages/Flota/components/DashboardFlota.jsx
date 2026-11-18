@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import { createVehiculo, getAlertasFlota, getResumenFlota, getVehiculos } from '../../../api/flota'
 import { useAuth } from '../../../hooks/useAuth'
 import { useToast } from '../../../hooks/useToast'
+import { TIPO_ICONOS, TIPO_LABELS } from '../constants'
 import FormularioVehiculo from './FormularioVehiculo'
 import PanelAlertas from './PanelAlertas'
 import TarjetaVehiculo from './TarjetaVehiculo'
 
-export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoChecklist, onVerSinValidar, onVerIncidencias, onVehiculoCreado }) {
+export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoChecklist, onNuevoMantenimiento, onVerSinValidar, onVerIncidencias, onVehiculoCreado }) {
   const { user } = useAuth()
   const { showToast } = useToast()
   const [vehiculos, setVehiculos] = useState([])
@@ -18,6 +19,25 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
   const [error, setError] = useState('')
   const [mostrarFormulario, setMostrarFormulario] = useState(false)
   const [guardando, setGuardando] = useState(false)
+  const [colapsados, setColapsados] = useState({})
+
+  const grupos = useMemo(() => {
+    const orden = Object.keys(TIPO_LABELS)
+    const mapa = {}
+    vehiculos.forEach((v) => {
+      const tipo = TIPO_LABELS[v.tipo] ? v.tipo : 'otro'
+      ;(mapa[tipo] ??= []).push(v)
+    })
+    return orden
+      .filter((tipo) => mapa[tipo]?.length)
+      .map((tipo) => ({
+        tipo,
+        items: mapa[tipo],
+        alertas: mapa[tipo].reduce((n, v) => n + (v.alertas_activas_count || 0), 0),
+      }))
+  }, [vehiculos])
+
+  const toggleGrupo = (tipo) => setColapsados((prev) => ({ ...prev, [tipo]: !prev[tipo] }))
 
   const puedeCrearChecklist = ['campo', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeGestionarVehiculo = ['operaciones', 'superadmin'].includes(user?.rol)
@@ -105,16 +125,50 @@ export default function DashboardFlota({ recargar, onVerVehiculo, onNuevoCheckli
         )}
 
         {!loading && !error && vehiculos.length > 0 && (
-          <div className="flex flex-col gap-2.5">
-            {vehiculos.map((vehiculo) => (
-              <TarjetaVehiculo
-                key={vehiculo.id}
-                vehiculo={vehiculo}
-                puedeCrearChecklist={puedeCrearChecklist}
-                onVerDetalle={() => onVerVehiculo(vehiculo.id)}
-                onNuevoChecklist={() => onNuevoChecklist(vehiculo)}
-              />
-            ))}
+          <div className="flex flex-col gap-5">
+            {grupos.map(({ tipo, items, alertas: nAlertas }) => {
+              const abierto = !colapsados[tipo]
+              return (
+                <section key={tipo}>
+                  <button
+                    type="button"
+                    onClick={() => toggleGrupo(tipo)}
+                    aria-expanded={abierto}
+                    style={{ minHeight: '48px' }}
+                    className="mb-2 flex w-full items-center gap-2 rounded-xl px-1 text-left"
+                  >
+                    <span className="text-xl">{TIPO_ICONOS[tipo]}</span>
+                    <h2 className="text-sm font-bold uppercase tracking-wide text-flotafg">
+                      {TIPO_LABELS[tipo]}
+                    </h2>
+                    <span className="rounded-full bg-flotabg/70 px-2 py-0.5 text-xs font-semibold text-flotafg-muted">
+                      {items.length}
+                    </span>
+                    {nAlertas > 0 && (
+                      <span className="rounded-full bg-error px-2 py-0.5 text-[11px] font-bold text-white">
+                        ⚠ {nAlertas}
+                      </span>
+                    )}
+                    <span className="h-px flex-1 bg-flotafg-muted/20" />
+                    <span className={`text-flotafg-muted transition-transform ${abierto ? 'rotate-90' : ''}`}>›</span>
+                  </button>
+                  {abierto && (
+                    <div className="flex flex-col gap-2.5">
+                      {items.map((vehiculo) => (
+                        <TarjetaVehiculo
+                          key={vehiculo.id}
+                          vehiculo={vehiculo}
+                          puedeCrearChecklist={puedeCrearChecklist}
+                          onVerDetalle={() => onVerVehiculo(vehiculo.id)}
+                          onNuevoChecklist={() => onNuevoChecklist(vehiculo)}
+                          onNuevoMantenimiento={() => onNuevoMantenimiento(vehiculo)}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </section>
+              )
+            })}
           </div>
         )}
       </div>

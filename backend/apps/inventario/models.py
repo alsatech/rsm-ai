@@ -1,3 +1,4 @@
+import re
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
@@ -31,6 +32,20 @@ class Ubicacion(models.Model):
         TALLER = 'taller', 'Taller'
         PATIO_YARDA = 'patio_yarda', 'Patio/Yarda'
 
+    # Cada ubicación tiene su propia serie de códigos (ej. AL-001, HNG-001). El código de un
+    # producto ya no cambia de ubicación: no existen traslados entre ubicaciones.
+    PREFIJOS = {
+        'alacena': 'AL',
+        'almacen': 'ALM',
+        'bodega_nueva': 'BN',
+        'granero': 'GR',
+        'hangar': 'HNG',
+        'oficina_ca': 'OC',
+        'oficina_reserva': 'OR',
+        'taller': 'TAL',
+        'patio_yarda': 'PY',
+    }
+
     nombre = models.CharField(max_length=20, choices=Nombre.choices, unique=True)
     descripcion = models.TextField(blank=True)
 
@@ -41,6 +56,23 @@ class Ubicacion(models.Model):
 
     def __str__(self):
         return self.get_nombre_display()
+
+    @property
+    def prefijo(self):
+        return self.PREFIJOS.get(self.nombre)
+
+    def siguiente_codigo(self):
+        """Siguiente código libre de la serie de esta ubicación (ej. 'AL-004')."""
+        patron = re.compile(rf'^{re.escape(self.prefijo)}-(\d+)$', re.IGNORECASE)
+        mayor = 0
+        for codigo in Producto.objects.filter(ubicacion=self).values_list('codigo', flat=True):
+            match = patron.match(codigo.strip())
+            if match:
+                mayor = max(mayor, int(match.group(1)))
+        return f'{self.prefijo}-{mayor + 1:03d}'
+
+    def codigo_valido(self, codigo):
+        return bool(self.prefijo) and bool(re.match(rf'^{re.escape(self.prefijo)}-\d{{3,}}$', codigo.strip()))
 
 
 class GrupoMaterial(models.Model):
