@@ -52,7 +52,7 @@ from .permissions import (
     PuedeVerReportesCompletos,
     ROLES_REPORTES_COMPLETOS,
 )
-from .reportes import generar_pdf_reporte_diario
+from .reportes import generar_pdf_lista_compras, generar_pdf_reporte_diario
 from .serializers import (
     AutorizarSolicitudSerializer,
     CancelarMovimientoSerializer,
@@ -450,6 +450,36 @@ class ReporteDiarioView(APIView):
         pdf_bytes = generar_pdf_reporte_diario(fecha, request)
         response = HttpResponse(pdf_bytes, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="reporte_inventario_{fecha.isoformat()}.pdf"'
+        return response
+
+
+class ListaComprasView(APIView):
+    """GET /lista-compras/?desde=YYYY-MM-DD&hasta=YYYY-MM-DD — PDF de lo que hay que comprar en
+    Alacena (stock mínimo − existencia al cierre de `hasta`). Si falta `hasta`, usa hoy; si falta
+    `desde`, usa `hasta` (un solo día)."""
+    permission_classes = [IsAuthenticated, PuedeVerReportesCompletos]
+
+    def get(self, request):
+        hoy = timezone.localdate()
+        errores = {}
+        valores = {}
+        for campo, defecto in (('hasta', hoy), ('desde', None)):
+            crudo = request.query_params.get(campo)
+            if crudo:
+                valores[campo] = parse_date(crudo)
+                if valores[campo] is None:
+                    errores[campo] = 'Fecha inválida, usa formato YYYY-MM-DD.'
+            else:
+                valores[campo] = defecto
+        if errores:
+            return Response(errores, status=status.HTTP_400_BAD_REQUEST)
+        hasta = valores['hasta']
+        desde = valores['desde'] or hasta
+        if desde > hasta:
+            return Response({'desde': 'La fecha inicial no puede ser posterior a la final.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        response = HttpResponse(generar_pdf_lista_compras(desde, hasta), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="lista_compras_alacena_{desde.isoformat()}_{hasta.isoformat()}.pdf"'
         return response
 
 

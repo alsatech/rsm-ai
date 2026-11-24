@@ -466,6 +466,44 @@ class InventarioAPITest(APITestCase):
         self.assertIn('reporte_inventario_2026-08-26.pdf', resp['Content-Disposition'])
         self.assertTrue(resp.content.startswith(b'%PDF'))
 
+    def test_lista_compras_requiere_permiso(self):
+        self._auth(self.campo)
+        resp = self.client.get('/api/v1/inventario/lista-compras/')
+        self.assertEqual(resp.status_code, status.HTTP_403_FORBIDDEN)
+
+    def test_lista_compras_genera_pdf(self):
+        self._auth(self.inventario)
+        resp = self.client.get('/api/v1/inventario/lista-compras/', {'desde': '2026-11-01', 'hasta': '2026-11-15'})
+        self.assertEqual(resp.status_code, status.HTTP_200_OK)
+        self.assertEqual(resp['Content-Type'], 'application/pdf')
+        self.assertTrue(resp.content.startswith(b'%PDF'))
+
+    def test_lista_compras_rechaza_rango_invertido(self):
+        self._auth(self.inventario)
+        resp = self.client.get('/api/v1/inventario/lista-compras/', {'desde': '2026-11-15', 'hasta': '2026-11-01'})
+        self.assertEqual(resp.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_calculo_lista_compras_alacena(self):
+        from datetime import date
+
+        from .reportes import calcular_lista_compras
+
+        alacena = Ubicacion.objects.get(nombre='alacena')
+        leche = crear_producto('AL-T01', stock_actual=9, stock_minimo=10, ubicacion=alacena)
+        crear_producto('AL-T02', stock_actual=10, stock_minimo=10, ubicacion=alacena)  # completo: no sale
+        crear_producto('ALM-T01', stock_actual=0, stock_minimo=5, ubicacion=Ubicacion.objects.get(nombre='almacen'))  # otra ubicación: no sale
+        # Salida posterior al corte: al 10/11 la existencia era 12, no 9.
+        MovimientoInventario.objects.create(
+            producto=leche, tipo='salida', cantidad='3.00', stock_anterior=12, stock_resultante=9,
+            responsable=self.inventario, fecha_movimiento=date(2026, 11, 12),
+        )
+        filas = calcular_lista_compras(date(2026, 11, 1), date(2026, 11, 10))
+        self.assertEqual(filas, [])  # al 10/11 había 12 >= 10
+        filas = calcular_lista_compras(date(2026, 11, 1), date(2026, 11, 12))
+        self.assertEqual([f['codigo'] for f in filas], ['AL-T01'])
+        self.assertEqual(filas[0]['comprar'], 1)
+        self.assertEqual(filas[0]['consumo'], 3)
+
     def test_todos_los_roles_ven_productos(self):
         for user in (self.campo, self.inventario, self.operaciones, self.admin, self.superadmin):
             self._auth(user)

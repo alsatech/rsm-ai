@@ -160,3 +160,90 @@ def generar_pdf_reporte_diario(fecha, request):
 
     doc.build(story)
     return buffer.getvalue()
+
+
+def _fmt(valor):
+    """Cantidad sin ceros de relleno: 9.00 -> 9, 2.50 -> 2.5."""
+    texto = f'{valor:f}'
+    return texto.rstrip('0').rstrip('.') if '.' in texto else texto
+
+
+def calcular_lista_compras(desde, hasta):
+    """Alacena: lo que hay que comprar para volver al stock (stock_minimo).
+
+    La existencia es la que había al cierre de `hasta`: se parte de stock_actual y se revierte
+    el efecto de los movimientos posteriores (los cancelados ya se revirtieron, se ignoran).
+    `consumo` son las salidas del rango desde–hasta."""
+    productos = Producto.objects.filter(
+        activo=True, ubicacion__nombre='alacena', stock_minimo__gt=0,
+    ).order_by('codigo')
+
+    posteriores = {}
+    for mov in MovimientoInventario.objects.filter(
+        producto__in=productos, fecha_movimiento__gt=hasta, rechazado=False,
+    ).only('producto_id', 'stock_anterior', 'stock_resultante'):
+        posteriores[mov.producto_id] = posteriores.get(mov.producto_id, 0) + (mov.stock_resultante - mov.stock_anterior)
+
+    consumos = dict(
+        MovimientoInventario.objects.filter(
+            producto__in=productos, tipo=MovimientoInventario.Tipo.SALIDA, rechazado=False,
+            fecha_movimiento__gte=desde, fecha_movimiento__lte=hasta,
+        ).values_list('producto_id').annotate(total=models.Sum('cantidad')).values_list('producto_id', 'total')
+    )
+
+    filas = []
+    for p in productos:
+        existencia = p.stock_actual - posteriores.get(p.id, 0)
+        comprar = p.stock_minimo - existencia
+        if comprar > 0:
+            filas.append({
+                'codigo': p.codigo, 'descripcion': p.descripcion, 'existencia': existencia,
+                'stock': p.stock_minimo, 'comprar': comprar, 'consumo': consumos.get(p.id, 0),
+            })
+    return filas
+
+
+def generar_pdf_lista_compras(desde, hasta):
+    filas = calcular_lista_compras(desde, hasta)
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        topMargin=1.5 * cm, bottomMargin=1.5 * cm, leftMargin=1.5 * cm, rightMargin=1.5 * cm,
+    )
+    periodo = (
+        desde.strftime('%d/%m/%Y') if desde == hasta
+        else f'{desde.strftime("%d/%m/%Y")} al {hasta.strftime("%d/%m/%Y")}'
+    )
+    story = [
+        Paragraph('Reserva Santa Margarita', _TITULO),
+        Paragraph(f'Lista de compras — Alacena — {periodo}', _STYLES['Heading3']),
+        Paragraph(f'Existencias al cierre del {hasta.strftime("%d/%m/%Y")}.', _VACIO),
+        Spacer(1, 0.3 * cm),
+    ]
+    if not filas:
+        story.append(Paragraph('Todo está en stock, no hay nada por comprar.', _VACIO))
+    else:
+        data = [[Paragraph(f'<font color="white"><b>{t}</b></font>', _CELDA) for t in ('Código', 'Descripción', 'Existencia', 'Stock', 'Consumo', 'Comprar')]]
+        data += [
+            [
+                _p(f['codigo']), _p(f['descripcion']), _p(_fmt(f['existencia'])), _p(_fmt(f['stock'])),
+                _p(_fmt(f['consumo'])), Paragraph(f'<b>{_fmt(f["comprar"])}</b>', _CELDA),
+            ]
+            for f in filas
+        ]
+        tabla = Table(data, colWidths=[2.3 * cm, 7 * cm, 2.2 * cm, 2 * cm, 2.2 * cm, 2.2 * cm], repeatRows=1)
+        estilo = TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#0f3347')),
+            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#999999')),
+            ('VALIGN', (0, 0), (-1, -1), 'MIDDLE'),
+            ('BACKGROUND', (5, 1), (5, -1), colors.HexColor('#ffff66')),
+        ])
+        for i, f in enumerate(filas, start=1):
+            if f['existencia'] <= 0:
+                estilo.add('BACKGROUND', (0, i), (-1, i), colors.HexColor('#ff4d4d'))
+        tabla.setStyle(estilo)
+        story.append(tabla)
+        story.append(Spacer(1, 0.3 * cm))
+        story.append(Paragraph(f'{len(filas)} producto(s) por comprar. Comprar = Stock − Existencia.', _VACIO))
+    doc.build(story)
+    return buffer.getvalue()

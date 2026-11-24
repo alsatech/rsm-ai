@@ -22,6 +22,7 @@ import EtiquetaGrupo from './EtiquetaGrupo'
 import EtiquetaProducto from './EtiquetaProducto'
 import EtiquetasUbicacion from './EtiquetasUbicacion'
 import FormularioProducto from './FormularioProducto'
+import ListaComprasAlacena from './ListaComprasAlacena'
 
 const inputClass =
   'w-full rounded-lg border border-border bg-bg px-4 py-3 text-base text-text outline-none focus:border-highlight'
@@ -50,6 +51,7 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
   const [grupoParaEtiqueta, setGrupoParaEtiqueta] = useState(null)
   const [grupoParaAgregar, setGrupoParaAgregar] = useState(null)
   const [mostrarEntradaRapida, setMostrarEntradaRapida] = useState(false)
+  const [mostrarListaCompras, setMostrarListaCompras] = useState(false)
 
   const puedeGestionarCatalogo = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
   const puedeDarEntrada = ['inventario', 'administrador', 'superadmin'].includes(user?.rol)
@@ -329,6 +331,16 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
             >
               🏷️ Agrupar materiales
             </button>
+            {ubicacionActiva?.nombre === 'alacena' && (
+              <button
+                type="button"
+                onClick={() => setMostrarListaCompras(true)}
+                style={{ minHeight: '52px' }}
+                className="flex-1 rounded-xl border border-accent px-6 text-sm font-bold text-highlight transition hover:bg-card sm:flex-none"
+              >
+                🛒 Lista de compras
+              </button>
+            )}
             {ubicacionActiva && productosFiltrados.length > 0 && (
               <button
                 type="button"
@@ -488,6 +500,8 @@ export default function ListaProductos({ ubicacionInicial, grupoInicial, recarga
       {productoParaEtiqueta && (
         <EtiquetaProducto producto={productoParaEtiqueta} onCerrar={() => setProductoParaEtiqueta(null)} />
       )}
+
+      {mostrarListaCompras && <ListaComprasAlacena onCerrar={() => setMostrarListaCompras(false)} />}
 
       {mostrarEtiquetasUbicacion && ubicacionActiva && (
         <EtiquetasUbicacion

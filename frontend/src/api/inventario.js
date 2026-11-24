@@ -36,6 +36,8 @@ export const getAlertasStock = () => api.get('/api/v1/inventario/alertas-stock/'
 export const getResumenInventario = () => api.get('/api/v1/inventario/resumen/')
 export const getReporteDiario = (params) =>
   api.get('/api/v1/inventario/reporte-diario/', { params, responseType: 'blob' })
+export const getListaCompras = (params) =>
+  api.get('/api/v1/inventario/lista-compras/', { params, responseType: 'blob' })
 
 // Adquisiciones — Protocolo de Adquisición, Recepción y Envío de Material (RSM, junio 2026)
 export const getSolicitudes = (params) => api.get('/api/v1/inventario/solicitudes/', { params })
